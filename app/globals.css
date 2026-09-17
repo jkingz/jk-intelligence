@@ -57,46 +57,48 @@
 
 :root {
   /* dark mode defaults */
-  --bg-base: #0f0f0f;
-  --bg-surface: #161618;
-  --bg-elevated: #1c1c1f;
-  --bg-subtle: #222226;
-  --border-default: #2c2c32;
-  --border-subtle: #3a3a42;
-  --text-primary: #f2f0ed;
-  --text-secondary: #b8b4ae;
-  --text-muted: #78746e;
-  --text-faint: #4a4742;
-  --accent-primary: #e8622a;
-  --accent-primary-dim: rgba(232, 98, 42, 0.12);
-  --accent-ai: #6457f9;
-  --accent-ai-text: #8b82ff;
-  --state-success: #34d399;
-  --state-error: #f87171;
-  --state-warning: #fbbf24;
-  --state-neutral: #94a3b8;
+  --bg-base: #141412;
+  --bg-surface: #1a1a17;
+  --bg-elevated: #232320;
+  --bg-subtle: #2a2a26;
+  --border-default: #32322d;
+  --border-subtle: #45453f;
+  --text-primary: #fafaf7;
+  --text-secondary: #c4c4ba;
+  --text-muted: #9a9a90;
+  --text-faint: #6f6f66;
+  --accent-primary: #c14a2c;
+  --accent-hover: #d4643f;
+  --accent-primary-dim: rgba(193, 74, 44, 0.14);
+  --accent-ai: #9a9a90;
+  --accent-ai-text: #c4c4ba;
+  --state-success: #8fbf5a;
+  --state-error: #f08e7d;
+  --state-warning: #f6c669;
+  --state-neutral: #6f6f66;
 }
 
 [data-theme="light"] {
   /* light mode overrides */
-  --bg-base: #f5f4f2;
-  --bg-surface: #ffffff;
-  --bg-elevated: #f0eeec;
-  --bg-subtle: #e8e6e3;
-  --border-default: #d6d3ce;
-  --border-subtle: #c4c0ba;
-  --text-primary: #1a1816;
-  --text-secondary: #4a4642;
-  --text-muted: #78746e;
-  --text-faint: #a8a49e;
-  --accent-primary: #d4521a;
-  --accent-primary-dim: rgba(212, 82, 26, 0.10);
-  --accent-ai: #5548e0;
-  --accent-ai-text: #6c63ff;
-  --state-success: #059669;
-  --state-error: #dc2626;
-  --state-warning: #d97706;
-  --state-neutral: #64748b;
+  --bg-base: #fafaf7;
+  --bg-surface: #f1f1ec;
+  --bg-elevated: #e5e5de;
+  --bg-subtle: #e5e5de;
+  --border-default: #e5e5de;
+  --border-subtle: #d8d8d0;
+  --text-primary: #141412;
+  --text-secondary: #45453f;
+  --text-muted: #6f6f66;
+  --text-faint: #9a9a90;
+  --accent-primary: #c14a2c;
+  --accent-hover: #a63d22;
+  --accent-primary-dim: rgba(193, 74, 44, 0.10);
+  --accent-ai: #9a9a90;
+  --accent-ai-text: #45453f;
+  --state-success: #6d9a3d;
+  --state-error: #d4543f;
+  --state-warning: #c99b32;
+  --state-neutral: #6f6f66;
 }
 
 @layer base {

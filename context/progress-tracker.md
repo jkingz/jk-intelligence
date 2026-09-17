@@ -9,7 +9,11 @@ Design System Implementation
 Implement design system and dashboard component
 
 ## Completed
-- Installed and configured shadcn/ui
+- Adapted theme palette from structurewebworks.com (warm charcoal ink scale, paper text, brick #c14a2c accent, olive/lime success, salmon error, warm amber warning) in `app/globals.css`
+- Added `--accent-hover` token; AI accent remapped to neutral grays (reference site has no AI accent)
+- Light mode rebuilt from reference paper/ink scale
+- Updated `context/ui-context.md` token tables to match
+- Verified successful build, lint, typecheck, and vitest run
 - Added shadcn components: Button, Card, Dialog, Input, Tabs, Textarea, ScrollArea
 - Installed lucide-react
 - Created lib/utils.ts with cn() helper for merging Tailwind classes
@@ -40,4 +44,4 @@ None
 - Applied shadcn/ui composition patterns (CardHeader/CardContent/CardFooter, etc.)
 
 ## Session Notes
-Successfully resolved the `react-hooks/set-state-in-effect` lint error and SSR prerendering compatibility. All checks (`eslint`, `tsc`, `next build`) pass cleanly with zero errors.
+Theme palette now mirrors structurewebworks.com tokens (`--ink-*`/`--paper-*`/`--brick-*` mapped onto project roles). Build, eslint, tsc, and vitest all pass. Visual toggle and browser screenshots unverified — no browser automation available locally.

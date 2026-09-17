@@ -2,7 +2,7 @@
 
 ## Theme
 
-Dark/light mode supported. Default: dark. Toggle via `data-theme` attribute on `<html>`. Visual language: deep charcoal surfaces, ember accent, clean data-dense reporting UI.
+Dark/light mode supported. Default: dark. Toggle via `data-theme` attribute on `<html>`. Visual language: warm charcoal surfaces, brick accent, paper text, clean data-dense reporting UI. Palette adapted from structurewebworks.com.
 
 All colors defined as CSS custom properties in `globals.css`, mapped to Tailwind via `@theme inline`. Components use tokens only — no hardcoded hex or raw Tailwind color classes like `zinc-*` or `slate-*`.
 
@@ -10,61 +10,63 @@ All colors defined as CSS custom properties in `globals.css`, mapped to Tailwind
 
 | Role | CSS Variable | Hex |
 |------|-------------|-----|
-| Page background | `--bg-base` | `#0f0f0f` |
-| Surface | `--bg-surface` | `#161618` |
-| Elevated surface | `--bg-elevated` | `#1c1c1f` |
-| Subtle surface | `--bg-subtle` | `#222226` |
-| Default border | `--border-default` | `#2c2c32` |
-| Subtle border | `--border-subtle` | `#3a3a42` |
-| Primary text | `--text-primary` | `#f2f0ed` |
-| Secondary text | `--text-secondary` | `#b8b4ae` |
-| Muted text | `--text-muted` | `#78746e` |
-| Faint text | `--text-faint` | `#4a4742` |
-| Brand accent (ember) | `--accent-primary` | `#e8622a` |
-| Brand dim | `--accent-primary-dim` | `rgba(232, 98, 42, 0.12)` |
-| AI accent | `--accent-ai` | `#6457f9` |
-| AI text | `--accent-ai-text` | `#8b82ff` |
-| Positive / up | `--state-success` | `#34d399` |
-| Negative / down | `--state-error` | `#f87171` |
-| Warning / stale | `--state-warning` | `#fbbf24` |
-| Neutral / flat | `--state-neutral` | `#94a3b8` |
+| Page background | `--bg-base` | `#141412` |
+| Surface | `--bg-surface` | `#1a1a17` |
+| Elevated surface | `--bg-elevated` | `#232320` |
+| Subtle surface | `--bg-subtle` | `#2a2a26` |
+| Default border | `--border-default` | `#32322d` |
+| Subtle border | `--border-subtle` | `#45453f` |
+| Primary text | `--text-primary` | `#fafaf7` |
+| Secondary text | `--text-secondary` | `#c4c4ba` |
+| Muted text | `--text-muted` | `#9a9a90` |
+| Faint text | `--text-faint` | `#6f6f66` |
+| Brand accent (brick) | `--accent-primary` | `#c14a2c` |
+| Brand hover | `--accent-hover` | `#d4643f` |
+| Brand dim | `--accent-primary-dim` | `rgba(193, 74, 44, 0.14)` |
+| AI accent | `--accent-ai` | `#9a9a90` |
+| AI text | `--accent-ai-text` | `#c4c4ba` |
+| Positive / up | `--state-success` | `#8fbf5a` |
+| Negative / down | `--state-error` | `#f08e7d` |
+| Warning / stale | `--state-warning` | `#f6c669` |
+| Neutral / flat | `--state-neutral` | `#6f6f66` |
 
 ### Light Mode Tokens
 
 | Role | CSS Variable | Hex |
 |------|-------------|-----|
-| Page background | `--bg-base` | `#f5f4f2` |
-| Surface | `--bg-surface` | `#ffffff` |
-| Elevated surface | `--bg-elevated` | `#f0eeec` |
-| Subtle surface | `--bg-subtle` | `#e8e6e3` |
-| Default border | `--border-default` | `#d6d3ce` |
-| Subtle border | `--border-subtle` | `#c4c0ba` |
-| Primary text | `--text-primary` | `#1a1816` |
-| Secondary text | `--text-secondary` | `#4a4642` |
-| Muted text | `--text-muted` | `#78746e` |
-| Faint text | `--text-faint` | `#a8a49e` |
-| Brand accent (ember) | `--accent-primary` | `#d4521a` |
-| Brand dim | `--accent-primary-dim` | `rgba(212, 82, 26, 0.10)` |
-| AI accent | `--accent-ai` | `#5548e0` |
-| AI text | `--accent-ai-text` | `#6c63ff` |
-| Positive / up | `--state-success` | `#059669` |
-| Negative / down | `--state-error` | `#dc2626` |
-| Warning / stale | `--state-warning` | `#d97706` |
-| Neutral / flat | `--state-neutral` | `#64748b` |
+| Page background | `--bg-base` | `#fafaf7` |
+| Surface | `--bg-surface` | `#f1f1ec` |
+| Elevated surface | `--bg-elevated` | `#e5e5de` |
+| Subtle surface | `--bg-subtle` | `#e5e5de` |
+| Default border | `--border-default` | `#e5e5de` |
+| Subtle border | `--border-subtle` | `#d8d8d0` |
+| Primary text | `--text-primary` | `#141412` |
+| Secondary text | `--text-secondary` | `#45453f` |
+| Muted text | `--text-muted` | `#6f6f66` |
+| Faint text | `--text-faint` | `#9a9a90` |
+| Brand accent (brick) | `--accent-primary` | `#c14a2c` |
+| Brand hover | `--accent-hover` | `#a63d22` |
+| Brand dim | `--accent-primary-dim` | `rgba(193, 74, 44, 0.10)` |
+| AI accent | `--accent-ai` | `#9a9a90` |
+| AI text | `--accent-ai-text` | `#45453f` |
+| Positive / up | `--state-success` | `#6d9a3d` |
+| Negative / down | `--state-error` | `#d4543f` |
+| Warning / stale | `--state-warning` | `#c99b32` |
+| Neutral / flat | `--state-neutral` | `#6f6f66` |
 
 ### globals.css Pattern
 
 ```css
 :root {
   /* dark mode defaults */
-  --bg-base: #0f0f0f;
-  --accent-primary: #e8622a;
+  --bg-base: #141412;
+  --accent-primary: #c14a2c;
   /* ... */
 }
 
 [data-theme="light"] {
-  --bg-base: #f5f4f2;
-  --accent-primary: #d4521a;
+  --bg-base: #fafaf7;
+  --accent-primary: #c14a2c;
   /* ... */
 }
 ```
