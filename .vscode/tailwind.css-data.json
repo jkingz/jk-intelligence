@@ -1,0 +1,57 @@
+{
+  "version": 1.1,
+  "atDirectives": [
+    {
+      "name": "@import",
+      "description": "Imports external stylesheets or Tailwind CSS packages into the stylesheet."
+    },
+    {
+      "name": "@custom-variant",
+      "description": "Tailwind CSS v4 directive that defines a custom variant."
+    },
+    {
+      "name": "@theme",
+      "description": "Tailwind CSS v4 directive that defines design tokens for utility generation."
+    },
+    {
+      "name": "@theme inline",
+      "description": "Tailwind CSS v4 directive that emits theme values inline instead of as CSS variables."
+    },
+    {
+      "name": "@apply",
+      "description": "Tailwind CSS directive that inlines existing utility classes as CSS declarations."
+    },
+    {
+      "name": "@layer",
+      "description": "CSS cascade layers at-rule, used by Tailwind for base, components, and utilities."
+    },
+    {
+      "name": "@utility",
+      "description": "Tailwind CSS v4 directive that defines a custom utility class."
+    },
+    {
+      "name": "@source",
+      "description": "Tailwind CSS v4 directive that registers additional content paths for class detection."
+    },
+    {
+      "name": "@config",
+      "description": "Tailwind CSS v4 directive that loads a legacy JavaScript configuration file."
+    },
+    {
+      "name": "@plugin",
+      "description": "Tailwind CSS v4 directive that loads a Tailwind JS plugin."
+    },
+    {
+      "name": "@variant",
+      "description": "Tailwind CSS v4 directive used inside @utility to apply variants to a custom utility."
+    },
+    {
+      "name": "@screen",
+      "description": "Legacy Tailwind directive for responsive breakpoints."
+    }
+  ],
+  "pseudoClasses": [
+    { "name": "dark", "description": "Custom dark variant targeting [data-theme=\"dark\"]." },
+    { "name": "light", "description": "Custom light variant targeting [data-theme=\"light\"]." }
+  ]
+}
