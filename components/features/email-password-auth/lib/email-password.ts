@@ -34,7 +34,7 @@ export async function submitEmailAuth(
 
   try {
     const supabase = createBrowserSupabaseClient();
-    const destination = safeNext(next) ?? "/";
+    const destination = safeNext(next) ?? "/dashboard";
 
     if (mode === "sign-in") {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password: input.password });

@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 import { z } from "zod";
 import { safeNext } from "@/lib/auth/routing";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -21,7 +23,7 @@ export async function GET(request: Request) {
     flowId: url.searchParams.get("sb_flow_id") ?? undefined,
   });
   if (!parsed.success) {
-    return Response.redirect(new URL("/auth/login?error=code", origin));
+    return NextResponse.redirect(new URL("/auth/login?error=code", origin));
   }
 
   try {
@@ -33,12 +35,17 @@ export async function GET(request: Request) {
     if (!error && data.session) {
       const destination = "redirectType" in data && data.redirectType === "recovery"
         ? "/auth/reset-password"
-        : safeNext(parsed.data.next) ?? "/";
-      return Response.redirect(new URL(destination, origin));
+        : safeNext(parsed.data.next) ?? "/dashboard";
+      const response = NextResponse.redirect(new URL(destination, origin));
+      const cookieStore = await cookies();
+      for (const cookie of cookieStore.getAll()) {
+        response.cookies.set(cookie);
+      }
+      return response;
     }
   } catch {
-    return Response.redirect(new URL("/auth/login?error=code", origin));
+    return NextResponse.redirect(new URL("/auth/login?error=code", origin));
   }
 
-  return Response.redirect(new URL("/auth/login?error=code", origin));
+  return NextResponse.redirect(new URL("/auth/login?error=code", origin));
 }

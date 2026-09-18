@@ -19,6 +19,14 @@ export type ProxyAction =
   | { type: "redirect-login"; next: string | undefined }
   | { type: "redirect-home" };
 
+const PROTECTED_PREFIXES = ["/dashboard", "/profile"];
+
+function isProtected(path: string): boolean {
+  return PROTECTED_PREFIXES.some(
+    (prefix) => path === prefix || path.startsWith(`${prefix}/`),
+  );
+}
+
 export function resolveProxyAction(path: string, hasSession: boolean): ProxyAction {
   if (path === "/auth/login") {
     return hasSession ? { type: "redirect-home" } : { type: "pass" };
@@ -26,8 +34,11 @@ export function resolveProxyAction(path: string, hasSession: boolean): ProxyActi
   if (path.startsWith("/auth/")) {
     return { type: "pass" };
   }
-  if (!hasSession) {
-    return { type: "redirect-login", next: path === "/" ? undefined : path };
+  if (path === "/") {
+    return hasSession ? { type: "redirect-home" } : { type: "pass" };
+  }
+  if (isProtected(path)) {
+    return hasSession ? { type: "pass" } : { type: "redirect-login", next: path };
   }
   return { type: "pass" };
 }

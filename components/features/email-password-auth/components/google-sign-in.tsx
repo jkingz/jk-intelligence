@@ -53,6 +53,7 @@ export function GoogleSignInButton({ next }: { next?: string }) {
     <Button
       type="button"
       size="lg"
+      variant="outline"
       className="h-10 w-full gap-2"
       onClick={handleSignIn}
       disabled={pending}

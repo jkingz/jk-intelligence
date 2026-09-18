@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { resolveProxyAction } from "@/lib/auth/routing";
 import { updateSession } from "@/lib/supabase/proxy";
 
+const HOME_PATH = "/dashboard";
+
 export default async function proxy(request: NextRequest) {
   const { response, user } = await updateSession(request);
   const action = resolveProxyAction(request.nextUrl.pathname, Boolean(user));
@@ -13,12 +15,12 @@ export default async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone();
 
   if (action.type === "redirect-home") {
-    url.pathname = "/";
+    url.pathname = HOME_PATH;
     url.search = "";
   } else {
     url.pathname = "/auth/login";
     url.search = "";
-    url.searchParams.set("next", action.next ?? "/");
+    url.searchParams.set("next", action.next ?? HOME_PATH);
   }
 
   const redirect = NextResponse.redirect(url);

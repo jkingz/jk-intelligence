@@ -46,6 +46,23 @@
   --color-state-error: var(--state-error);
   --color-state-warning: var(--state-warning);
   --color-state-neutral: var(--state-neutral);
+
+  --color-landing-bg: var(--landing-bg);
+  --color-landing-surface: var(--landing-surface);
+  --color-landing-surface-2: var(--landing-surface-2);
+  --color-landing-border: var(--landing-border);
+  --color-landing-text: var(--landing-text);
+  --color-landing-muted: var(--landing-muted);
+  --color-landing-faint: var(--landing-faint);
+  --color-landing-accent: var(--landing-accent);
+  --color-landing-sky: var(--landing-sky);
+  --color-landing-lilac: var(--landing-lilac);
+  --color-landing-blue: var(--landing-blue);
+
+  --animate-landing-fade-in: landing-fade-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-landing-fade-down: landing-fade-down 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-landing-scale-in: landing-scale-in 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
@@ -75,6 +92,19 @@
   --state-error: #f08e7d;
   --state-warning: #f6c669;
   --state-neutral: #6f6f66;
+
+  /* uploadthing-inspired landing palette (always dark) — updated: orange/black scheme */
+  --landing-bg: #050201;
+  --landing-surface: #191c21;
+  --landing-surface-2: #232830;
+  --landing-border: #2a2f38;
+  --landing-text: #ffffff;
+  --landing-muted: #a6aeb8;
+  --landing-faint: #6e7682;
+  --landing-accent: #ea580c;
+  --landing-sky: #ff9e5e;
+  --landing-lilac: #f2b88d;
+  --landing-blue: #95a5b8;
 }
 
 [data-theme="light"] {
@@ -173,6 +203,26 @@
 @keyframes vt-fade-out {
   to {
     opacity: 0;
+  }
+}
+
+@keyframes landing-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes landing-fade-down {
+  from {
+    opacity: 0;
+    transform: translateY(-0.75rem);
+  }
+}
+
+@keyframes landing-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
   }
 }
 

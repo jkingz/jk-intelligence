@@ -2,6 +2,10 @@
 
 Multi-client SEO reporting platform built with Next.js, TypeScript, Supabase, and shadcn/ui. Product scope and implementation status live in [context](context/project-overview.md) and the [progress tracker](context/progress-tracker.md).
 
+## Architecture
+
+![JK Intelligence architecture](docs/architecture.svg)
+
 ## Development
 
 Requires Node.js >=22.9 and pnpm >=10 (see `package.json`).

@@ -195,6 +195,17 @@ Dashboard section switches (Overview / Queries / AI Citation) use React's `<View
 - All `::view-transition-*` animations are disabled under `prefers-reduced-motion: reduce`; no JS reduced-motion branch is needed for these.
 - Keep this as the *one* navigational motion moment; do not also add `motion` transitions to the same panels.
 
+## Landing Page (`/`, marketing) & Auth Pages
+
+Landing palette — always dark, independent of `data-theme`. Active tokens: `landing-bg` `#050201`, `landing-surface` `#191c21`, `landing-surface-2` `#232830`, `landing-border` `#2a2f38`, landing text `#ffffff` / `#a6aeb8` / `#6e7682`, accent `#ea580c`, tints `#ff9e5e` (light orange), `#f2b88d` (warm), `#95a5b8` (neutral).
+
+- Used solely on the landing page (hero glow, metric-card cards, icon chips); the app surfaces keep the structured tokens above.
+- Entrance animations, uploadthing-style: `animate-landing-fade-in` (opacity), `animate-landing-fade-down` (opacity + −y), `animate-landing-scale-in` (opacity + scale) — gated `motion-safe:` so `prefers-reduced-motion` receives final state. Delays via inline `animation-delay` for the metric grid.
+- Hero backdrop: two decorative `radial-gradient` glows (sky top-center, mint lower-left) — `aria-hidden` + `pointer-events-none`; layout unaffected.
+- No CTA buttons and no footer on the landing page (removed per request); single header text link to `/auth/login`.
+- `SiteHeader` / `SiteFooter` (`components/features/landing/`) are shared page chrome with a `tone` prop: `"landing"` (landing palette) or `"default"` (app tokens). Auth pages wrap in `AuthPageShell` (header + centered `AuthCard` + footer, app tokens + full-height layout) — also on forgot/reset pages.
+- Auth pages use one `AuthFlow` client component (`email-password-auth`): the sign-in and sign-up forms share a card and flip in place with a motion crossfade (`AnimatePresence mode="wait"`), fields stay email + password, `Continue with Google` (outline) sits below the divider under the fields. Login/sign-up pages are chrome-less (`AuthPageShell chrome={false}`) — no site header/footer; a "Back to home" link (left, aligned with "Forgot your password?" on the right) heads back to `/`. Forgot/reset pages keep the header/footer chrome.
+
 ## Charts & Data Viz
 
 - Library: Recharts (already in stack).

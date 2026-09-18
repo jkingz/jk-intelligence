@@ -18,22 +18,27 @@ describe("resolveProxyAction", () => {
     });
   });
 
-  it("sends unauthenticated users to login, remembering the target path", () => {
-    expect(resolveProxyAction("/admin", false)).toEqual({
-      type: "redirect-login",
-      next: "/admin",
-    });
+  it("passes the public landing route to anonymous users", () => {
+    expect(resolveProxyAction("/", false)).toEqual({ type: "pass" });
   });
 
-  it("uses no next target for the root route", () => {
-    expect(resolveProxyAction("/", false)).toEqual({
+  it("redirects authenticated users away from the landing route", () => {
+    expect(resolveProxyAction("/", true)).toEqual({ type: "redirect-home" });
+  });
+
+  it("sends unauthenticated users to login, remembering the target path", () => {
+    expect(resolveProxyAction("/dashboard", false)).toEqual({
       type: "redirect-login",
-      next: undefined,
+      next: "/dashboard",
+    });
+    expect(resolveProxyAction("/profile", false)).toEqual({
+      type: "redirect-login",
+      next: "/profile",
     });
   });
 
   it("passes protected routes for authenticated users", () => {
-    expect(resolveProxyAction("/", true)).toEqual({ type: "pass" });
-    expect(resolveProxyAction("/admin", true)).toEqual({ type: "pass" });
+    expect(resolveProxyAction("/dashboard", true)).toEqual({ type: "pass" });
+    expect(resolveProxyAction("/profile", true)).toEqual({ type: "pass" });
   });
 });
