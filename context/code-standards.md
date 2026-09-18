@@ -52,7 +52,7 @@ const data: any = await fetchGSC()
 ## Security Headers
 
 - `next.config.ts` owns the `Content-Security-Policy` (non-nonce) and applies it to every route; keep `proxy.ts` auth-only.
-- Trusted Types are enforced in production (`require-trusted-types-for 'script'; trusted-types nextjs`). Do not enforce them in development — React's `eval`-based stack reconstruction and Turbopack's HMR script loader assign raw strings to script sinks; dev sends the directives on `Content-Security-Policy-Report-Only` instead.
+- Trusted Types are **not** enforced via `require-trusted-types-for` — the Next.js client router re-creates head `<script>`/`<link>` elements on route transitions and React DOM parses scripts through an HTML sink (`div.innerHTML = "<script></script>"`), so enforcing the directive blocks client-side navigation in production ("This document requires 'TrustedHTML'/'TrustedScriptURL' assignment"). Production and dev send only `trusted-types nextjs` on the enforced policy (defense in depth against injected `createPolicy` calls); dev additionally carries `require-trusted-types-for 'script'` on `Content-Security-Policy-Report-Only` for observability.
 - `trusted-types` must list `nextjs` — the policy Next.js creates in `next/dist/client/trusted-types.js`.
 - `connect-src` is dev-wide (`ws: wss: https:`) and production-scoped (`https://*.supabase.co wss://*.supabase.co`). Any new external origin (APIs, fonts, images) must be added to the matching directive in `next.config.ts`.
 

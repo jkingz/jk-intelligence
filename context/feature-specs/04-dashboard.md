@@ -33,7 +33,7 @@ Hook extraction, mock-data ownership changes, additional tests, and live-data in
 
 ## Trusted Types CSP Increment
 - Own the `Content-Security-Policy` in `next.config.ts` for every route (non-nonce, per the Next.js CSP guide); `proxy.ts` stays auth-only.
-- Enforce `require-trusted-types-for 'script'; trusted-types nextjs` in production. In development, enforce the base policy but carry the Trusted Types directives on `Content-Security-Policy-Report-Only`, because React dev `eval` and Turbopack HMR violate enforced Trusted Types.
+- Do **not** enforce `require-trusted-types-for` — Next's client router re-creates head `<script>`/`<link>` elements on route transitions and React DOM parses `<script>` through an HTML sink, so enforcement produces "This document requires 'TrustedHTML' assignment. The action has been blocked" and breaks client-side navigation (reproduced in production build: navigating login → sign-up). Send `trusted-types nextjs` on the enforced production CSP and keep `require-trusted-types-for 'script'` on `Content-Security-Policy-Report-Only` in development only.
 - `connect-src`: dev-wide (`ws: wss: https:`), production-scoped (`https://*.supabase.co wss://*.supabase.co`).
 - Scope: `next.config.ts` only. No application code creates a policy — Next's built-in `nextjs` policy covers it.
 

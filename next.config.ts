@@ -17,26 +17,30 @@ const baseDirectives = [
     : "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
 ];
 
-// React's dev runtime (eval-based stack reconstruction) and Turbopack's HMR
-// script loader assign raw strings to script sinks, so Trusted Types cannot be
-// enforced in development. Report violations instead; enforce in production.
-const trustedTypesDirectives = [
-  "require-trusted-types-for 'script'",
-  "trusted-types nextjs",
-];
+// Trusted Types enforcement (`require-trusted-types-for 'script'`) is not
+// viable: the Next.js client router re-creates head <script>/<link> elements on
+// route transitions, and React DOM parses scripts through an HTML sink
+// (`div.innerHTML = "<script></script>"`) and assigns script.src. Enforcing the
+// directive blocks those sinks and breaks client-side navigation in production
+// ("This document requires 'TrustedHTML'/'TrustedScriptURL' assignment").
+// Keep only the narrow `trusted-types nextjs` policy allowlist (defense in
+// depth against injected `createPolicy` calls); do not require sink types.
+// Development separately observes the blocked-by-enforcement cases in
+// report-only mode.
+const trustedTypesDirective = "trusted-types nextjs";
 
 const securityHeaders = isDev
   ? [
       { key: "Content-Security-Policy", value: baseDirectives.join("; ") },
       {
         key: "Content-Security-Policy-Report-Only",
-        value: trustedTypesDirectives.join("; "),
+        value: ["require-trusted-types-for 'script'", trustedTypesDirective].join("; "),
       },
     ]
   : [
       {
         key: "Content-Security-Policy",
-        value: [...baseDirectives, ...trustedTypesDirectives].join("; "),
+        value: [...baseDirectives, trustedTypesDirective].join("; "),
       },
     ];
 
