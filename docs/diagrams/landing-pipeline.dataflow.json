@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "From client accounts to performance insights",
+    "output": "docs/diagrams/landing-pipeline.html",
+    "viewBox": [
+      1080,
+      520
+    ],
+    "quality_profile": "showcase"
+  },
+  "stages": [
+    {
+      "label": "Sources"
+    },
+    {
+      "label": "Daily sync"
+    },
+    {
+      "label": "Store"
+    },
+    {
+      "label": "Insights"
+    },
+    {
+      "label": "Dashboards"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "gsc",
+      "type": "external",
+      "label": "Google Search Console",
+      "sublabel": "clicks · positions",
+      "stage": 0,
+      "row": 0,
+      "width": 150
+    },
+    {
+      "id": "ga4",
+      "type": "external",
+      "label": "GA4",
+      "sublabel": "traffic · conversions",
+      "stage": 0,
+      "row": 1
+    },
+    {
+      "id": "seo",
+      "type": "external",
+      "label": "SEO platform",
+      "sublabel": "keyword rankings",
+      "stage": 0,
+      "row": 2
+    },
+    {
+      "id": "sync",
+      "type": "backend",
+      "label": "Sync Agent",
+      "sublabel": "2 AM · retries",
+      "stage": 1,
+      "row": 1
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "Supabase",
+      "sublabel": "Postgres + current cache",
+      "stage": 2,
+      "row": 1
+    },
+    {
+      "id": "ai",
+      "type": "backend",
+      "label": "AI Brief",
+      "sublabel": "Claude · daily",
+      "stage": 3,
+      "row": 0
+    },
+    {
+      "id": "dash",
+      "type": "frontend",
+      "label": "Client dashboard",
+      "sublabel": "role-based reads",
+      "stage": 4,
+      "row": 1
+    }
+  ],
+  "flows": [
+    {
+      "from": "gsc",
+      "to": "sync",
+      "label": "organic metrics",
+      "variant": "default",
+      "fromSide": "right",
+      "toSide": "top",
+      "via": [
+        [
+          315,
+          157
+        ],
+        [
+          315,
+          225
+        ]
+      ]
+    },
+    {
+      "from": "ga4",
+      "to": "sync",
+      "label": "traffic metrics",
+      "variant": "default"
+    },
+    {
+      "from": "seo",
+      "to": "sync",
+      "label": "rankings",
+      "variant": "default",
+      "fromSide": "right",
+      "toSide": "bottom",
+      "via": [
+        [
+          315,
+          385
+        ],
+        [
+          315,
+          310
+        ]
+      ]
+    },
+    {
+      "from": "sync",
+      "to": "db",
+      "label": "normalized rows",
+      "variant": "emphasis"
+    },
+    {
+      "from": "db",
+      "to": "ai",
+      "label": "30-day window",
+      "variant": "default"
+    },
+    {
+      "from": "db",
+      "to": "dash",
+      "label": "cached metrics",
+      "variant": "default"
+    },
+    {
+      "from": "ai",
+      "to": "dash",
+      "label": "plain-English brief",
+      "variant": "emphasis"
+    }
+  ]
+}

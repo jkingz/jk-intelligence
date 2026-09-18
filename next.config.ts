@@ -45,6 +45,15 @@ const securityHeaders = isDev
     ];
 
 const nextConfig: NextConfig = {
+  images: {
+    // Only self-authored, script-free SVGs in this repo (Archify exports). SVG
+    // is served unoptimized (vector, lossless) but `dangerouslyAllowSVG` is
+    // still required for `next/image` to accept the source, and the CSP below
+    // blocks any script inside the SVG from executing.
+    dangerouslyAllowSVG: true,
+    contentDispositionType: "inline",
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+  },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

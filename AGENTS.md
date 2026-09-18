@@ -18,6 +18,8 @@ Read the following files in order before implementing or making any architectura
 5. `context/ai-workflow-rules.md` — development workflow, scoping rules, and delivery approach
 6. `context/progress-tracker.md` — current phase, completed work, open questions, and next steps
 
+Project-wide convention: all images use `next/image` (`Image`), never a raw `<img>` element (enforced by `@next/next/no-img-element`). SVG sources are allowed for self-authored, script-free assets only. Details in `context/code-standards.md` → "Images".
+
 Update `context/progress-tracker.md` after each meaningful implementation change.
 
 If implementation changes the architecture, scope, or standards documented in the context files, update the relevant file before continuing.

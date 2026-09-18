@@ -56,6 +56,13 @@ const data: any = await fetchGSC()
 - `trusted-types` must list `nextjs` — the policy Next.js creates in `next/dist/client/trusted-types.js`.
 - `connect-src` is dev-wide (`ws: wss: https:`) and production-scoped (`https://*.supabase.co wss://*.supabase.co`). Any new external origin (APIs, fonts, images) must be added to the matching directive in `next.config.ts`.
 
+## Images
+
+- Use `next/image` (`Image`) for every image project-wide. Never use a raw `<img>` element — the `@next/next/no-img-element` lint rule enforces this.
+- For known-SVG sources, `next/image` automatically sets `unoptimized` (vector, lossless); this repo allows SVGs via `images.dangerouslyAllowSVG` in `next.config.ts`, paired with `contentDispositionType: "inline"` and a CSP that blocks embedded scripts (`default-src 'self'; script-src 'none'; sandbox;`). Only point this at self-authored, script-free SVGs (e.g. Archify exports).
+- Always pass explicit `width`/`height` (the asset's natural dimensions) so Next can reserve layout space; pair with `sizes` or responsive classes (`h-auto w-full`) for fluid scaling.
+- New external image origins must be added to `images.remotePatterns` in `next.config.ts` AND to `img-src` in the CSP.
+
 ## Styling
 
 - Use CSS custom property tokens defined in `globals.css` — no raw Tailwind color classes like `zinc-*` or hardcoded hex values.

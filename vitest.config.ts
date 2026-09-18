@@ -6,5 +6,14 @@ export default defineConfig({
     alias: { "@": fileURLToPath(new URL(".", import.meta.url)) },
     conditions: ["react-server"],
   },
-  test: { environment: "node", clearMocks: true },
+  test: {
+    environment: "node",
+    clearMocks: true,
+    exclude: [
+      "**/node_modules/**",
+      "**/.agents/**",
+      "**/.claude/**",
+      "**/.playwright/**",
+    ],
+  },
 });

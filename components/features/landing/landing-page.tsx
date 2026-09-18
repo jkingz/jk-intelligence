@@ -1,11 +1,16 @@
+import Image from "next/image";
+import Link from "next/link";
 import {
   BarChart3,
   TrendingUp,
   Sparkles,
   RefreshCw,
   ShieldCheck,
+  ArrowRight,
 } from "lucide-react";
 import { Reveal } from "@/components/features/landing/reveal";
+import { StaggerReveal } from "@/components/features/landing/stagger-reveal";
+import { LandingFooter } from "@/components/features/landing/landing-footer";
 import { SiteHeader } from "@/components/features/landing/site-header";
 
 const features = [
@@ -72,11 +77,11 @@ export function LandingPage() {
         <section className="relative overflow-hidden">
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 top-0 h-96 bg-[radial-gradient(60%_50%_at_50%_0%,rgba(173,215,255,0.14),transparent_70%)]"
+            className="pointer-events-none absolute inset-x-0 top-0 h-96 bg-[radial-gradient(60%_50%_at_50%_0%,rgba(234,88,12,0.14),transparent_70%)]"
           />
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 top-40 h-80 bg-[radial-gradient(40%_50%_at_20%_0%,rgba(93,228,199,0.1),transparent_70%)]"
+            className="pointer-events-none absolute inset-x-0 top-40 h-80 bg-[radial-gradient(40%_50%_at_20%_0%,rgba(255,158,94,0.1),transparent_70%)]"
           />
           <div className="relative mx-auto w-full max-w-6xl px-4 pb-20 pt-20 sm:px-6 sm:pt-28">
             <Reveal>
@@ -92,16 +97,31 @@ export function LandingPage() {
                   dashboards for every client — automated daily, with plain-English AI summaries of
                   what changed.
                 </p>
+
+                <div className="mt-8 motion-safe:animate-landing-fade-in flex flex-col items-center gap-3 sm:flex-row">
+                  <Link
+                    href="/auth/sign-up"
+                    className="inline-flex items-center gap-2 rounded-full bg-landing-accent px-6 py-3 text-sm font-medium text-white transition-all duration-150 ease-out hover:bg-landing-sky hover:text-landing-bg active:scale-[0.97]"
+                  >
+                    Get started
+                    <ArrowRight className="size-4" aria-hidden="true" />
+                  </Link>
+                  <Link
+                    href="/auth/login"
+                    className="inline-flex items-center gap-2 rounded-full border border-landing-border bg-transparent px-6 py-3 text-sm font-medium text-landing-text transition-colors duration-150 ease-out hover:border-landing-text"
+                  >
+                    Sign in
+                  </Link>
+                </div>
               </div>
             </Reveal>
 
             <Reveal delay={120} className="mt-16">
-              <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                {sampleMetrics.map((metric, index) => (
+              <StaggerReveal stagger={70} className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                {sampleMetrics.map((metric) => (
                   <div
                     key={metric.label}
-                    className="motion-safe:animate-landing-scale-in rounded-2xl border border-landing-border bg-landing-surface p-5"
-                    style={{ animationDelay: `${index * 60}ms` }}
+                    className="rounded-2xl border border-landing-border bg-landing-surface p-5 transition-transform duration-200 ease-out hover:-translate-y-0.5 motion-reduce:transform-none"
                   >
                     <dt className="text-xs uppercase tracking-wide text-landing-faint">
                       {metric.label}
@@ -124,21 +144,45 @@ export function LandingPage() {
                     </dd>
                   </div>
                 ))}
-              </dl>
+              </StaggerReveal>
             </Reveal>
           </div>
         </section>
 
-        <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6" aria-labelledby="features-heading">
+        <section
+          id="pipeline-overview"
+          className="relative mx-auto w-full max-w-6xl px-4 py-10 sm:px-6"
+          aria-label="Pipeline overview"
+        >
+          <Reveal>
+            <div className="rounded-2xl border border-landing-border bg-landing-surface p-4 sm:p-6">
+              <Image
+                src="/diagrams/landing-pipeline.svg"
+                alt="Daily reporting pipeline: client sources sync into JK Intelligence and surface in dashboards with AI briefs"
+                width={1080}
+                height={520}
+                loading="lazy"
+                className="mx-auto h-auto w-full max-w-4xl"
+              />
+            </div>
+          </Reveal>
+        </section>
+
+        <section
+          className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6"
+          aria-labelledby="features-heading"
+        >
           <Reveal>
             <h2 id="features-heading" className="text-2xl font-semibold tracking-tight">
               What it does
             </h2>
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+          </Reveal>
+          <Reveal delay={80} className="mt-8">
+            <StaggerReveal stagger={70} className="grid gap-3 sm:grid-cols-2">
               {features.map((feature) => (
                 <div
                   key={feature.name}
-                  className="rounded-2xl border border-landing-border bg-landing-surface p-5"
+                  className="rounded-2xl border border-landing-border bg-landing-surface p-5 transition-colors duration-200 ease-out hover:border-landing-border/60"
                 >
                   <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-landing-accent/10 text-landing-accent">
                     <feature.icon className="size-5" aria-hidden="true" />
@@ -147,7 +191,7 @@ export function LandingPage() {
                   <p className="mt-2 text-sm text-landing-muted">{feature.description}</p>
                 </div>
               ))}
-            </div>
+            </StaggerReveal>
           </Reveal>
         </section>
 
@@ -156,20 +200,28 @@ export function LandingPage() {
             <h2 id="how-heading" className="text-2xl font-semibold tracking-tight">
               How it works
             </h2>
-            <ol className="mt-8 grid gap-3 sm:grid-cols-3">
+          </Reveal>
+          <Reveal delay={80} className="mt-8">
+            <StaggerReveal stagger={80} className="grid gap-3 sm:grid-cols-3">
               {steps.map((step) => (
-                <li key={step.number} className="rounded-2xl border border-landing-border bg-landing-surface p-5">
+                <div
+                  key={step.number}
+                  className="rounded-2xl border border-landing-border bg-landing-surface p-5 transition-transform duration-200 ease-out hover:-translate-y-0.5 motion-reduce:transform-none"
+                >
                   <span className="font-mono text-xs text-landing-accent">{step.number}</span>
                   <h3 className="mt-3 text-sm font-semibold">{step.title}</h3>
                   <p className="mt-2 text-sm text-landing-muted">{step.description}</p>
-                </li>
+                </div>
               ))}
-            </ol>
+            </StaggerReveal>
           </Reveal>
         </section>
 
-        <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6" aria-labelledby="trust-heading">
-          <Reveal>
+        <Reveal>
+          <section
+            className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6"
+            aria-labelledby="trust-heading"
+          >
             <div className="rounded-2xl border border-landing-border bg-landing-surface p-8 sm:p-12">
               <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
                 <ShieldCheck className="size-8 text-landing-sky" aria-hidden="true" />
@@ -181,11 +233,20 @@ export function LandingPage() {
                   isolated at the database layer, synced daily, and readable even when a source
                   API is down.
                 </p>
+                <Link
+                  href="/auth/sign-up"
+                  className="mt-8 inline-flex items-center gap-2 rounded-full bg-landing-accent px-6 py-3 text-sm font-medium text-white transition-all duration-150 ease-out hover:bg-landing-sky hover:text-landing-bg active:scale-[0.97]"
+                >
+                  Get started free
+                  <ArrowRight className="size-4" aria-hidden="true" />
+                </Link>
               </div>
             </div>
-          </Reveal>
-        </section>
+          </section>
+        </Reveal>
       </main>
+
+      <LandingFooter />
     </div>
   );
 }
