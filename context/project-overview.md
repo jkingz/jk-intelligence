@@ -29,7 +29,7 @@ Multi-client automated SEO reporting platform. Clients and internal staff log in
 
 ### Authentication & Access Control
 
-- Google OAuth via Supabase Auth.
+- Google OAuth and email/password via Supabase Auth, with email confirmation and password recovery.
 - Route protection: clients see only own data (RLS at DB layer).
 - Roles: admin (full access) | client (own data only) | staff (assigned clients).
 

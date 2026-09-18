@@ -32,6 +32,7 @@
 - Database stores metric values as typed columns + JSONB metadata (not raw API responses).
 - Immutable snapshots (metrics_snapshots) — never overwrite, always append.
 - Denormalized cache (current_metrics) — fast dashboard reads, updated after each sync.
+- Dashboard reads cached in the Next data cache via `unstable_cache` (tag `dashboard-overview`), invalidated after syncs through the revalidation route above.
 
 ### Persistence Schema
 
@@ -46,7 +47,9 @@
 ## Auth & Multi-Tenancy Model
 
 - Supabase Auth handles sign-in UI, session management, and JWTs.
-- Google OAuth is the only sign-in method.
+- Google OAuth and email/password sign-in via Supabase Auth; email sign-up requires confirmation.
+- Email confirmation and password recovery exchange PKCE codes at `/auth/callback`; recovery continues only to `/auth/reset-password`.
+- Sign-up creates only an Auth identity; application roles/client assignments remain separately provisioned. No schema or RLS changes.
 - Supabase JWT sub claim stores user identity; client_id FK links user to client.
 - Roles: `admin` (full access), `client` (own data only), `staff` (assigned clients).
 - RLS enforced at DB layer — not bypassable via API.
@@ -57,10 +60,12 @@
 ## Sync API
 
 - `POST /api/sync/trigger` — manually trigger sync for one client (admin only).
-- `POST /api/cron/sync` — Vercel cron endpoint, queues BullMQ jobs for all active clients.
+- `POST /api/cron/sync` — Vercel cron endpoint (POST only, `Authorization: Bearer <CRON_SECRET>` via `vercel.json`), iterates `listActiveClients()` and queues one BullMQ job per client with `Promise.allSettled`; returns `{ queued, errors }`.
+- `POST /api/revalidate/dashboard` — internal endpoint the BullMQ worker pokes after each sync job to `revalidateTag("dashboard-overview")`; `revalidateTag` throws outside a request context, so the standalone worker cannot call it directly — it POSTs here via `lib/cache/notify.ts` (`CRON_SECRET` bearer, no-ops when no app URL or secret).
 - `GET /api/sync/logs/{clientId}` — retrieve sync history for client.
 - `GET /api/metrics/{clientId}` — fetch current_metrics for dashboard (fast read).
 - `GET /api/metrics/{clientId}/history` — fetch metrics_snapshots with date range filter.
+- `GET /api/metrics/{clientId}/keywords` — fetch keyword rank time series (`keyword_rankings` grouped per keyword, best rank first); esp: `source` (`gsc` default) + `from`/`to` ISO; `enforceClientAccess` (401/403).
 
 Route handlers stay thin: auth check → validate input → delegate to `lib/db` or `lib/queue`.
 
@@ -92,3 +97,4 @@ Route handlers stay thin: auth check → validate input → delegate to `lib/db`
 7. Every Supabase table has RLS enabled with policies matching ownership/role model.
 8. is_stale flag set server-side — client UI reads it, never computes staleness itself.
 9. API credentials never logged, never returned in API responses.
+10. The Next data-cache tag for the dashboard is owned by `lib/cache/invalidate.ts` (`DASHBOARD_OVERVIEW_TAG = "dashboard-overview"`) and only revalidated through `app/api/revalidate/dashboard` (secret-guarded) — never called from the worker process directly.

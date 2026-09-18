@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# JK Intelligence
 
-## Getting Started
+Multi-client SEO reporting platform built with Next.js, TypeScript, Supabase, and shadcn/ui. Product scope and implementation status live in [context](context/project-overview.md) and the [progress tracker](context/progress-tracker.md).
 
-First, run the development server:
+## Development
+
+Requires Node.js >=22.9 and pnpm >=10 (see `package.json`).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000. Auth requires local environment variables:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` supported)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Configure Supabase providers and redirect URLs for the auth flows. Keep credentials out of Git. Live auth verification and outstanding setup are tracked in [progress tracker](context/progress-tracker.md).
 
-## Learn More
+## Checks
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+pnpm test && pnpm typecheck && pnpm lint && pnpm build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Feature Workflow
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Read [AGENTS.md](AGENTS.md) and its ordered context files before implementation.
 
-## Deploy on Vercel
+- Specs: `context/feature-specs/<nn>-<slug>.md`.
+- Components: `components/features/<slug>/`, public exports through `index.ts`.
+- Numbers belong only to spec filenames; feature folders/imports stay unnumbered.
+- Mark tracker **In Progress** before implementation; complete after verification.
+- PR branches: `feat/<slug>`; titles: `feat(<slug>): <summary>`. Commit/push/PR only when requested.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Full rules: [feature conventions](docs/conventions/feature-components.md).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Feature Command
+
+In OpenCode, use the project slash command:
+
+```text
+/feature-component context/feature-specs/03-user-profile.md
+/feature-component add a feature for saved reports
+```
+
+The command loads [feature-component](.claude/skills/feature-component/SKILL.md), follows the spec-first workflow, and wires pages through the feature barrel. With no arguments, it asks which feature to work on.
+
+- Command: `.opencode/commands/feature-component.md`
+- Skill: `.claude/skills/feature-component/SKILL.md`
+- Shared discovery link: `.agents/skills/feature-component`
+
+Quit and restart OpenCode after command/skill changes. `/help` shows OpenCode usage help.

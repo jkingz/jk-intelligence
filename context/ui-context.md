@@ -98,6 +98,25 @@ Both loaded via `next/font/google`, applied as CSS variables on `<html>`. Body u
 
 ---
 
+## Dropdown / Menu Spacing
+
+Account-style menus (`DropdownMenu*`) share one spacing rhythm — account block, then a separator, then actions:
+
+```
+DropdownMenuContent: w-60 (primitive default p-1)
+├── DropdownMenuLabel: flex flex-col gap-1 px-1.5 py-1.5
+│   ├── name:  text-sm font-medium text-foreground
+│   └── email: text-xs font-normal text-muted-foreground
+├── DropdownMenuSeparator
+└── DropdownMenuItem: primitive default (px-1.5 py-1)
+```
+
+- Label horizontal padding matches item padding so the name/email align with the menu item icons.
+- Always place a `DropdownMenuSeparator` between the account block and its action items — never let the header sit flush against the first item.
+- Name and email are different sizes (`text-sm` / `text-xs`); never render both at one size.
+
+---
+
 ## Dashboard-Specific UI Patterns
 
 ### Metric Cards
@@ -156,6 +175,25 @@ bg-warning/10 border border-warning text-warning rounded-xl px-4 py-2
 shadcn/ui on Tailwind 4. Components in `components/ui/`. Use `shadcn` CLI to add — never write from scratch. Override styles via token classes only.
 
 ---
+
+## Motion
+
+- Library: `motion` (Framer Motion), imported from `motion/react`, inside `"use client"` components only.
+- Motion is deliberate, not decorative: at most one orchestrated reveal per view, triggered by scroll. Do not animate every section or card.
+- Reveal-on-scroll uses the Fragment-Ref `InView` primitive (`components/ui/in-view.tsx`), not `motion`'s `whileInView`. The chart's decorative backdrop layers (offset `bg-secondary` panel + accent glow) were removed (2026-09-18); the only page motion is the `InView` card reveal gated by `useReducedMotion`.
+- Always gate transforms and reveals with `useReducedMotion()` — when reduced, render the final state (no transforms, no opacity fade). `InView` consumers combine `revealed || shouldReduceMotion` and add `motion-reduce:transition-none`.
+- Decorative layers (glows, backdrop panels) are `aria-hidden="true"` + `pointer-events-none` and never change layout.
+
+### View Transitions (React 19.3)
+
+Dashboard section switches (Overview / Queries / AI Citation) use React's `<ViewTransition>` rather than `motion`:
+
+- Tab panels stay mounted and are shown/hidden with `<Activity mode>` — panel state (e.g. the `QueryTable` filter) survives tab switches, and hidden panels do no background work.
+- `<Activity>` nested inside `<ViewTransition>` triggers the enter/exit animation on visibility change.
+- `addTransitionType("forward" | "backward")` (inside `startTransition`) selects the direction; classes live in `globals.css` as `vt-enter-forward` / `vt-enter-backward` / `vt-exit-forward` / `vt-exit-backward` / `vt-fade`.
+- Panel content animates as a single wrapper element — do not wrap multiple sibling roots in one `<ViewTransition>`.
+- All `::view-transition-*` animations are disabled under `prefers-reduced-motion: reduce`; no JS reduced-motion branch is needed for these.
+- Keep this as the *one* navigational motion moment; do not also add `motion` transitions to the same panels.
 
 ## Charts & Data Viz
 

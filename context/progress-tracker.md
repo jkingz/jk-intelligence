@@ -3,45 +3,129 @@
 Update this file after every meaningful implementation change.
 
 ## Current Phase
-Design System Implementation
+Supabase Auth + Google OAuth (implementation order step 2)
 
 ## Current Goal
-Implement design system and dashboard component
+Email + password sign-in/sign-up verified
 
 ## Completed
-- Adapted theme palette from structurewebworks.com (warm charcoal ink scale, paper text, brick #c14a2c accent, olive/lime success, salmon error, warm amber warning) in `app/globals.css`
-- Added `--accent-hover` token; AI accent remapped to neutral grays (reference site has no AI accent)
-- Light mode rebuilt from reference paper/ink scale
-- Updated `context/ui-context.md` token tables to match
-- Verified successful build, lint, typecheck, and vitest run
-- Added shadcn components: Button, Card, Dialog, Input, Tabs, Textarea, ScrollArea
-- Installed lucide-react
-- Created lib/utils.ts with cn() helper for merging Tailwind classes
-- Created dashboard component using the new UI components in components/dashboard/
-- Updated app/page.tsx to use the dashboard component
-- Ensured all components match the existing dark theme in globals.css
-- Fixed import paths and type checking errors
-- Made dashboard responsive with proper Tailwind utility classes
-- Resolved `react-hooks/set-state-in-effect` by using lazy state initializer with SSR guard
-- Fixed unescaped HTML entities in JSX
-- Integrated next-themes with `data-theme` attribute and hydration guards
-- Modularized `dashboard.tsx` into decoupled sub-components (`dashboard-header`, `dashboard-hero`, `dashboard-metrics`, `dashboard-chart`, `autonomous-brief`, `query-table`, `ai-citation-grid`, and `dashboard-data`)
-- Verified successful TypeScript compilation, ESLint linting, and Next.js production build
+- Theme palette (structurewebworks tokens), light/dark mode, dashboard component suite — see prior session notes
+- Supabase Auth + Google OAuth runtime scaffolding
+  - `lib/supabase/server.ts` — server client (`createServerClient` + `@supabase/ssr`, `cookies()` from `next/headers`)
+  - `lib/supabase/client.ts` — browser client (`createBrowserClient`, `"use client"`)
+  - `lib/supabase/proxy.ts` — `updateSession()` for the Next.js 16 Proxy (session refresh + cookie propagation)
+  - `proxy.ts` (root) — route protection: unauthenticated → `/auth/login?next=…`, authenticated → blocked from login; `/api`, static assets, and `/auth/*` bypassed via matcher
+  - `lib/auth/routing.ts` — pure route-guard decision helper (framework-free, unit tested)
+  - `lib/agents/authAgent.ts` — `getAuthUser()`, `enforceClientAccess(clientId)`, `requireAdmin()` (reads `users` row via RLS, plan: no JWT claim authorization)
+  - `app/auth/login/page.tsx` + `google-sign-in.tsx` — login card, Google OAuth button, error banner
+  - `app/auth/callback/route.ts` — PKCE code exchange, sanitized `next` redirect (no open redirect)
+  - `scripts/run-migrations.mjs` + `pnpm db:migrate` — applies `supabase/migrations/*.sql` in order via the Postgres connection string (`SUPABASE_DB_URL`); tracks applied files in `public.schema_migrations` so re-runs are safe
+- Rig: env key naming aligned to `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (falls back to legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
+- Verified: `pnpm test` (18 passing, incl. routing guard + authAgent), `pnpm typecheck`, `pnpm lint`, `pnpm build` all pass; build shows `/auth/login`, `/auth/callback`, and Proxy registered
+- Email + password sign-in/sign-up — spec: `context/feature-specs/02-email-password-auth.md`
+  - First example of feature-folder convention (`docs/conventions/feature-components.md`): moved to `components/features/email-password-auth/` with barrel `index.ts` (AuthCard, EmailAuthForm, submitEmailAuth) + `components/` + `lib/`; pages in `app/auth/*` import via barrel only; `pnpm test`/typecheck/lint/build re-verified green
+  - `components/features/email-password-auth/lib/email-password.ts` — `submitEmailAuth()` + `EmailAuthMode`: sign-in (session → sanitized `next`), sign-up (PKCE `emailRedirectTo` → `/auth/callback`), forgot (`resetPasswordForEmail` → `/auth/callback?next=/auth/reset-password`), reset (`getUser` guard + `updateUser`); Zod email/password validation, generic anti-enumeration messages
+  - `lib/auth/routing.ts` — shared `safeNext()` (origin-checked, control-char blocked); callback now uses it
+  - `app/auth/callback/route.ts` — passes `sb_flow_id` to `exchangeCodeForSession`, recovery type → `/auth/reset-password`, sanitized `next` otherwise; try/catch
+  - `app/auth/login/page.tsx` — tabs: Google OAuth | Email/Password, forgot-password link, sign-up link, `next` preserved
+  - `components/features/email-password-auth/components/auth-card.tsx`, `components/features/email-password-auth/components/email-auth-form.tsx` — shared card + form (fieldset pending disable, min 8 chars, aria status/alert)
+  - `app/auth/sign-up/page.tsx`, `app/auth/forgot-password/page.tsx`, `app/auth/reset-password/page.tsx` — server pages; reset server-gates form on `auth.getUser()`, shows invalid-link banner otherwise
+  - Verified: `pnpm test` (18 passing), `pnpm typecheck`, `pnpm lint`, `pnpm build` — all pass; build emits `/auth/sign-up`, `/auth/forgot-password`, `/auth/reset-password`
+- User profile (view + sign out) — spec: `context/feature-specs/03-user-profile.md`
+  - `components/features/user-profile/` — barrel: `ProfileCard` (email/role/client/providers), `SignOutButton`, `getProfileView()` (`auth.getUser` + `getAuthUser`, RLS-scoped), `signOutAction()` (`"use server"` file — kept out of `server-only` module so client button can import)
+  - `app/profile/page.tsx` — thin server page; no profile → redirect login; proxy already gates `/profile` for unauthenticated
+  - Verified: `pnpm test` (18), `pnpm typecheck`, `pnpm lint`, `pnpm build` green; `/profile` route emitted
+
+- Feature naming: unnumbered `components/features/email-password-auth/` and `components/features/user-profile/`; imports, conventions, skill, and documented paths updated. Spec filenames retain numbers. Verified: `pnpm test` (18), `pnpm typecheck`, `pnpm lint`, `pnpm build` passed.
+
+- Feature command: `/feature-component <spec-or-request>` registered in `.opencode/commands/feature-component.md`; skill frontmatter and shared discovery link fixed; root README updated. Verified real read-only command invocation loaded the skill; lint/typecheck passed.
+
+- Dashboard migration, first increment — `context/feature-specs/04-dashboard.md`: eight components moved to `components/features/dashboard/components/`, data/types to feature `lib/dashboard-data.ts`; `app/page.tsx` imports `Dashboard` through the feature barrel. Behavior unchanged; hooks and mock-data ownership deferred. Verified: 18 tests, typecheck, lint, build passed; dashboard interactions not browser-tested.
+
+- Dashboard header account menu: email-initial avatar (user-icon fallback), Profile link, Log out with pending/error handling. Page composes profile feature into dashboard slot without cross-feature imports; `/` now dynamically reads authenticated email. Added shadcn avatar/dropdown-menu primitives and logout action tests. Verified: 21 tests, typecheck, lint, build passed. Browser interactions and live logout not exercised.
+- Dashboard header profile fix: header account menu now reflects the user's display name (`user_metadata.name`) — avatar initial + menu label fall back to email, then user icon; page passes `name` into the header slot; profile-card avatar initial no longer hardcoded "J"; dropped unused `FormEvent` import. Verified: 25 tests, typecheck, lint, build passed.
+- Profile navigation bounce fix: clicking Profile in the header navigated to `/profile`, but `getProfileView()` returned null for an authenticated user without a `users` row, so the page redirected to `/auth/login`, where the proxy bounces authenticated users back home — appearing as a refresh. `getProfileView()` now returns the identity for any authenticated session (`role`/`clientId` nullable when unprovisioned) and only returns null without a session; `ProfileCard` renders `—` for a missing role; added `profile.test.ts`. Verified: 28 tests, typecheck, lint, build passed; header Link soft-navigation confirmed in browser via Playwright.
+- Profile editing (display name): `EditProfileForm` now actually persists edits — the name `<input>` was uncontrolled (`defaultValue`) while submit sent the initial `name` state, so changes were silently discarded. Bound it to state (`value`/`onChange`). Server action (`updateProfileAction` → `auth.updateUser({ data: { name } })`, Zod trimmed ≤80) and its tests already existed. Verified: 28 tests, typecheck, lint, build passed.
+- Profile as a dialog: header account menu's Profile item now opens a `ProfileDialog` (no navigation); page background blurred behind a 50% scrim (`bg-black/50 backdrop-blur-sm`). `app/page.tsx` fetches `getProfileView()` and passes it to `AccountMenu`. Extracted `ProfileDetails` (shared by dialog + `/profile` card); `ProfileCard` no longer owns full-page layout (moved to `app/profile/page.tsx`); dialog hosts details + `EditProfileForm` + `SignOutButton`. `DialogContent` gained `overlayClassName`; `updateProfileAction` now revalidates `/` and `/profile`. Verified: 28 tests, typecheck, lint, build passed; dialog open/close, fields, and overlay computed style (black 50% + 4px blur) checked in browser via Playwright on a throwaway route. Screenshot could not be visually inspected (no image input support).
+
+- Dark-mode text-color bug (root cause): `@theme inline` defined `--color-base: var(--bg-base)`, so Tailwind emitted a `text-base` *color* utility that shadowed the font-size `text-base` utility. Any `text-base` usage (header title, login inputs, `ui/card`, `ui/dialog`, `ui/textarea`) inherited `--bg-base` — near-black `#141412` in dark mode — making text near-invisible on dark surfaces. Removed the redundant `--color-base` token (`bg-background` already covers page background; `bg-base` was unused); `text-base` is now font-size only. Verified in browser: header title and login input compute to `#fafaf7` (dark) / `#141412` (light). 28 tests, typecheck, lint, build pass.
+
+- Header account-menu spacing: the account block (`DropdownMenuLabel`) sat flush against the first action item and rendered name/email at one size. Gave the label `px-1.5 py-1.5 gap-1` (aligned with item icons), elevated the name to `text-sm font-medium`, and inserted a `DropdownMenuSeparator` before the actions. Documented the rhythm in `context/ui-context.md` → "Dropdown / Menu Spacing". Verified in browser via throwaway route (label→separator and separator→item each 4px; name 14px / email 12px); dialog still opens. 28 tests, typecheck, lint, build pass.
+
+- Dashboard chart backdrop + motion: added a layered decorative backdrop behind the chart card — an offset `bg-secondary` panel plus a faint `accent-primary/10` blurred glow (both `aria-hidden`, `pointer-events-none`) — and installed `motion` 13 for a scroll-triggered reveal. `dashboard-chart.tsx` now uses `useScroll`/`useTransform` for backdrop parallax + glow scale and a single `whileInView` card reveal, all gated by `useReducedMotion`. Documented in `context/ui-context.md` → "Motion" and `context/feature-specs/04-dashboard.md`. Verified in browser via throwaway route: backdrop peeks 6px/side and ~7px below the card, `bg-secondary` = `#2a2a26` (dark) / `#e5e5de` (light), no horizontal overflow, chart still renders (750×320). 28 tests, typecheck, lint, build pass.
+
+- React 19.3 upgrade + new API adoption: bumped `react`/`react-dom`/`@types/react`/`@types/react-dom` `19.2.8 → 19.3.0` (Next 16.3.5 peer range `^19.0.0`, compatible). Adopted four new APIs:
+  - `browser()` (`react-dom`) replaces the two hand-rolled `useSyncExternalStore` mounted gates — the chart (`dashboard-chart.tsx`, with new `DashboardChartFallback` in a `<Suspense>`) and a new `ThemeToggle` component (`theme-toggle.tsx`); `DashboardHeader` no longer takes a `mounted` prop.
+  - `<Activity>` keeps the three dashboard tab panels mounted (with Base UI `keepMounted`) so panel state — the `QueryTable` search filter — survives tab switches, and inactive panels are `inert`.
+  - `<ViewTransition>` + `addTransitionType("forward" | "backward")` animate tab changes inside `startTransition`; direction classes (`vt-enter-forward`/`vt-enter-backward`/`vt-exit-forward`/`vt-exit-backward`/`vt-fade`) added to `globals.css`, all disabled under `prefers-reduced-motion: reduce`. New `AnimatedPanel` wrapper in `dashboard.tsx`.
+  - Intentionally not applied, with rationale: `<Context>` in RSC (only next-themes provider, a third-party client lib), Suspense image/font animation (no async assets). Fragment Refs, `useEffectEvent`, and Trusted Types were deferred here and adopted in the follow-up below.
+  - Documented in `context/code-standards.md` → "React 19.3 Rendering", `context/ui-context.md` → "View Transitions (React 19.3)", `context/feature-specs/04-dashboard.md`. Verified in browser via throwaway route: 0 console errors, chart SVG renders client-side while SSR HTML has the fallback (`recharts-surface: 0`) and no theme-toggle output, query filter persisted across Overview→Queries→Overview, and `document.startViewTransition` fired on each switch. 28 tests, typecheck, lint, build pass.
+
+- Fragment-Ref `InView` primitive + Trusted Types CSP (follow-up to React 19.3 upgrade):
+  - `components/ui/in-view.tsx` (barrel-exported) — headless `InView` on React 19.3 Fragment Refs: `useRef<FragmentInstance>` + `<Fragment ref>` observes its first-level children with a single `IntersectionObserver` via `observeUsing` / `unobserveUsing`. Props: `once` (disconnect after first hit), `threshold`, `rootMargin`, `onChange(inView)`. `onChange` is wrapped in `useEffectEvent` so an inline callback does not re-subscribe the observer.
+  - `dashboard-chart.tsx` now uses `<InView once>` + `revealed` state instead of `motion`'s `whileInView` / `viewport`; the reveal is a CSS transition (`opacity` / `translate-y`, `motion-reduce:transition-none`) with `isRevealed = revealed || shouldReduceMotion`. `motion` still drives the scroll parallax (`useScroll` / `useTransform`). No `whileInView` remains in the codebase.
+  - `next.config.ts` now sends a `Content-Security-Policy` on every route. Production enforces `require-trusted-types-for 'script'; trusted-types nextjs`; development enforces the base policy but carries the Trusted Types directives on `Content-Security-Policy-Report-Only`, because React dev `eval`-based stack reconstruction and Turbopack HMR assign raw strings to script sinks (verified: enforcing in dev throws `TrustedScript` / `TrustedScriptURL` violations). `connect-src` is dev-wide (`ws: wss: https:`) and production-scoped (`https://*.supabase.co wss://*.supabase.co`), per the nonce-less Next CSP guide.
+  - Verified against a production build (`pnpm build && pnpm start`): `/auth/dashboard-test` and `/auth/login` load with 0 console errors under enforced Trusted Types; positive control confirms `script.src = string` throws `TypeError`; Next's `nextjs` policy is present; the chart card computes `opacity: 1` after the InView reveal.
+  - Documented in `context/code-standards.md` → "React 19.3 Rendering" / new "Security Headers", `context/ui-context.md` → "Motion", `context/feature-specs/04-dashboard.md`. 28 tests, typecheck, lint, build pass.
+
+- Database seed script: `scripts/seed.mjs` + `pnpm db:seed` (same `pg` + `SUPABASE_DB_URL`/`DATABASE_URL` pattern as `db:migrate`). Seeds the three demo clients (`northstar.example`, `evergreen.example`, `atlas.example`) and, per client, `--days` (default 90, max 365) days of metrics across `gsc`/`ga4`/`semrush` via the existing `public.persist_metrics` RPC — so `metrics_snapshots`, `keyword_rankings`, and `current_metrics` are all written atomically and validated by the same path the sync agent will use. Deterministic (mulberry32 seeded per client/source/day) and idempotent (run id `seed-<date>`, `persist_metrics` conflicts are no-ops). Flags: `--days`, `--end YYYY-MM-DD`, `--reset` (deletes only `run_id like 'seed-%'` snapshots + their cascades and seed sync logs), `--dry-run` (no DB; prints counts + a sample payload). Reproduces the stale case by marking Atlas `current_metrics.is_stale`; writes one `sync_logs` row per client. Each client seeds 20 keywords with per-slot deterministic ranks (bucketed across pages 1–3), rank-change drift over the window, and varied search volumes so the dashboard's query table, chart, and metrics are populated. Verified: `--dry-run` (810 snapshots, 20 keywords/client) and `pnpm lint` pass; also ran against the live DB (see below).
+  - Gap for deleting mock frontend data: `lib/mock-dashboard.ts` / `components/features/dashboard/lib/dashboard-data.ts` still back `dashboard.tsx` (`demoClients`, `getMockOverview`); a DB-backed overview read path does not exist yet. `NormalizedMetric` also has no representation for the mock's `aiCitations` (engine/sentiment/citation share) or `volume`/`change` — those need a schema decision before mock data can be removed entirely. **Resolved by the repository-backed overview below**: `searchVolume` was added for volume; AI citations have no source yet and render an explicit "not available" state rather than mock numbers; keyword `change` is derived from synced rank history.
+
+- Repository-backed dashboard overview: replaced the in-memory mock with a live Supabase read path and deleted `lib/mock-dashboard.ts` + `components/features/dashboard/lib/dashboard-data.ts`.
+  - Shared types `types/dashboard.ts`: `DashboardClient`, `TrafficPoint`, `KeywordRow`, `AICitation`, `BriefItem`, `DashboardOverview`, `DASHBOARD_RANGES`, `isDashboardRange`.
+  - Pure `lib/dashboard/overview.ts` (`buildOverview`, `initialsOf`, `toDashboardClient`) + `lib/dashboard/overview.test.ts`. Derives per-day clicks/impressions/CTR from `gsc` keyword rows (falls back to all rows), previous period as the same window shifted back by `days`, positive rank `change` = improved, and returns `null` when no `gsc` snapshots exist.
+  - `NormalizedMetric` gained `searchVolume: number | null` (rides in the existing `metrics` JSONB; `persist_metrics` ignores extra keys, so no migration). `scripts/seed.mjs` now emits it.
+  - `lib/db/repository.ts` gained `snapshotSchema`, `listMetricSnapshots`, `listAccessibleClients` (admin → all active; `client` → own client; otherwise none), `getDashboardOverview`.
+  - `app/page.tsx` is now an async server component reading `searchParams: Promise<{ client?, days? }>`, scoping clients by profile, defaulting to 30 days, and passing `clients` / `selectedClient` / `days` / `overview | null`. `dashboard.tsx` is fully prop-driven: client + range changes navigate via `router.replace(?client=&days=)` in `startTransition`; empty/no-data shells for no client or no metrics.
+  - Components retargeted to `@/types/dashboard`; AI card/chart/legend/citation grid show an explicit "not available" / "no AI source connected" state; query volume renders `—` when null. Removed "Demo" copy throughout.
+  - AI citations intentionally carry no data (no storage/source yet) — flagged as a gap, not faked. Verified: 33 tests, typecheck, lint, build pass. Query path still not browser-verified end to end (login needs the missing anon key).
+
+- Seeded the live Supabase DB: `pnpm db:seed` wrote 3 clients, 810 snapshots (270 each `gsc`/`ga4`/`semrush`), 10,800 keyword rankings (20 keywords/client), and `current_metrics` for all 3 clients × 3 sources; Atlas marked `is_stale`. Also provisioned the current auth user (`dummydump01@gmail.com`) as `admin` in `public.users`, so `listAccessibleClients` returns all three demo clients on `/`.
+
+- Fixed "Database operation failed" on `/`: the repository read path needs `SUPABASE_SERVICE_ROLE_KEY` (via `getAdminDb()`), which was absent from `.env`; the throw was masked by `databaseOperation`. Added `SUPABASE_SERVICE_ROLE_KEY` and made `databaseOperation` log the underlying error server-side while still returning the generic client message. Verified the admin client returns clients + 90 `gsc` snapshots (20 metrics each, `searchVolume` present) + `current_metrics`.
+
+- Client switcher now shows client names: Base UI's `Select.Value` renders the raw value by default, so `DashboardHeader` passes `items={clients.map(({id,name}) => ({ value: id, label: name }))}` to `Select` (the same `{value,label}` mapping Base UI uses for the trigger label). Verified in a throwaway route that the trigger renders "Atlas Coffee", not the UUID.
+
+- Added loading + caching to the URL-navigation dashboard. `app/page.tsx` now wraps an async `DashboardData` (which awaits `searchParams`) in `<Suspense fallback={<DashboardSkeleton />}>`, so `?client=`/`?days=` navigations stream a skeleton shell that mirrors the header/hero/metric/chart/table layout, then swap in the resolved dashboard. `getCachedDashboardOverview` wraps `getDashboardOverview` in `unstable_cache` (client+range key, `revalidate: 300`, tag `dashboard-overview`); `unstable_cache` (not `use cache`) because `cacheComponents` is off. Verified against live Supabase via a throwaway route: cold `?days=90` miss 411ms, immediate re-hit 0–1ms; `?days=30` hits ~0ms; skeleton markers present in the streamed HTML on a cold 227ms request; 0 console errors. Invalidation: `revalidateTag("dashboard-overview")` after a sync writes snapshots is not yet wired (cron only enqueues), so cache can trail a sync by up to 5 min. Spec updated (`context/feature-specs/04-dashboard.md`).
+
+- Considered making client switching client-side (pre-load all clients' overviews, swap via `useState`) to avoid the per-switch server render. Reverted to the URL-navigation approach (`?client=&days=`) per decision: one overview fetch per request, deep-linkable URL, no duplicated data. `app/page.tsx` resolves a single `selectedClient` + `overview`; `Dashboard` receives `selectedClient`/`overview` props and `navigate()`s via `router.replace` inside `startTransition`.
+
+- Fixed the dev-only React 19 warning "Encountered a script tag while rendering React component" caused by `next-themes@0.4.6` re-rendering its FOUC `<script>` on the client. Patched via `pnpm.patchedDependencies` (`patches/next-themes@0.4.6.patch`, registered in `pnpm-workspace.yaml`): `ThemeScript` early-returns `null` when `window` is defined. SSR still ships and runs the script (`data-theme="dark"` applied before hydration); verified in a restarted dev server — 0 console errors/warnings, no hydration mismatch. Documented in `context/code-standards.md` → "React 19.3 Rendering".
+
+- Cron hardening + sync revalidation — spec: `context/feature-specs/05-keyword-rankings.md`
+  - `app/api/cron/sync/route.ts` is POST-only (removed `export const GET = POST`); secret-checked via new pure `lib/auth/cron.ts` `verifyCronSecret` (→ `"ok" | "unavailable" | "denied"`); iterates `listActiveClients()` + `Promise.allSettled` enqueue per client (partial failure → `{ queued, errors }` 202, never aborts the run); run id = today's date.
+  - Revalidation wired end to end: `revalidateTag` throws outside a Next request context (verified in `node_modules`), so `lib/cache/invalidate.ts` owns tag `DASHBOARD_OVERVIEW_TAG` + `revalidateDashboardOverview()`; the standalone BullMQ worker POSTs via `lib/cache/notify.ts` (`notifyDashboardRevalidated` → `Authorization: Bearer <CRON_SECRET>` to `/api/revalidate/dashboard`, no-op without app URL/secret); new secret-guarded `app/api/revalidate/dashboard/route.ts`; `lib/queue/worker.ts` awaits it after each job; `vercel.json` declares the `0 2 * * *` POST cron.
+  - `lib/queue/syncQueue.ts` `redisConnection()` prefers `REDIS_URL` else derives `rediss://default:<UPSTASH_REDIS_REST_TOKEN>@<host>:6379` from `UPSTASH_REDIS_REST_URL` + `_REST_TOKEN` (both now present in `.env`); throws if neither.
+  - Verified: `pnpm test` (52 incl. rewritten `flow.test.ts` with mocked BullMQ, `cron.test.ts`, `syncQueue.test.ts`, `revalidate route.test.ts`), `pnpm typecheck`, `pnpm lint`, `pnpm build` — all green; build emits `/api/revalidate/dashboard` and cron POST-only.
+
+- Keyword rankings read/history path + dashboard time series — spec: `context/feature-specs/05-keyword-rankings.md`
+  - `types/dashboard.ts` gains `RankPoint`, `KeywordRankSeries`; pure `lib/dashboard/keywords.ts` `buildKeywordSeries` (groups rows, skips null-latest-rank keywords, sorts best-first + chronological, unit tested).
+  - `lib/db/repository.ts`: `keywordRankingRowSchema` (`rank` via `z.coerce.number()` — PostgREST numeric can arrive as string; confirmed raw `pg` returns string), `listKeywordRankings`, `getKeywordRankingHistory` (2× window), `getCachedKeywordHistory` (tagged with `DASHBOARD_OVERVIEW_TAG`). `databaseOperation` already logs the root cause server-side.
+  - New `app/api/metrics/[clientId]/keywords/route.ts`: GET, zod params (Next 16 `await ctx.params`), `enforceClientAccess` 401/403, `{ data, meta }`.
+  - Dashboard: `query-table.tsx` takes `history` prop + Trend buttons; `keyword-rank-chart.tsx` (recharts, reversed Y so rank 1 is at top, `ResponsiveContainer initialDimension` to silence the width/height −1 warning, token colors, #rank + gained/lost header); `app/page.tsx` fetches overview + history in parallel; `Dashboard` plumbs `history`.
+  - Live DB verified: `getKeywordRankingHistory` → 20 series/client, dense daily points, seeded data confirmed (1,800 rows, 20 keywords over the last 60d).
+  - Browser verified via throwaway route (Playwright): 0 console errors/warnings; chart renders heading/legend/rank axis/date axis; close + reopen, tooltip on hover, and search-as-you-type filter all work. Screenshot not visually inspected (no image input).
+  - Verified: 52 tests, typecheck, lint, build all pass.
+
+- Dashboard chart backdrop removed: the decorative layers behind the chart card — the offset `bg-secondary` panel and the `accent-primary/10` blurred glow, plus their `useScroll`/`useTransform` parallax hooks — were removed from `dashboard-chart.tsx` (reported as annoying). The `InView` scroll reveal on the card itself stays. Docs updated (`ui-context.md` → "Motion", `04-dashboard.md`). Verified: 52 tests, typecheck, lint pass.
 
 ## In Progress
-None
+- (none — last completed: cron hardening + sync revalidation + keyword rankings, below)
+
+## Completed (cont.)
 
 ## Open Questions
-None
+- Profile: no display-name column exists (`users` has only id/role/client_id) — name editing deferred until schema decision.
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` now set in `.env` (208 chars) — auth login flows can be exercised at runtime; needs mirroring in Vercel.
+- `REDIS_URL` intentionally empty — the queue derives its connection from `UPSTASH_REDIS_REST_URL` + `_REST_TOKEN`. `CRON_SECRET` is only 1 char locally (a stub): give it a real value locally + in Vercel so cron and `/api/revalidate/dashboard` actually gate.
+- Google OAuth must be enabled on the Supabase project; `users` rows for admins/clients must be provisioned (RLS reads role/client_id from `users` table).
+- Docs (AGENTS.md, architecture-context.md) reference a `staff` role, but the migration + `types/database.ts` only allow `admin | client`. Decide: add `staff` to the DB role check + typing, or drop it from docs.
+- Supabase CLI / local Supabase not present on this machine — schema changes and auth flows not exercised against a real project. Email/password flows unit-level verified only; needs live Supabase + redirect URL allowlist (`/auth/callback`, `/auth/reset-password`) + PKCE email templates (token_hash style) to exercise end to end.
 
 ## Architecture Decisions
-- Used shadcn/ui primitives to maintain consistency with existing design
-- Leveraged the existing cn() utility from the "cn" package, updated to use clsx and tailwind-merge
-- Dashboard component composes various UI primitives (Cards, Tabs, Buttons, etc.) to display client analytics
-- Implemented responsive design with Tailwind breakpoint utilities (sm:, md:, lg:)
-- Organized dashboard components in components/dashboard/ folder for better structure
-- Used lazy state initializer `useState(() => ...)` with `typeof window !== "undefined"` checks to eliminate cascading renders and support SSR/prerendering
-- Applied shadcn/ui composition patterns (CardHeader/CardContent/CardFooter, etc.)
+- Route protection uses Next.js 16 Proxy (middleware renamed) with pure decision logic in `lib/auth/routing.ts` to keep the decision testable without framework imports
+- `authAgent` resolves authorization from the `users` table (RLS-protected, self-or-admin select) rather than JWT `user_metadata`/`app_metadata` claims — per Supabase security best practice
+- Admin/client access check (`enforceClientAccess`) matches DB schema: roles `admin | client`
 
 ## Session Notes
-Theme palette now mirrors structurewebworks.com tokens (`--ink-*`/`--paper-*`/`--brick-*` mapped onto project roles). Build, eslint, tsc, and vitest all pass. Visual toggle and browser screenshots unverified — no browser automation available locally.
+Auth unit wired but not exercised end to end (no live Supabase project / Google OAuth on this machine). Env var `NEXT_PUBLIC_SUPABASE_ANON_KEY` must be added before login works at runtime. Email/password added on top of same PKCE callback; sign-up confirmation + recovery require Supabase dashboard email-template updates (token_hash) before runtime use.

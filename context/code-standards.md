@@ -33,10 +33,28 @@ const data: any = await fetchGSC()
 ## Next.js
 
 - Default to React Server Components.
-- Add `"use client"` only for charts, date pickers, real-time stale banners.
+- Add `"use client"` only for interactive UI: charts, date pickers, real-time stale banners, and auth forms.
 - Route handlers handle one responsibility: auth → validate → delegate to lib.
 - Never run sync jobs inline in route handlers — always queue via BullMQ.
 - Long-running work belongs in BullMQ jobs, not request handlers.
+
+## React 19.3 Rendering
+
+- Opt a component out of SSR with `use(browser())` (`react-dom`) and wrap it in the nearest `<Suspense>` with a layout-matched fallback. Never hand-roll a `mounted` flag or `typeof window` check — `browser()` is the first-class API for this.
+- Keep expensive offscreen subtrees mounted with `<Activity mode={open ? "visible" : "hidden"}>` so their state survives, instead of remounting. Do not use it to hide content that must re-initialize on show.
+- Animate navigational changes with `<ViewTransition>` paired with `addTransitionType` so direction-aware enter/exit is possible. The state update must run inside `startTransition`, otherwise no animation is captured.
+- `<Activity>` inside `<ViewTransition>` animates enter/exit on visibility changes while preserving state — this is the sanctioned pattern for tabbed/conditional panels.
+- Define view-transition animations as CSS classes in `globals.css`, and disable all `::view-transition-*` animations under `prefers-reduced-motion: reduce`.
+- Group wrapper-free DOM nodes with a Fragment Ref (`useRef<FragmentInstance>` + `<Fragment ref>`), not an extra `<div>`. `InView` (`components/ui/in-view.tsx`) uses this to observe its first-level children with one `IntersectionObserver` via `observeUsing` / `unobserveUsing`. Prefer it over `motion`'s `whileInView` for reveal-on-scroll; keep `motion` for scroll-linked values (`useScroll` / `useTransform`).
+- Extract non-reactive callbacks out of effects with `useEffectEvent` instead of adding them to the dependency array. `InView` uses it so an inline `onChange` does not re-subscribe the observer.
+- `next-themes@0.4.6` is patched via `pnpm.patchedDependencies` (`patches/next-themes@0.4.6.patch`) so its FOUC-prevention `<script>` is not re-rendered on the client. React 19 warns "Encountered a script tag while rendering React component" for the unpatched build. The patch early-returns `null` when `window` is defined; the script still ships in SSR HTML and runs before hydration. To change: re-run `pnpm patch next-themes@0.4.6` + `pnpm patch-commit`, never edit `node_modules` directly.
+
+## Security Headers
+
+- `next.config.ts` owns the `Content-Security-Policy` (non-nonce) and applies it to every route; keep `proxy.ts` auth-only.
+- Trusted Types are enforced in production (`require-trusted-types-for 'script'; trusted-types nextjs`). Do not enforce them in development — React's `eval`-based stack reconstruction and Turbopack's HMR script loader assign raw strings to script sinks; dev sends the directives on `Content-Security-Policy-Report-Only` instead.
+- `trusted-types` must list `nextjs` — the policy Next.js creates in `next/dist/client/trusted-types.js`.
+- `connect-src` is dev-wide (`ws: wss: https:`) and production-scoped (`https://*.supabase.co wss://*.supabase.co`). Any new external origin (APIs, fonts, images) must be added to the matching directive in `next.config.ts`.
 
 ## Styling
 
