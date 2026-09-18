@@ -1,7 +1,7 @@
 # 05 — Keyword Rankings Read/History + Sync Revalidation & Cron Hardening
 
 ## Goal
-Provide a dedicated read/history path for `keyword_rankings` (table is seeded/persisted by `persist_metrics` but had no API or time-series view), and close the cron quirks: POST-only cron, per-active-client enqueueing, and a wired `dashboard-overview` revalidation after syncs.
+Provide a dedicated read/history path for `keyword_rankings` (table is seeded/persisted by `persist_metrics` but had no API or time-series view), and close the cron quirks: no `GET = POST` alias, per-active-client enqueueing, and a wired `dashboard-overview` revalidation after syncs.
 
 **Status: implemented** (52 tests, typecheck, lint, build pass; trend chart browser-verified via throwaway route; keyword read path verified against the live seeded DB).
 
@@ -15,9 +15,9 @@ Provide a dedicated read/history path for `keyword_rankings` (table is seeded/pe
 
 ## Cron & Revalidation (Item 9)
 - **`lib/auth/cron.ts`**: pure `verifyCronSecret(request, secret)` → `"ok" | "unavailable" | "denied"` (constant-time for non-empty secret).
-- **`app/api/cron/sync/route.ts`**: POST-only (removed `export const GET = POST`), secret-checked, iterates `listActiveClients()` and `Promise.allSettled`s a BullMQ enqueue per client (partial failures reported as `{ clientId, message }`, never aborting the run). Run id = today's date so repeated enqueues are idempotent (`persist_metrics` conflicts no-op). Returns `{ queued, errors }` with 202.
+- **`app/api/cron/sync/route.ts`**: `GET` handler (Vercel cron invokes with `GET` — `method` is not a valid `vercel.json` crons key), secret-checked, iterates `listActiveClients()` and `Promise.allSettled`s a BullMQ enqueue per client (partial failures reported as `{ clientId, message }`, never aborting the run). Run id = today's date so repeated enqueues are idempotent (`persist_metrics` conflicts no-op). Returns `{ queued, errors }` with 202.
 - **Revalidation wire-up**: `revalidateTag` throws outside a Next request context (`Invariant: static generation store missing`), so the standalone BullMQ worker cannot call it directly. Instead: `lib/cache/invalidate.ts` owns the shared tag `DASHBOARD_OVERVIEW_TAG = "dashboard-overview"` + `revalidateDashboardOverview()` (`revalidateTag(tag, { expire: 0 })`); `lib/cache/notify.ts` gives the worker a `notifyDashboardRevalidated()` bridge that POSTs to `/api/revalidate/dashboard` with the `CRON_SECRET`, no-oping when `NEXT_PUBLIC_APP_URL`/`VERCEL_URL` or the secret is absent; `lib/queue/worker.ts` awaits it after each processed sync job. The route (`app/api/revalidate/dashboard/route.ts`) is secret-guarded and calls `revalidateDashboardOverview()`, returning `{ revalidated: true, tag }`.
-- **`vercel.json`**: cron `POST /api/cron/sync` at `0 2 * * *` (Vercel attaches `Authorization: Bearer <CRON_SECRET>`).
+- **`vercel.json`**: cron `GET /api/cron/sync` at `0 2 * * *` (Vercel attaches `Authorization: Bearer <CRON_SECRET>`).
 - Queue Redis: `redisConnection()` prefers an explicit `REDIS_URL` and otherwise derives `rediss://default:<UPSTASH_REDIS_REST_TOKEN>@<host>:6379` from `UPSTASH_REDIS_REST_URL` (host extracted) + `UPSTASH_REDIS_REST_TOKEN`; throws a clear error if neither exists. Queue and worker share the same connection.
 - Scope: `vercel.json`, `lib/auth/cron.ts`, `lib/cache/invalidate.ts`, `lib/cache/notify.ts`, `lib/queue/syncQueue.ts`, `lib/queue/worker.ts`, `app/api/cron/sync/route.ts`, `app/api/revalidate/dashboard/route.ts`.
 
@@ -28,6 +28,6 @@ Provide a dedicated read/history path for `keyword_rankings` (table is seeded/pe
 
 ## Verification
 1. Unit/integration: 52 tests pass — new `lib/auth/cron.test.ts`, `lib/dashboard/keywords.test.ts`, `lib/queue/syncQueue.test.ts`, `lib/queue/flow.test.ts` (rewritten: mocked BullMQ per-client enqueue, partial-failure survivor, unauthorized, malformed-job), `app/api/metrics/[clientId]/keywords/route.test.ts`, `app/api/revalidate/dashboard/route.test.ts`.
-2. `pnpm typecheck`, `pnpm lint`, `pnpm build` pass; build emits `/api/metrics/[clientId]/keywords` and `/api/revalidate/dashboard`; cron is POST-only.
+2. `pnpm typecheck`, `pnpm lint`, `pnpm build` pass; build emits `/api/metrics/[clientId]/keywords` and `/api/revalidate/dashboard`; cron uses a `GET` handler.
 3. Live DB: `getKeywordRankingHistory` returns 20 series per client (dense daily points, best-first ordering) — verified via tsx against the seeded Supabase project.
 4. Browser (throwaway route + Playwright): 0 console errors/warnings after `ResponsiveContainer initialDimension`; chart renders heading/legend/dates/rank axis; close + reopen, tooltip on hover, and search-as-you-type all work. Screenshot not visually inspected (no image input) — structure confirmed via accessibility snapshot.

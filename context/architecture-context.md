@@ -60,7 +60,7 @@
 ## Sync API
 
 - `POST /api/sync/trigger` — manually trigger sync for one client (admin only).
-- `POST /api/cron/sync` — Vercel cron endpoint (POST only, `Authorization: Bearer <CRON_SECRET>` via `vercel.json`), iterates `listActiveClients()` and queues one BullMQ job per client with `Promise.allSettled`; returns `{ queued, errors }`.
+- `GET /api/cron/sync` — Vercel cron endpoint (crons are invoked with `GET`; `Authorization: Bearer <CRON_SECRET>` via `vercel.json`), iterates `listActiveClients()` and queues one BullMQ job per client with `Promise.allSettled`; returns `{ queued, errors }`.
 - `POST /api/revalidate/dashboard` — internal endpoint the BullMQ worker pokes after each sync job to `revalidateTag("dashboard-overview")`; `revalidateTag` throws outside a request context, so the standalone worker cannot call it directly — it POSTs here via `lib/cache/notify.ts` (`CRON_SECRET` bearer, no-ops when no app URL or secret).
 - `GET /api/sync/logs/{clientId}` — retrieve sync history for client.
 - `GET /api/metrics/{clientId}` — fetch current_metrics for dashboard (fast read).
