@@ -132,8 +132,12 @@ Email + password sign-in/sign-up verified
 
 - Project-wide `next/image` convention (no raw `<img>`): pipeline SVG migrated to `<Image>` (was the only `<img>` left); `next.config.ts` gains `images.dangerouslyAllowSVG: true` (self-authored, script-free SVGs only) + `contentDispositionType: "inline"` + per-image CSP (`default-src 'self'; script-src 'none'; sandbox;`); SVGs served unoptimized automatically (vector, lossless). Convention documented in `AGENTS.md` (headline rule) and `code-standards.md` → new "Images" section (rule + SVG rationale + remote origins requirement). Lint now clean (0 problems — `no-img-element` warning gone). Verified: typecheck/lint/tests (53) green, build green, prod server — SVG now served via `/_next/image` optimizer (200 `image/svg+xml`), decodes 1080×520 natural at 896px rendered, 0 console errors/warnings. Uncommitted.
 
+- Landing hero extracted to `components/features/landing/landing-hero.tsx`: badge/h1/subhead/CTAs/sample-metric cards moved out of `landing-page.tsx` into the new `LandingHero` ({id="pipeline-overview"}, keeps the footer anchor working), and the pipeline SVG is now the hero's background — `<Image priority>` absolutely positioned behind the content, `opacity-[0.18]` with a bottom-up `landing-bg` gradient scrim so the diagram reads as a backdrop while text stays legible (decorative, `aria-hidden`/`alt=""`). The old separate "Pipeline overview" card section was removed. `landing-page.tsx` is now just `SiteHeader` + `LandingHero` + features/steps/trust/footer (unused `sampleMetrics` + `Image`/`Link` imports dropped from the page). Verified: typecheck/lint clean (0 problems), build green (all landing routes emit), rendered HTML contains the hero `hero-heading` + the background `<Image>` with `opacity-[0.18]`. Not committed.
+
+- Hero CTA trim: removed the secondary "Sign in" button from the hero (redundant — the trust band and landing footer already link sign-in); "Get started" now sits alone in a `flex justify-center` wrapper (parent column already `items-center`), perfectly centered. `engines.node` bumped `>=22.9.0 → >=24.0.0` (newest line Vercel supports; local v26.8.2 still satisfies). Verified: typecheck/lint clean.
+
 ## In Progress
-- (none — landing CTA/footer/motion + privacy/terms just completed below)
+- (none — hero extraction + pipeline background just completed)
 
 ## Completed (cont.)
 
