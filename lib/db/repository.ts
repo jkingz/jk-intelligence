@@ -1,7 +1,21 @@
 import "server-only";
 
+import { unstable_cache } from "next/cache";
 import { z } from "zod";
+import { DASHBOARD_OVERVIEW_TAG } from "@/lib/cache/invalidate";
 import { getAdminDb } from "@/lib/db/admin";
+import {
+  buildOverview,
+  toDashboardClient,
+  type MetricSnapshotInput,
+} from "@/lib/dashboard/overview";
+import { buildKeywordSeries, type KeywordRankingRow } from "@/lib/dashboard/keywords";
+import type {
+  DashboardClient,
+  DashboardOverview,
+  DashboardRange,
+  KeywordRankSeries,
+} from "@/types/dashboard";
 import {
   SOURCES,
   type Client,
@@ -22,6 +36,7 @@ const metricSchema = z.strictObject({
   conversions: z.number().nonnegative().nullable(),
   keyword: z.string().nullable(),
   rank: z.number().nonnegative().nullable(),
+  searchVolume: z.number().nonnegative().nullable(),
 });
 const metricsSchema = z.array(metricSchema);
 const clientSchema = z.object({
@@ -38,10 +53,26 @@ const currentSchema = z.object({
   is_stale: z.boolean(),
 });
 
+const snapshotSchema = z.object({
+  source: sourceSchema,
+  metrics: metricsSchema,
+  synced_at: timestampSchema,
+});
+
+const keywordRankingRowSchema = z.object({
+  keyword: z.string().min(1),
+  rank: z.coerce.number().nonnegative(),
+  synced_at: timestampSchema,
+});
+
 async function databaseOperation<T>(operation: () => Promise<T>): Promise<T> {
   try {
     return await operation();
-  } catch {
+  } catch (error) {
+    console.error(
+      "[db] operation failed:",
+      error instanceof Error ? error.message : error,
+    );
     throw new Error("Database operation failed");
   }
 }
@@ -143,4 +174,137 @@ export async function writeSyncLog(input: SyncLogInput): Promise<void> {
     const { error } = await getAdminDb().from("sync_logs").insert(log);
     if (error) throw new Error("Database operation failed");
   });
+}
+
+export async function listMetricSnapshots(
+  clientId: string,
+  source: Source,
+  from: string,
+  to: string,
+): Promise<MetricSnapshotInput[]> {
+  return databaseOperation(async () => {
+    const { data, error } = await getAdminDb()
+      .from("metrics_snapshots")
+      .select("source,metrics,synced_at")
+      .eq("client_id", idSchema.parse(clientId))
+      .eq("source", sourceSchema.parse(source))
+      .gte("synced_at", timestampSchema.parse(from))
+      .lte("synced_at", timestampSchema.parse(to))
+      .order("synced_at", { ascending: true });
+    if (error || !data) throw new Error("Database operation failed");
+    return z.array(snapshotSchema).parse(data).map((row) => ({
+      source: row.source,
+      metrics: row.metrics,
+      syncedAt: row.synced_at,
+    }));
+  });
+}
+
+/**
+ * Dedicated read path for `keyword_rankings`: the per-keyword, per-date rank
+ * history persisted by `persist_metrics`. Time-bounded so API callers can page
+ * a range and the dashboard can plot a series.
+ */
+export async function listKeywordRankings(
+  clientId: string,
+  source: Source,
+  from: string,
+  to: string,
+): Promise<KeywordRankingRow[]> {
+  return databaseOperation(async () => {
+    const { data, error } = await getAdminDb()
+      .from("keyword_rankings")
+      .select("keyword,rank,synced_at")
+      .eq("client_id", idSchema.parse(clientId))
+      .eq("source", sourceSchema.parse(source))
+      .gte("synced_at", timestampSchema.parse(from))
+      .lte("synced_at", timestampSchema.parse(to))
+      .order("synced_at", { ascending: true });
+    if (error || !data) throw new Error("Database operation failed");
+    return z.array(keywordRankingRowSchema).parse(data).map((row) => ({
+      keyword: row.keyword,
+      rank: row.rank,
+      syncedAt: row.synced_at,
+    }));
+  });
+}
+
+export async function listAccessibleClients(profile: {
+  role: "admin" | "client" | null;
+  clientId: string | null;
+}): Promise<DashboardClient[]> {
+  if (profile.role === "admin") {
+    return (await listActiveClients()).map(toDashboardClient);
+  }
+  if (profile.role === "client" && profile.clientId) {
+    const client = await getActiveClient(profile.clientId);
+    return client ? [toDashboardClient(client)] : [];
+  }
+  return [];
+}
+
+export async function getDashboardOverview(
+  client: DashboardClient,
+  days: DashboardRange,
+  now: Date = new Date(),
+): Promise<DashboardOverview | null> {
+  const dayMs = 86_400_000;
+  const from = new Date(now.getTime() - days * 2 * dayMs).toISOString();
+  const to = now.toISOString();
+  const snapshots = await listMetricSnapshots(client.id, "gsc", from, to);
+  if (snapshots.length === 0) return null;
+
+  const current = await getCurrentMetrics(client.id, "gsc");
+  return buildOverview({
+    client,
+    days,
+    snapshots,
+    stale: current?.is_stale ?? false,
+    now,
+  });
+}
+
+/**
+ * Cross-request cached overview so revisiting a client/range is instant.
+ * Keyed by client + range; shared tag with the keyword-history cache so one
+ * `revalidateTag` after a sync invalidates both. `unstable_cache` is the
+ * pre-`cacheComponents` API (this project does not enable the flag); revisit
+ * with `use cache` if enabled.
+ */
+const cachedDashboardOverview = unstable_cache(
+  (client: DashboardClient, days: DashboardRange) => getDashboardOverview(client, days),
+  ["dashboard-overview"],
+  { revalidate: 300, tags: [DASHBOARD_OVERVIEW_TAG] },
+);
+
+export function getCachedDashboardOverview(
+  client: DashboardClient,
+  days: DashboardRange,
+): Promise<DashboardOverview | null> {
+  return cachedDashboardOverview(client, days);
+}
+
+export async function getKeywordRankingHistory(
+  client: DashboardClient,
+  days: DashboardRange,
+  now: Date = new Date(),
+): Promise<KeywordRankSeries[]> {
+  const dayMs = 86_400_000;
+  const from = new Date(now.getTime() - days * 2 * dayMs).toISOString();
+  const to = now.toISOString();
+  const rows = await listKeywordRankings(client.id, "gsc", from, to);
+  return buildKeywordSeries(rows);
+}
+
+const cachedKeywordHistory = unstable_cache(
+  (client: DashboardClient, days: DashboardRange) => getKeywordRankingHistory(client, days),
+  ["keyword-rankings"],
+  { revalidate: 300, tags: [DASHBOARD_OVERVIEW_TAG] },
+);
+
+export function getCachedKeywordHistory(
+  client: DashboardClient,
+  days: DashboardRange,
+): Promise<KeywordRankSeries[]> {
+  return cachedKeywordHistory(client, days);
 }

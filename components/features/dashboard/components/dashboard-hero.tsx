@@ -3,15 +3,15 @@
 import React from "react";
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectGroup } from "@/components/ui/select";
-import { Overview } from "./dashboard-data";
+import { DASHBOARD_RANGES, DashboardOverview, DashboardRange, isDashboardRange } from "@/types/dashboard";
 
 interface DashboardHeroProps {
-  overview: Overview;
-  days: number;
-  onDaysChange: (days: number) => void;
+  overview: DashboardOverview;
+  days: DashboardRange;
+  onDaysChange: (days: DashboardRange) => void;
 }
 
-const ranges = [7, 30, 90].map((days) => ({ value: String(days), label: `Last ${days} days` }));
+const ranges = DASHBOARD_RANGES.map((days) => ({ value: String(days), label: `Last ${days} days` }));
 
 export function DashboardHero({ overview, days, onDaysChange }: DashboardHeroProps) {
   return (
@@ -19,7 +19,7 @@ export function DashboardHero({ overview, days, onDaysChange }: DashboardHeroPro
       <div className="flex flex-col md:flex-row md:items-baseline md:justify-between gap-4 border-b border-default pb-4">
         <div className="min-w-0">
           <p className="text-xs text-text-muted tracking-wide mb-1 font-mono uppercase">
-            {overview.client.domain} · Demo Organic Performance Report · {overview.dateRange}
+            {overview.client.domain} · Organic Performance Report · {overview.dateRange}
           </p>
           <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl text-text-primary tracking-tight font-normal">
             Organic momentum {overview.growth < 0 ? "down" : "up"} <span className="italic font-normal text-primary">{Math.abs(overview.growth).toFixed(1)}%</span> over {days} days.
@@ -30,7 +30,8 @@ export function DashboardHero({ overview, days, onDaysChange }: DashboardHeroPro
             items={ranges}
             value={String(days)}
             onValueChange={(value) => {
-              if (value !== null && ranges.some((range) => range.value === value)) onDaysChange(Number(value));
+              const next = Number(value);
+              if (value !== null && isDashboardRange(next)) onDaysChange(next);
             }}
           >
             <SelectTrigger aria-label="Reporting date range" className="w-36 text-xs h-8">
@@ -53,7 +54,7 @@ export function DashboardHero({ overview, days, onDaysChange }: DashboardHeroPro
       </div>
       {overview.staleSource && (
         <div role="status" className="bg-state-warning/10 border border-state-warning text-state-warning rounded-xl px-4 py-2 text-xs">
-          Demo data from {overview.lastUpdated} — simulated sync failed. Showing cached results.
+          Data from {overview.lastUpdated} — last sync failed. Showing cached results.
         </div>
       )}
     </section>

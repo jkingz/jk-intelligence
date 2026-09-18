@@ -4,7 +4,7 @@ import React from "react";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { TrendingUp, Globe2, Bot, Activity, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Overview } from "./dashboard-data";
+import { DashboardOverview } from "@/types/dashboard";
 
 interface Metric {
   title: string;
@@ -15,8 +15,10 @@ interface Metric {
   footerText: string;
 }
 
-export function DashboardMetrics({ overview }: { overview: Overview }) {
+export function DashboardMetrics({ overview }: { overview: DashboardOverview }) {
   const signed = (value: number) => `${value > 0 ? "+" : ""}${value.toFixed(1)}`;
+  const aiAvailable = overview.aiGrowth !== null;
+  const aiTotal = overview.aiCitations.reduce((total, citation) => total + citation.count, 0);
   const metrics: Metric[] = [
     {
       title: `Total Clicks (${overview.days}d)`,
@@ -36,11 +38,11 @@ export function DashboardMetrics({ overview }: { overview: Overview }) {
     },
     {
       title: "AI Search Engine Citations",
-      value: overview.aiCitations.reduce((total, citation) => total + citation.count, 0).toLocaleString("en-US"),
-      change: overview.aiGrowth,
-      delta: `${signed(overview.aiGrowth)}%`,
+      value: aiAvailable ? aiTotal.toLocaleString("en-US") : "—",
+      change: overview.aiGrowth ?? 0,
+      delta: aiAvailable ? `${signed(overview.aiGrowth ?? 0)}%` : "Not available",
       icon: Bot,
-      footerText: `Demo proxy: AI referrals vs previous ${overview.days} days`,
+      footerText: aiAvailable ? `AI referrals vs previous ${overview.days} days` : "No AI citation source connected",
     },
     {
       title: "Avg Position (Tracked Keywords)",

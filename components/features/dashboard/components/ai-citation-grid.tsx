@@ -3,10 +3,10 @@
 import React from "react";
 import { Bot } from "lucide-react";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
-import { AICitation, Client } from "./dashboard-data";
+import { AICitation, DashboardClient } from "@/types/dashboard";
 
 interface AICitationGridProps {
-  selectedClient: Client;
+  selectedClient: DashboardClient;
   citations: AICitation[];
 }
 
@@ -17,16 +17,21 @@ export function AICitationGrid({ selectedClient, citations }: AICitationGridProp
         <div>
           <h3 className="font-serif text-lg font-medium">Synthetic & LLM Visibility Breakdown</h3>
           <p className="text-xs text-text-muted">
-            Demo citation distribution for {selectedClient.domain}; counts use mock AI referrals as a proxy.
+            Citation distribution for {selectedClient.domain}.
           </p>
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-primary font-medium bg-secondary px-2.5 py-1 rounded-md self-start sm:self-auto">
+        <div className="flex items-center gap-1.5 text-xs text-text-muted font-medium bg-secondary px-2.5 py-1 rounded-md self-start sm:self-auto">
           <Bot className="size-3.5 shrink-0" />
-          <span>Demo Data · Not Verified</span>
+          <span>No AI source connected</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {citations.length === 0 ? (
+        <p className="py-8 text-center text-xs text-text-muted">
+          AI citation data is not available yet. Connect an AI visibility source to populate this view.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {citations.map((cite) => (
           <Card key={cite.engine} className="p-4 space-y-2">
             <CardHeader className="p-0 flex flex-row items-center justify-between">
@@ -48,7 +53,8 @@ export function AICitationGrid({ selectedClient, citations }: AICitationGridProp
             </CardFooter>
           </Card>
         ))}
-      </div>
+        </div>
+      )}
     </section>
   );
 }

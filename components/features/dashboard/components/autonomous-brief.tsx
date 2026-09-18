@@ -4,10 +4,10 @@ import React from "react";
 import { Sparkles, ArrowUpRight } from "lucide-react";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Overview } from "./dashboard-data";
+import { DashboardOverview } from "@/types/dashboard";
 
 interface AutonomousBriefProps {
-  overview: Overview;
+  overview: DashboardOverview;
 }
 
 export function AutonomousBrief({ overview }: AutonomousBriefProps) {
@@ -20,7 +20,7 @@ export function AutonomousBrief({ overview }: AutonomousBriefProps) {
         </CardHeader>
         <CardContent className="p-0 flex flex-col gap-3">
           <p className="text-xs text-text-muted leading-relaxed">
-            Demo summary for {overview.client.name} · {overview.days} days. Based on mock rankings, not a live AI analysis.
+            Summary for {overview.client.name} · {overview.days} days. Based on synced keyword rankings.
           </p>
           <div className="flex flex-col gap-3 pt-1">
             {overview.brief.map((item) => (
@@ -37,7 +37,7 @@ export function AutonomousBrief({ overview }: AutonomousBriefProps) {
       </div>
       <CardFooter className="p-0 pt-4 border-t border-default mt-4 bg-transparent">
         <Button className="w-full text-xs" disabled>
-          <span>PDF Export Unavailable in Demo</span>
+          <span>PDF Export Unavailable</span>
           <ArrowUpRight data-icon="inline-end" />
         </Button>
       </CardFooter>

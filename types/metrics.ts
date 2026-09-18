@@ -10,6 +10,7 @@ export type NormalizedMetric = {
   conversions: number | null;
   keyword: string | null;
   rank: number | null;
+  searchVolume: number | null;
 };
 
 export type CurrentMetrics = {
