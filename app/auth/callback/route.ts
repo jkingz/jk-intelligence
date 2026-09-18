@@ -1,0 +1,44 @@
+import { z } from "zod";
+import { safeNext } from "@/lib/auth/routing";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const callbackParamsSchema = z.object({
+  code: z.string().min(1),
+  next: z.string().optional(),
+  flowId: z.string().min(1).optional(),
+});
+
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const origin = url.origin;
+
+  const parsed = callbackParamsSchema.safeParse({
+    code: url.searchParams.get("code"),
+    next: url.searchParams.get("next") ?? undefined,
+    flowId: url.searchParams.get("sb_flow_id") ?? undefined,
+  });
+  if (!parsed.success) {
+    return Response.redirect(new URL("/auth/login?error=code", origin));
+  }
+
+  try {
+    const supabase = await createServerSupabaseClient();
+    const { data, error } = await supabase.auth.exchangeCodeForSession(
+      parsed.data.code,
+      parsed.data.flowId ? { flowId: parsed.data.flowId } : undefined,
+    );
+    if (!error && data.session) {
+      const destination = "redirectType" in data && data.redirectType === "recovery"
+        ? "/auth/reset-password"
+        : safeNext(parsed.data.next) ?? "/";
+      return Response.redirect(new URL(destination, origin));
+    }
+  } catch {
+    return Response.redirect(new URL("/auth/login?error=code", origin));
+  }
+
+  return Response.redirect(new URL("/auth/login?error=code", origin));
+}
