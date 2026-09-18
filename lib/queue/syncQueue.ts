@@ -8,8 +8,29 @@ export const syncJobSchema = z.object({
 });
 export type SyncJob = z.infer<typeof syncJobSchema>;
 
+/**
+ * BullMQ needs a Redis wire-protocol URL. Prefer an explicit `REDIS_URL`, but
+ * derive one from the Upstash REST credentials (`UPSTASH_REDIS_REST_URL` +
+ * `UPSTASH_REDIS_REST_TOKEN`) when it is absent — Upstash accepts the REST
+ * token as the rediss password.
+ */
+function resolveRedisUrl(): string | undefined {
+  const explicit = process.env.REDIS_URL?.trim();
+  if (explicit) return explicit;
+
+  const restUrl = process.env.UPSTASH_REDIS_REST_URL;
+  const restToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (restUrl && restToken) {
+    const { hostname } = new URL(restUrl);
+    if (hostname) {
+      return `rediss://default:${encodeURIComponent(restToken)}@${hostname}:6379`;
+    }
+  }
+  return undefined;
+}
+
 export function redisConnection(worker = false): ConnectionOptions {
-  const raw = process.env.REDIS_URL;
+  const raw = resolveRedisUrl();
   if (!raw) throw new Error("REDIS_URL is required");
   const url = new URL(raw);
   if (!["redis:", "rediss:"].includes(url.protocol)) {

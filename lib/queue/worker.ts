@@ -1,10 +1,12 @@
 import { Worker } from "bullmq";
+import { notifyDashboardRevalidated } from "@/lib/cache/notify";
 import { redisConnection, SYNC_QUEUE, syncJobSchema } from "./syncQueue";
 
 const worker = new Worker(
   SYNC_QUEUE,
   async (job) => {
     const data = syncJobSchema.parse(job.data);
+    await notifyDashboardRevalidated();
     return { clientId: data.clientId, status: "mock_completed" };
   },
   { connection: redisConnection(true), concurrency: 3 },
