@@ -62,7 +62,7 @@ vi.mock("@/lib/db/repository", () => ({
   listActiveClients: vi.fn(async () => boundary.activeClients),
 }));
 
-import { POST } from "@/app/api/cron/sync/route";
+import { GET } from "@/app/api/cron/sync/route";
 import { closeSyncQueue } from "./syncQueue";
 
 vi.stubEnv("REDIS_URL", "redis://localhost:6379");
@@ -82,9 +82,9 @@ describe("cron → mocked BullMQ queue → worker", () => {
   it("enqueues one job per active client and processes each job", async () => {
     vi.stubEnv("REDIS_URL", "redis://localhost:6379");
     vi.stubEnv("CRON_SECRET", "test-only-secret");
-    const response = await POST(
+    const response = await GET(
       new Request("http://localhost/api/cron/sync", {
-        method: "POST",
+        method: "GET",
         headers: { authorization: "Bearer test-only-secret" },
       }),
     );
@@ -110,9 +110,9 @@ describe("cron → mocked BullMQ queue → worker", () => {
     vi.stubEnv("CRON_SECRET", "test-only-secret");
     boundary.failClientId = CLIENT_B;
 
-    const response = await POST(
+    const response = await GET(
       new Request("http://localhost/api/cron/sync", {
-        method: "POST",
+        method: "GET",
         headers: { authorization: "Bearer test-only-secret" },
       }),
     );
@@ -126,8 +126,8 @@ describe("cron → mocked BullMQ queue → worker", () => {
 
   it("rejects unauthorized requests without enqueueing", async () => {
     vi.stubEnv("CRON_SECRET", "test-only-secret");
-    const response = await POST(
-      new Request("http://localhost/api/cron/sync", { method: "POST" }),
+    const response = await GET(
+      new Request("http://localhost/api/cron/sync", { method: "GET" }),
     );
     expect(response.status).toBe(401);
     expect(boundary.jobs).toHaveLength(0);

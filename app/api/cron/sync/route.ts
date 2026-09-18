@@ -6,11 +6,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Vercel cron (see `vercel.json`, `crons[0].method = "POST"`) queues one
- * BullMQ sync job per active client. Vercel attaches
- * `Authorization: Bearer <CRON_SECRET>` to the request.
+ * Vercel cron (see `vercel.json`) queues one BullMQ sync job per active
+ * client. Vercel invokes crons with `GET` and attaches
+ * `Authorization: Bearer <CRON_SECRET>`; the secret check is the access
+ * control, not the HTTP method.
  */
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   const verdict = verifyCronSecret(request, process.env.CRON_SECRET);
   if (verdict === "unavailable") {
     return Response.json({ error: "Cron unavailable" }, { status: 503 });
