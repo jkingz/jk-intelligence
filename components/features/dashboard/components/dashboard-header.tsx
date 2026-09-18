@@ -1,7 +1,7 @@
 "use client";
 
 import React, { Suspense } from "react";
-import { Building2, RefreshCw } from "lucide-react";
+import { Building2, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
 import {
@@ -23,6 +23,7 @@ interface DashboardHeaderProps {
   onSelectClient: (client: DashboardClient) => void;
   syncing: boolean;
   onSync: () => void;
+  switchingClient: boolean;
   theme: string | undefined;
   onToggleTheme: () => void;
 }
@@ -35,6 +36,7 @@ export function DashboardHeader({
   onSelectClient,
   syncing,
   onSync,
+  switchingClient,
   theme,
   onToggleTheme,
 }: DashboardHeaderProps) {
@@ -56,7 +58,11 @@ export function DashboardHeader({
           <div className="hidden sm:block h-4 w-px bg-border-subtle shrink-0" />
 
           <div className="flex items-center gap-2 min-w-0">
-            <Building2 className="w-3.5 h-3.5 text-text-muted shrink-0 hidden sm:inline-block" />
+            {switchingClient ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 hidden sm:inline-block" aria-hidden="true" />
+            ) : (
+              <Building2 className="w-3.5 h-3.5 text-text-muted shrink-0 hidden sm:inline-block" />
+            )}
             <Select
               items={clientItems}
               value={selectedClient.id}

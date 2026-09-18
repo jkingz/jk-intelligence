@@ -3,6 +3,8 @@
 import React, {
   Suspense,
   useState,
+  useEffect,
+  useRef,
   startTransition,
   addTransitionType,
   Activity,
@@ -98,8 +100,17 @@ export default function Dashboard({
 }: DashboardProps) {
   const [activeTab, setActiveTab] = useState("overview");
   const [syncing, setSyncing] = useState(false);
+  const [switchingClient, setSwitchingClient] = useState(false);
+  const selectedClientRef = useRef(selectedClient?.id);
   const { resolvedTheme, setTheme } = useTheme();
   const router = useRouter();
+
+  useEffect(() => {
+    if (selectedClientRef.current !== selectedClient?.id) {
+      selectedClientRef.current = selectedClient?.id;
+      setSwitchingClient(false);
+    }
+  }, [selectedClient?.id]);
 
   if (!selectedClient) {
     return (
@@ -122,12 +133,13 @@ export default function Dashboard({
   const navigate = (clientId: string, range: DashboardRange) => {
     const params = new URLSearchParams({ client: clientId, days: String(range) });
     startTransition(() => {
-      router.replace(`/?${params.toString()}`, { scroll: false });
+      router.replace(`/dashboard?${params.toString()}`, { scroll: false });
     });
   };
 
   const handleSelectClient = (client: DashboardClient) => {
     if (client.id === selectedClient.id) return;
+    setSwitchingClient(true);
     navigate(client.id, days);
   };
 
@@ -164,6 +176,7 @@ export default function Dashboard({
         overview={overview}
         onSelectClient={handleSelectClient}
         syncing={syncing}
+        switchingClient={switchingClient}
         onSync={handleManualSync}
         theme={resolvedTheme}
         onToggleTheme={toggleTheme}
