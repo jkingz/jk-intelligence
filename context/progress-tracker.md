@@ -141,9 +141,12 @@ Email + password sign-in/sign-up verified
 - Light-theme contrast fix (Lighthouse): the light palette failed WCAG AA — `text-faint` 2.70, `state-warning` 2.45, `state-success` 3.17, `state-error` 3.91, fire-red accent on its dim chip 3.67 (all vs `#fafafa`). Rewrote the `[data-theme="light"]` block in `globals.css` while keeping the charcoal + fire-red identity: text `#171717`/`#3d3d3d`/`#5c5c5c`/`#616161`, accent deepened to `#b91c1c` (hover `#991b1b`, dim 10%, now 6.20 plain / 4.92 on chip / 6.47 white-on-accent), success `#35701a`, error `#b3261e`, warning `#7d5800`, neutral `#5c5c5c`; borders `#dcdcdc`/`#c8c8c8`. All text roles now ≥4.5:1 on base, surface, and subtle. `ui-context.md` light table updated. Known gap: dark `--color-primary-foreground: #ffffff` on `#ff3b30` is 3.55:1 (primary buttons) — not addressed. Verified: lint clean.
 
 ## In Progress
-- (none — hero extraction + pipeline background just completed)
+- (none — staff role + cron secret just completed)
 
 ## Recent Work
+
+- `staff` role added (docs now match schema): new migration `20260920000000_add_staff_role.sql` alters `users_role_check` to allow `admin | client | staff` (applied to live DB — constraint confirmed). Code: `types/database.ts` role union; `lib/agents/authAgent.ts` (zod enum + `enforceClientAccess` treats staff like a client on its assigned `client_id`, `requireAdmin` still excludes staff); `lib/db/repository.ts` `listAccessibleClients` (staff → own client); profile feature (`ProfileView.role`, `roleLabels` "Staff", client row also shown for staff). RLS needed no change — policies key off `current_user_client_id()`/admin, not the role string. Added 3 authAgent tests (staff granted assigned client, staff denied other client, staff forbidden from admin). Verified: 60 tests, typecheck, lint, build pass.
+- `CRON_SECRET` set to a real 64-char random value in `.env` (was a stub); added `NEXT_PUBLIC_APP_URL=http://localhost:3000` so the worker→`/api/revalidate/dashboard` notify loop works locally. Verified against a production server on a fresh port: no/wrong bearer → 401, correct bearer → `202 {"queued":3,"errors":[]}` (3 active clients enqueued). Remaining: mirror the same `CRON_SECRET` value in Vercel (Settings → Environment Variables; Vercel also auto-generates one for crons).
 
 - Landing footer links removed + full landing palette applied: removed the Sign in / Get started links from `LandingFooter` (Company nav now Privacy Policy + Terms & Conditions only). Landing page now uses every `landing-*` token: hero glow gradients converted from hardcoded `rgba()` to `color-mix()` over `--landing-accent` / `--landing-sky`; metric/feature/step cards gain a `hover:bg-landing-surface-2` elevation (previously unused token); the four feature icon chips vary across the full tint ramp (accent / sky / lilac / blue) instead of accent-only. Verified: typecheck + lint clean, production build green, `color-mix` radial-gradient classes emitted with a plain (non-mix) fallback for older browsers.
 
@@ -196,15 +199,15 @@ Email + password sign-in/sign-up verified
 ## Open Questions
 - Profile: no display-name column exists (`users` has only id/role/client_id) — name editing deferred until schema decision.
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` now set in `.env` (208 chars) — auth login flows can be exercised at runtime; needs mirroring in Vercel.
-- `REDIS_URL` intentionally empty — the queue derives its connection from `UPSTASH_REDIS_REST_URL` + `_REST_TOKEN`. `CRON_SECRET` is only 1 char locally (a stub): give it a real value locally + in Vercel so cron and `/api/revalidate/dashboard` actually gate.
+- Mirror into Vercel so prod actually gates: `CRON_SECRET` (same 64-char value as `.env`), `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_DEMO_EMAIL`/`NEXT_PUBLIC_DEMO_PASSWORD`, and `UPSTASH_REDIS_REST_URL`/`_TOKEN`. A cron/queue/revalidate worker is live only where these env vars are set.
+- Staff access is enforced via the `users` table `role` column (staff → own `client_id`), not JWT claims — matches how Supabase RLS derives role/client per the advisor; no per-request DB round-trip for admins (short-circuit before query).
 - Google OAuth must be enabled on the Supabase project; `users` rows for admins/clients must be provisioned (RLS reads role/client_id from `users` table).
-- Docs (AGENTS.md, architecture-context.md) reference a `staff` role, but the migration + `types/database.ts` only allow `admin | client`. Decide: add `staff` to the DB role check + typing, or drop it from docs.
 - Supabase CLI / local Supabase not present on this machine — schema changes and auth flows not exercised against a real project. Email/password flows unit-level verified only; needs live Supabase + redirect URL allowlist (`/auth/callback`, `/auth/reset-password`) + PKCE email templates (token_hash style) to exercise end to end.
 
 ## Architecture Decisions
 - Route protection uses Next.js 16 Proxy (middleware renamed) with pure decision logic in `lib/auth/routing.ts` to keep the decision testable without framework imports
 - `authAgent` resolves authorization from the `users` table (RLS-protected, self-or-admin select) rather than JWT `user_metadata`/`app_metadata` claims — per Supabase security best practice
-- Admin/client access check (`enforceClientAccess`) matches DB schema: roles `admin | client`
+- Admin/client access check (`enforceClientAccess`) matches DB schema: roles `admin | client | staff`
 
 ## Session Notes
 Auth unit wired but not exercised end to end (no live Supabase project / Google OAuth on this machine). Env var `NEXT_PUBLIC_SUPABASE_ANON_KEY` must be added before login works at runtime. Email/password added on top of same PKCE callback; sign-up confirmation + recovery require Supabase dashboard email-template updates (token_hash) before runtime use.
