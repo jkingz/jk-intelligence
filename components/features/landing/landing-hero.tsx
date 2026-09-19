@@ -18,11 +18,11 @@ export function LandingHero() {
     <section id="pipeline-overview" className="relative overflow-hidden" aria-labelledby="hero-heading">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-96 bg-[radial-gradient(60%_50%_at_50%_0%,rgba(234,88,12,0.14),transparent_70%)]"
+        className="pointer-events-none absolute inset-x-0 top-0 h-96 bg-[radial-gradient(60%_50%_at_50%_0%,color-mix(in_srgb,var(--landing-accent)_14%,transparent),transparent_70%)]"
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-40 h-80 bg-[radial-gradient(40%_50%_at_20%_0%,rgba(255,158,94,0.1),transparent_70%)]"
+        className="pointer-events-none absolute inset-x-0 top-40 h-80 bg-[radial-gradient(40%_50%_at_20%_0%,color-mix(in_srgb,var(--landing-sky)_10%,transparent),transparent_70%)]"
       />
 
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-end justify-center">
@@ -71,7 +71,7 @@ export function LandingHero() {
             {sampleMetrics.map((metric) => (
               <div
                 key={metric.label}
-                className="rounded-2xl border border-landing-border bg-landing-surface p-5 transition-transform duration-200 ease-out hover:-translate-y-0.5 motion-reduce:transform-none"
+                className="rounded-2xl border border-landing-border bg-landing-surface p-5 transition-colors duration-200 ease-out hover:border-landing-border/60 hover:bg-landing-surface-2"
               >
                 <dt className="text-xs uppercase tracking-wide text-landing-faint">{metric.label}</dt>
                 <dd className="mt-2 flex items-baseline justify-between gap-2">

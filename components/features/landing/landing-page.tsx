@@ -19,26 +19,37 @@ const features = [
     description:
       "Google Search Console, GA4, and SEO platform data merged into one dashboard per client — traffic, conversions, clicks, impressions, CTR, and average position.",
     icon: BarChart3,
+    tone: "accent",
   },
   {
     name: "Keyword ranking trends",
     description:
       "Time-series tracking of top 3 / top 10 / top 20 keywords with the biggest movers, so you can see which rankings gained and which slipped — over any date range.",
     icon: TrendingUp,
+    tone: "sky",
   },
   {
     name: "AI performance briefs",
     description:
       "A plain-English summary generated for every client: top wins, biggest declines, and recommended focus areas — cached daily to keep costs predictable.",
     icon: Sparkles,
+    tone: "lilac",
   },
   {
     name: "Automated daily sync",
     description:
       "A daily job pulls every client's data with per-source retries and partial-failure safety. Dashboards read from cache, so they stay fast even when an API is down.",
     icon: RefreshCw,
+    tone: "blue",
   },
 ];
+
+const tintChips: Record<string, string> = {
+  accent: "bg-landing-accent/10 text-landing-accent",
+  sky: "bg-landing-sky/10 text-landing-sky",
+  lilac: "bg-landing-lilac/10 text-landing-lilac",
+  blue: "bg-landing-blue/10 text-landing-blue",
+};
 
 const steps = [
   {
@@ -83,9 +94,11 @@ export function LandingPage() {
               {features.map((feature) => (
                 <div
                   key={feature.name}
-                  className="rounded-2xl border border-landing-border bg-landing-surface p-5 transition-colors duration-200 ease-out hover:border-landing-border/60"
+                  className="rounded-2xl border border-landing-border bg-landing-surface p-5 transition-colors duration-200 ease-out hover:border-landing-border/60 hover:bg-landing-surface-2"
                 >
-                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-landing-accent/10 text-landing-accent">
+                  <span
+                    className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${tintChips[feature.tone]}`}
+                  >
                     <feature.icon className="size-5" aria-hidden="true" />
                   </span>
                   <h3 className="mt-4 text-sm font-semibold">{feature.name}</h3>
@@ -107,7 +120,7 @@ export function LandingPage() {
               {steps.map((step) => (
                 <div
                   key={step.number}
-                  className="rounded-2xl border border-landing-border bg-landing-surface p-5 transition-transform duration-200 ease-out hover:-translate-y-0.5 motion-reduce:transform-none"
+                  className="rounded-2xl border border-landing-border bg-landing-surface p-5 transition-colors duration-200 ease-out hover:border-landing-border/60 hover:bg-landing-surface-2"
                 >
                   <span className="font-mono text-xs text-landing-accent">{step.number}</span>
                   <h3 className="mt-3 text-sm font-semibold">{step.title}</h3>

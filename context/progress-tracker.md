@@ -143,6 +143,10 @@ Email + password sign-in/sign-up verified
 ## In Progress
 - (none — hero extraction + pipeline background just completed)
 
+## Recent Work
+
+- Landing footer links removed + full landing palette applied: removed the Sign in / Get started links from `LandingFooter` (Company nav now Privacy Policy + Terms & Conditions only). Landing page now uses every `landing-*` token: hero glow gradients converted from hardcoded `rgba()` to `color-mix()` over `--landing-accent` / `--landing-sky`; metric/feature/step cards gain a `hover:bg-landing-surface-2` elevation (previously unused token); the four feature icon chips vary across the full tint ramp (accent / sky / lilac / blue) instead of accent-only. Verified: typecheck + lint clean, production build green, `color-mix` radial-gradient classes emitted with a plain (non-mix) fallback for older browsers.
+
 ## Completed (cont.)
 
 - Dashboard LCP skeleton: rewrote `components/features/dashboard/components/dashboard-skeleton.tsx` (the `/dashboard` Suspense fallback) to mirror the real layout 1:1 — header, hero (domain line + 2-line h1 + range/tabs row), 4 metric cards, 2/1 chart + brief grid, query table, AI citation grid, footer. Placeholder blocks are `bg-border/70 motion-safe:animate-pulse` and match real heights (`h-80` chart, `h-9` hero lines, matching card padding) so the early skeleton paint can be the LCP candidate and the real swap-in causes no layout shift. Server component, no client JS; `aria-busy`/`aria-live`/sr-only label retained. `ui-context.md` gained "Loading Skeletons". Verified: typecheck + lint clean.

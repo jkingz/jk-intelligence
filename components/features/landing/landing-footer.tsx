@@ -63,20 +63,6 @@ export function LandingFooter() {
                 </li>
               ))}
             </ul>
-            <div className="mt-5 flex items-center gap-4">
-              <Link
-                href="/auth/login"
-                className="text-sm text-landing-muted transition-colors hover:text-landing-text"
-              >
-                Sign in
-              </Link>
-              <Link
-                href="/auth/sign-up"
-                className="text-sm font-medium text-landing-accent transition-colors hover:text-landing-sky"
-              >
-                Get started
-              </Link>
-            </div>
           </nav>
         </div>
 
