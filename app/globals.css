@@ -73,25 +73,25 @@
 
 :root {
   /* dark mode defaults */
-  --bg-base: #141412;
-  --bg-surface: #1a1a17;
-  --bg-elevated: #232320;
-  --bg-subtle: #2a2a26;
-  --border-default: #32322d;
-  --border-subtle: #45453f;
-  --text-primary: #fafaf7;
-  --text-secondary: #c4c4ba;
-  --text-muted: #9a9a90;
-  --text-faint: #6f6f66;
-  --accent-primary: #c14a2c;
-  --accent-hover: #d4643f;
-  --accent-primary-dim: rgba(193, 74, 44, 0.14);
-  --accent-ai: #9a9a90;
-  --accent-ai-text: #c4c4ba;
+  --bg-base: #0d0d0d;
+  --bg-surface: #141414;
+  --bg-elevated: #1a1a1a;
+  --bg-subtle: #212121;
+  --border-default: #2b2b2b;
+  --border-subtle: #3d3d3d;
+  --text-primary: #fafafa;
+  --text-secondary: #d0d0d0;
+  --text-muted: #b0b0b0;
+  --text-faint: #8a8a8a;
+  --accent-primary: #ff3b30;
+  --accent-hover: #ff5f52;
+  --accent-primary-dim: rgba(255, 59, 48, 0.18);
+  --accent-ai: #b0b0b0;
+  --accent-ai-text: #d8d8d8;
   --state-success: #8fbf5a;
   --state-error: #f08e7d;
   --state-warning: #f6c669;
-  --state-neutral: #6f6f66;
+  --state-neutral: #8a8a8a;
 
   /* uploadthing-inspired landing palette (always dark) — updated: orange/black scheme */
   --landing-bg: #050201;
@@ -109,25 +109,25 @@
 
 [data-theme="light"] {
   /* light mode overrides */
-  --bg-base: #fafaf7;
-  --bg-surface: #f1f1ec;
-  --bg-elevated: #e5e5de;
-  --bg-subtle: #e5e5de;
-  --border-default: #e5e5de;
-  --border-subtle: #d8d8d0;
-  --text-primary: #141412;
-  --text-secondary: #45453f;
-  --text-muted: #6f6f66;
-  --text-faint: #9a9a90;
-  --accent-primary: #c14a2c;
-  --accent-hover: #a63d22;
-  --accent-primary-dim: rgba(193, 74, 44, 0.10);
-  --accent-ai: #9a9a90;
-  --accent-ai-text: #45453f;
-  --state-success: #6d9a3d;
-  --state-error: #d4543f;
-  --state-warning: #c99b32;
-  --state-neutral: #6f6f66;
+  --bg-base: #fafafa;
+  --bg-surface: #f2f2f2;
+  --bg-elevated: #ebebeb;
+  --bg-subtle: #e4e4e4;
+  --border-default: #dcdcdc;
+  --border-subtle: #c8c8c8;
+  --text-primary: #171717;
+  --text-secondary: #3d3d3d;
+  --text-muted: #4f4f4f;
+  --text-faint: #5a5a5a;
+  --accent-primary: #b91c1c;
+  --accent-hover: #991b1b;
+  --accent-primary-dim: rgba(185, 28, 28, 0.10);
+  --accent-ai: #4f4f4f;
+  --accent-ai-text: #3d3d3d;
+  --state-success: #336d18;
+  --state-error: #b3261e;
+  --state-warning: #7d5800;
+  --state-neutral: #4f4f4f;
 }
 
 @layer base {

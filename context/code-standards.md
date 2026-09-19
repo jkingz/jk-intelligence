@@ -37,6 +37,8 @@ const data: any = await fetchGSC()
 - Route handlers handle one responsibility: auth → validate → delegate to lib.
 - Never run sync jobs inline in route handlers — always queue via BullMQ.
 - Long-running work belongs in BullMQ jobs, not request handlers.
+- Load heavy first-party chart libraries (recharts) via `next/dynamic` behind the nearest `<Suspense>`, and keep the Suspense fallback in its **own recharts-free module**. Never co-locate the fallback with the chart import — co-location defeats the split by pulling the chart barrel back into the initial route JS.
+- Tree-shake first-party icon/chart barrel packages (`lucide-react`, `recharts`) via `experimental.optimizePackageImports` so the dashboard entry only ships the pieces the route actually uses.
 
 ## React 19.3 Rendering
 

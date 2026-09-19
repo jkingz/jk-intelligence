@@ -2,7 +2,7 @@
 
 ## Theme
 
-Dark/light mode supported. Default: dark. Toggle via `data-theme` attribute on `<html>`. Visual language: warm charcoal surfaces, brick accent, paper text, clean data-dense reporting UI. Palette adapted from structurewebworks.com.
+Dark/light mode supported. Default: dark. Toggle via `data-theme` attribute on `<html>`. Visual language: deep charcoal surfaces, fire-red accent, paper text, clean data-dense reporting UI. Palette adapted from structurewebworks.com.
 
 All colors defined as CSS custom properties in `globals.css`, mapped to Tailwind via `@theme inline`. Components use tokens only — no hardcoded hex or raw Tailwind color classes like `zinc-*` or `slate-*`.
 
@@ -10,63 +10,63 @@ All colors defined as CSS custom properties in `globals.css`, mapped to Tailwind
 
 | Role | CSS Variable | Hex |
 |------|-------------|-----|
-| Page background | `--bg-base` | `#141412` |
-| Surface | `--bg-surface` | `#1a1a17` |
-| Elevated surface | `--bg-elevated` | `#232320` |
-| Subtle surface | `--bg-subtle` | `#2a2a26` |
-| Default border | `--border-default` | `#32322d` |
-| Subtle border | `--border-subtle` | `#45453f` |
-| Primary text | `--text-primary` | `#fafaf7` |
-| Secondary text | `--text-secondary` | `#c4c4ba` |
-| Muted text | `--text-muted` | `#9a9a90` |
-| Faint text | `--text-faint` | `#6f6f66` |
-| Brand accent (brick) | `--accent-primary` | `#c14a2c` |
-| Brand hover | `--accent-hover` | `#d4643f` |
-| Brand dim | `--accent-primary-dim` | `rgba(193, 74, 44, 0.14)` |
-| AI accent | `--accent-ai` | `#9a9a90` |
-| AI text | `--accent-ai-text` | `#c4c4ba` |
+| Page background | `--bg-base` | `#0d0d0d` |
+| Surface | `--bg-surface` | `#141414` |
+| Elevated surface | `--bg-elevated` | `#1a1a1a` |
+| Subtle surface | `--bg-subtle` | `#212121` |
+| Default border | `--border-default` | `#2b2b2b` |
+| Subtle border | `--border-subtle` | `#3d3d3d` |
+| Primary text | `--text-primary` | `#fafafa` |
+| Secondary text | `--text-secondary` | `#d0d0d0` |
+| Muted text | `--text-muted` | `#b0b0b0` |
+| Faint text | `--text-faint` | `#8a8a8a` |
+| Brand accent (fire red) | `--accent-primary` | `#ff3b30` |
+| Brand hover | `--accent-hover` | `#ff5f52` |
+| Brand dim | `--accent-primary-dim` | `rgba(255, 59, 48, 0.18)` |
+| AI accent | `--accent-ai` | `#b0b0b0` |
+| AI text | `--accent-ai-text` | `#d8d8d8` |
 | Positive / up | `--state-success` | `#8fbf5a` |
 | Negative / down | `--state-error` | `#f08e7d` |
 | Warning / stale | `--state-warning` | `#f6c669` |
-| Neutral / flat | `--state-neutral` | `#6f6f66` |
+| Neutral / flat | `--state-neutral` | `#8a8a8a` |
 
 ### Light Mode Tokens
 
 | Role | CSS Variable | Hex |
 |------|-------------|-----|
-| Page background | `--bg-base` | `#fafaf7` |
-| Surface | `--bg-surface` | `#f1f1ec` |
-| Elevated surface | `--bg-elevated` | `#e5e5de` |
-| Subtle surface | `--bg-subtle` | `#e5e5de` |
-| Default border | `--border-default` | `#e5e5de` |
-| Subtle border | `--border-subtle` | `#d8d8d0` |
-| Primary text | `--text-primary` | `#141412` |
-| Secondary text | `--text-secondary` | `#45453f` |
-| Muted text | `--text-muted` | `#6f6f66` |
-| Faint text | `--text-faint` | `#9a9a90` |
-| Brand accent (brick) | `--accent-primary` | `#c14a2c` |
-| Brand hover | `--accent-hover` | `#a63d22` |
-| Brand dim | `--accent-primary-dim` | `rgba(193, 74, 44, 0.10)` |
-| AI accent | `--accent-ai` | `#9a9a90` |
-| AI text | `--accent-ai-text` | `#45453f` |
-| Positive / up | `--state-success` | `#6d9a3d` |
-| Negative / down | `--state-error` | `#d4543f` |
-| Warning / stale | `--state-warning` | `#c99b32` |
-| Neutral / flat | `--state-neutral` | `#6f6f66` |
+| Page background | `--bg-base` | `#fafafa` |
+| Surface | `--bg-surface` | `#f2f2f2` |
+| Elevated surface | `--bg-elevated` | `#ebebeb` |
+| Subtle surface | `--bg-subtle` | `#e4e4e4` |
+| Default border | `--border-default` | `#dcdcdc` |
+| Subtle border | `--border-subtle` | `#c8c8c8` |
+| Primary text | `--text-primary` | `#171717` |
+| Secondary text | `--text-secondary` | `#3d3d3d` |
+| Muted text | `--text-muted` | `#4f4f4f` |
+| Faint text | `--text-faint` | `#5a5a5a` |
+| Brand accent (fire red) | `--accent-primary` | `#b91c1c` |
+| Brand hover | `--accent-hover` | `#991b1b` |
+| Brand dim | `--accent-primary-dim` | `rgba(185, 28, 28, 0.10)` |
+| AI accent | `--accent-ai` | `#4f4f4f` |
+| AI text | `--accent-ai-text` | `#3d3d3d` |
+| Positive / up | `--state-success` | `#336d18` |
+| Negative / down | `--state-error` | `#b3261e` |
+| Warning / stale | `--state-warning` | `#7d5800` |
+| Neutral / flat | `--state-neutral` | `#4f4f4f` |
 
 ### globals.css Pattern
 
 ```css
 :root {
   /* dark mode defaults */
-  --bg-base: #141412;
-  --accent-primary: #c14a2c;
+  --bg-base: #0d0d0d;
+  --accent-primary: #ff3b30;
   /* ... */
 }
 
 [data-theme="light"] {
-  --bg-base: #fafaf7;
-  --accent-primary: #c14a2c;
+  --bg-base: #fafafa;
+  --accent-primary: #b91c1c;
   /* ... */
 }
 ```
@@ -156,6 +156,12 @@ bg-warning/10 border border-warning text-warning rounded-xl px-4 py-2
 - Failed: `bg-error/10 text-error` dot + label
 - Stale (>24hrs): `bg-warning/10 text-warning` dot + label
 - Pending: `bg-muted/10 text-muted` animated dot
+
+### Loading Skeletons
+
+- `DashboardSkeleton` (`components/features/dashboard/components/dashboard-skeleton.tsx`) is the `/dashboard` Suspense fallback and mirrors the real layout 1:1 — header, hero (domain line + h1 + range/tabs), 4 metric cards, 2/1 chart + brief grid, query table, AI grid, footer.
+- Placeholder blocks use `bg-border/70` + `motion-safe:animate-pulse` (respects reduced motion); heights match the real content (`h-80` chart, `h-9` hero lines, matching card padding) so the early skeleton paint is the LCP candidate and no layout shift occurs when real data swaps in.
+- Server component, no client JS. Root carries `aria-busy="true"`, `aria-live="polite"`, and an `sr-only` "Loading dashboard" label.
 
 ---
 

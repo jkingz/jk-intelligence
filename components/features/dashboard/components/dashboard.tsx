@@ -16,7 +16,13 @@ import { useRouter } from "next/navigation";
 import { DashboardHeader } from "./dashboard-header";
 import { DashboardHero } from "./dashboard-hero";
 import { DashboardMetrics } from "./dashboard-metrics";
-import { DashboardChart, DashboardChartFallback } from "./dashboard-chart";
+import dynamic from "next/dynamic";
+import { DashboardChartFallback } from "./dashboard-chart-fallback";
+
+const DashboardChart = dynamic(
+  () => import("./dashboard-chart").then((m) => ({ default: m.DashboardChart })),
+  { loading: () => <DashboardChartFallback /> }
+);
 import { AutonomousBrief } from "./autonomous-brief";
 import { QueryTable } from "./query-table";
 import { AICitationGrid } from "./ai-citation-grid";

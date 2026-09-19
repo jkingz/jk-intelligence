@@ -15,7 +15,7 @@ export function AICitationGrid({ selectedClient, citations }: AICitationGridProp
     <section className="bg-surface rounded-xl border border-default p-4 sm:p-6 space-y-4 sm:space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
-          <h3 className="font-serif text-lg font-medium">Synthetic & LLM Visibility Breakdown</h3>
+          <span className="font-serif text-lg font-medium">Synthetic & LLM Visibility Breakdown</span>
           <p className="text-xs text-text-muted">
             Citation distribution for {selectedClient.domain}.
           </p>

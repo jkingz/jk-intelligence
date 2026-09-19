@@ -28,7 +28,7 @@ export function QueryTable({ keywords, history }: QueryTableProps) {
     <section className="bg-surface rounded-xl border border-default overflow-hidden">
       <div className="p-4 sm:p-5 border-b border-default flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h3 className="font-serif text-lg font-medium">Top Performing Entities & Queries</h3>
+          <span className="font-serif text-lg font-medium">Top Performing Entities & Queries</span>
           <p className="text-xs text-text-muted">Search volume, rank changes, and clicks for the selected period</p>
         </div>
         <div className="relative flex-1 sm:flex-initial">

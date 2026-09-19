@@ -16,7 +16,7 @@ export function AutonomousBrief({ overview }: AutonomousBriefProps) {
       <div className="flex flex-col gap-4">
         <CardHeader className="p-0 flex flex-row items-center gap-2 text-primary">
           <Sparkles className="size-4" />
-          <h3 className="font-serif text-lg font-medium text-text-primary">Autonomous Brief</h3>
+          <span className="font-serif text-lg font-medium text-text-primary">Autonomous Brief</span>
         </CardHeader>
         <CardContent className="p-0 flex flex-col gap-3">
           <p className="text-xs text-text-muted leading-relaxed">

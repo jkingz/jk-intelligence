@@ -19,22 +19,6 @@ interface DashboardChartProps {
   data: TrafficPoint[];
 }
 
-export function DashboardChartFallback() {
-  return (
-    <div className="relative lg:col-span-2 min-w-0">
-      <div className="relative bg-surface rounded-xl border border-default p-4 sm:p-5">
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <div>
-            <h3 className="text-xs uppercase tracking-wide font-medium text-text-muted">Search Clicks</h3>
-            <p className="text-[11px] text-text-muted">Trend for the selected range</p>
-          </div>
-        </div>
-        <div className="w-full h-80" />
-      </div>
-    </div>
-  );
-}
-
 export function DashboardChart({ data }: DashboardChartProps) {
   use(browser());
   const shouldReduceMotion = useReducedMotion();
@@ -54,9 +38,9 @@ export function DashboardChart({ data }: DashboardChartProps) {
         >
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
-            <h3 className="text-xs uppercase tracking-wide font-medium text-text-muted">
+            <span className="text-xs uppercase tracking-wide font-medium text-text-muted">
               {hasAiData ? "Clicks vs AI Citations" : "Search Clicks"}
-            </h3>
+            </span>
             <p className="text-[11px] text-text-muted">Trend for the selected range</p>
           </div>
           <div className="flex items-center gap-4 text-[11px] text-text-muted">

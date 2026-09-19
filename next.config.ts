@@ -45,6 +45,18 @@ const securityHeaders = isDev
     ];
 
 const nextConfig: NextConfig = {
+  // Response compression (gzip/brotli) on by default in Next; made explicit
+  // and self-documenting for the Lighthouse "transfer size" audit rather than
+  // relying on the implicit default.
+  compress: true,
+  experimental: {
+    // Tree-shakes the re-export barrels of these two first-party libraries so
+    // the dashboard entry only ships the icons/chart primitives actually used
+    // on the route. Directly trims the "large first-party JavaScript" parse
+    // byte Lighthouse measures (lucide-react exports hundreds of icons;
+    // recharts re-exports every chart from one barrel).
+    optimizePackageImports: ["lucide-react", "recharts"],
+  },
   images: {
     // Only self-authored, script-free SVGs in this repo (Archify exports). SVG
     // is served unoptimized (vector, lossless) but `dangerouslyAllowSVG` is
@@ -52,6 +64,10 @@ const nextConfig: NextConfig = {
     // blocks any script inside the SVG from executing.
     dangerouslyAllowSVG: true,
     contentDispositionType: "inline",
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    formats: ['image/avif', 'image/webp'], // Modern formats first
+    minimumCacheTTL: 60 * 60 * 24 * 365, // 1 year cache
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   async headers() {
