@@ -24,6 +24,7 @@ import { enforceClientAccess, getAuthUser, requireAdmin } from "./authAgent";
 
 const ADMIN = "00000000-0000-4000-8000-000000000002";
 const CLIENT = "00000000-0000-4000-8000-000000000001";
+const STAFF = "00000000-0000-4000-8000-00000000000a";
 const OTHER_CLIENT = "00000000-0000-4000-8000-00000000000b";
 
 afterEach(() => {
@@ -94,6 +95,29 @@ describe("enforceClientAccess", () => {
     });
   });
 
+  it("grants staff access to their assigned client", async () => {
+    boundary.getUser.mockResolvedValue({ data: { user: { id: STAFF } }, error: null });
+    boundary.profile.mockResolvedValue({
+      data: { role: "staff", client_id: OTHER_CLIENT },
+      error: null,
+    });
+
+    await expect(enforceClientAccess(OTHER_CLIENT)).resolves.toEqual({ allow: true });
+  });
+
+  it("denies staff access to a client they are not assigned to", async () => {
+    boundary.getUser.mockResolvedValue({ data: { user: { id: STAFF } }, error: null });
+    boundary.profile.mockResolvedValue({
+      data: { role: "staff", client_id: CLIENT },
+      error: null,
+    });
+
+    await expect(enforceClientAccess(OTHER_CLIENT)).resolves.toEqual({
+      allow: false,
+      reason: "forbidden",
+    });
+  });
+
   it("denies unauthenticated requests", async () => {
     boundary.getUser.mockResolvedValue({ data: { user: null }, error: null });
 
@@ -119,6 +143,19 @@ describe("requireAdmin", () => {
     boundary.getUser.mockResolvedValue({ data: { user: { id: CLIENT } }, error: null });
     boundary.profile.mockResolvedValue({
       data: { role: "client", client_id: OTHER_CLIENT },
+      error: null,
+    });
+
+    await expect(requireAdmin()).resolves.toEqual({
+      allow: false,
+      reason: "forbidden",
+    });
+  });
+
+  it("forbids staff", async () => {
+    boundary.getUser.mockResolvedValue({ data: { user: { id: STAFF } }, error: null });
+    boundary.profile.mockResolvedValue({
+      data: { role: "staff", client_id: CLIENT },
       error: null,
     });
 

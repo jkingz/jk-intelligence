@@ -6,7 +6,7 @@ import { getAuthUser } from "@/lib/agents/authAgent";
 export interface ProfileView {
   email: string | null;
   name: string | null;
-  role: "admin" | "client" | null;
+  role: "admin" | "client" | "staff" | null;
   clientId: string | null;
   providers: string[];
 }

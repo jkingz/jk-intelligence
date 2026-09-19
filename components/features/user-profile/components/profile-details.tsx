@@ -3,6 +3,7 @@ import type { ProfileView } from "../lib/profile";
 const roleLabels: Record<NonNullable<ProfileView["role"]>, string> = {
   admin: "Admin",
   client: "Client",
+  staff: "Staff",
 };
 
 export function ProfileDetails({ profile }: { profile: ProfileView }) {
@@ -20,7 +21,7 @@ export function ProfileDetails({ profile }: { profile: ProfileView }) {
         <dt className="text-muted-foreground">Role</dt>
         <dd className="text-primary">{profile.role ? roleLabels[profile.role] : "—"}</dd>
       </div>
-      {profile.role === "client" && profile.clientId && (
+      {(profile.role === "client" || profile.role === "staff") && profile.clientId && (
         <div className="flex justify-between gap-4">
           <dt className="text-muted-foreground">Client</dt>
           <dd className="font-mono text-xs text-primary">{profile.clientId}</dd>

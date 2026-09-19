@@ -5,7 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const authUserSchema = z.object({
   id: z.string().uuid(),
-  role: z.enum(["admin", "client"]),
+  role: z.enum(["admin", "client", "staff"]),
   clientId: z.string().uuid().nullable(),
 });
 
@@ -38,7 +38,7 @@ export async function enforceClientAccess(clientId: string): Promise<AccessDecis
   const user = await getAuthUser();
   if (!user) return { allow: false, reason: "unauthenticated" };
   if (user.role === "admin") return { allow: true };
-  return user.role === "client" && user.clientId === clientId
+  return (user.role === "client" || user.role === "staff") && user.clientId === clientId
     ? { allow: true }
     : { allow: false, reason: "forbidden" };
 }
