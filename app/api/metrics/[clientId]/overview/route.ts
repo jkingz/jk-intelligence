@@ -13,9 +13,6 @@ import {
   type DashboardRange,
 } from "@/types/dashboard";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 const clientIdSchema = z.uuid();
 
 export async function GET(
@@ -25,13 +22,27 @@ export async function GET(
   const { clientId: rawClientId } = await ctx.params;
   const clientId = clientIdSchema.safeParse(rawClientId);
   if (!clientId.success) {
-    return Response.json("Invalid client id", { status: 400 });
+    return new Response(JSON.stringify({ error: "Invalid client id" }), {
+      status: 400,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+        'Vary': 'Cookie'
+      }
+    });
   }
 
   const access = await enforceClientAccess(clientId.data);
   if (!access.allow) {
     const status = access.reason === "unauthenticated" ? 401 : 403;
-    return Response.json("Forbidden", { status });
+    return new Response(JSON.stringify({ error: "Forbidden" }), {
+      status: status,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+        'Vary': 'Cookie'
+      }
+    });
   }
 
   const profile = await getProfileView();
@@ -41,7 +52,14 @@ export async function GET(
   });
   const client = clients.find((c) => c.id === clientId.data) ?? null;
   if (!client) {
-    return Response.json({ error: "Client not found" }, { status: 404 });
+    return new Response(JSON.stringify({ error: "Client not found" }), {
+      status: 404,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+        'Vary': 'Cookie'
+      }
+    });
   }
 
   const rawDays = Number(
@@ -56,12 +74,23 @@ export async function GET(
       getCachedDashboardOverview(client, days),
       getCachedKeywordHistory(client, days),
     ]);
-    return Response.json({ overview, history });
+    return new Response(JSON.stringify({ overview, history }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=30',
+        'Vary': 'Cookie'
+      }
+    });
   } catch {
-    return Response.json(
-      { error: "Database operation failed" },
-      { status: 503 },
-    );
+    return new Response(JSON.stringify({ error: "Database operation failed" }), {
+      status: 503,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+        'Vary': 'Cookie'
+      }
+    });
   }
 }
 
