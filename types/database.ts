@@ -82,7 +82,7 @@ export type Database = {
       users: Table<
         {
           id: string;
-          role: "admin" | "client";
+          role: "admin" | "client" | "staff";
           client_id: string | null;
           created_at: string;
         },

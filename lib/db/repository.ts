@@ -230,13 +230,13 @@ export async function listKeywordRankings(
 }
 
 export async function listAccessibleClients(profile: {
-  role: "admin" | "client" | null;
+  role: "admin" | "client" | "staff" | null;
   clientId: string | null;
 }): Promise<DashboardClient[]> {
   if (profile.role === "admin") {
     return (await listActiveClients()).map(toDashboardClient);
   }
-  if (profile.role === "client" && profile.clientId) {
+  if ((profile.role === "client" || profile.role === "staff") && profile.clientId) {
     const client = await getActiveClient(profile.clientId);
     return client ? [toDashboardClient(client)] : [];
   }

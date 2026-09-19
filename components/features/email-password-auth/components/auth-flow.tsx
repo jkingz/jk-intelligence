@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { EmailAuthForm } from "./email-auth-form";
 import { GoogleSignInButton } from "./google-sign-in";
 import { AppleSignInButton } from "./apple-sign-in";
+import { DemoAccess } from "./demo-access";
 
 type AuthMode = "sign-in" | "sign-up";
 
@@ -71,6 +72,8 @@ export function AuthFlow({ initialMode, next, error }: AuthFlowProps) {
           </div>
         </motion.div>
       </AnimatePresence>
+
+      {mode === "sign-in" && <DemoAccess next={next} />}
 
       {mode === "sign-in" ? (
         <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">

@@ -7,6 +7,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+## Standing Rules (read first)
+Read `RULES.md` at the repo root before anything else on every task — concise output, server/port hygiene, and removing unused project stuff apply to all future work, not just this session.
+
 ## Application Building Context
 
 Read the following files in order before implementing or making any architectural decision:
@@ -15,7 +18,7 @@ Read the following files in order before implementing or making any architectura
 2. `context/architecture-context.md` — system structure, boundaries, storage model, and invariants
 3. `context/ui-context.md` — theme, colors, typography, canvas design, and component conventions
 4. `context/code-standards.md` — implementation rules and conventions
-5. `context/ai-workflow-rules.md` — development workflow, scoping rules, and delivery approach
+5. `context/development-workflow.md` — development workflow, scoping rules, and delivery approach
 6. `context/progress-tracker.md` — current phase, completed work, open questions, and next steps
 
 Project-wide convention: all images use `next/image` (`Image`), never a raw `<img>` element (enforced by `@next/next/no-img-element`). SVG sources are allowed for self-authored, script-free assets only. Details in `context/code-standards.md` → "Images".
