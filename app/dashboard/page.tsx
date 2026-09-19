@@ -11,18 +11,17 @@ import { isDashboardRange, type DashboardRange } from "@/types/dashboard";
 
 const DEFAULT_RANGE: DashboardRange = 30;
 
-type DashboardSearchParams = Promise<{ client?: string; days?: string }>;
+export const revalidate = 60; // Revalidate every 60 seconds
 
-export default function Page({ searchParams }: { searchParams: DashboardSearchParams }) {
-  return (
-    <Suspense fallback={<DashboardSkeleton />}>
-      <DashboardData searchParams={searchParams} />
-    </Suspense>
-  );
-}
-
-async function DashboardData({ searchParams }: { searchParams: DashboardSearchParams }) {
-  const [profile, params] = await Promise.all([getProfileView(), searchParams]);
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ client?: string; days?: string }>;
+}) {
+  const [profile, params] = await Promise.all([
+    getProfileView(),
+    searchParams,
+  ]);
 
   const clients = await listAccessibleClients({
     role: profile?.role ?? null,
@@ -30,10 +29,12 @@ async function DashboardData({ searchParams }: { searchParams: DashboardSearchPa
   });
 
   const selectedClient =
-    clients.find((client) => client.id === params.client) ?? clients[0] ?? null;
+    clients.find((client) => client.id === params?.client) ?? clients[0] ?? null;
 
-  const requestedDays = Number(params.days);
-  const days: DashboardRange = isDashboardRange(requestedDays) ? requestedDays : DEFAULT_RANGE;
+  const requestedDays = Number(params?.days ?? DEFAULT_RANGE);
+  const days: DashboardRange = isDashboardRange(requestedDays)
+    ? requestedDays
+    : DEFAULT_RANGE;
 
   const [overview, history] = selectedClient
     ? await Promise.all([
@@ -43,13 +44,15 @@ async function DashboardData({ searchParams }: { searchParams: DashboardSearchPa
     : [null, [] as Awaited<ReturnType<typeof getCachedKeywordHistory>>];
 
   return (
-    <Dashboard
-      accountMenu={<AccountMenu profile={profile} />}
-      clients={clients}
-      selectedClient={selectedClient}
-      days={days}
-      overview={overview}
-      history={history}
-    />
+    <Suspense fallback={<DashboardSkeleton />}>
+      <Dashboard
+        accountMenu={<AccountMenu profile={profile} />}
+        clients={clients}
+        selectedClient={selectedClient}
+        days={days}
+        overview={overview}
+        history={history}
+      />
+    </Suspense>
   );
 }

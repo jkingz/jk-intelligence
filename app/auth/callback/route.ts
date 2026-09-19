@@ -4,9 +4,6 @@ import { z } from "zod";
 import { safeNext } from "@/lib/auth/routing";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 const callbackParamsSchema = z.object({
   code: z.string().min(1),
   next: z.string().optional(),

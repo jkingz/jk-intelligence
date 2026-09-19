@@ -1,10 +1,10 @@
 import { z } from "zod";
+
 import { enforceClientAccess } from "@/lib/agents/authAgent";
 import { listKeywordRankings } from "@/lib/db/repository";
 import { SOURCES, type Source } from "@/types/metrics";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 const DAY_MS = 86_400_000;
 
@@ -22,23 +22,41 @@ export async function GET(
   const { clientId: rawClientId } = await ctx.params;
   const clientId = clientIdSchema.safeParse(rawClientId);
   if (!clientId.success) {
-    return Response.json({ error: "Invalid client id" }, { status: 400 });
+    return new Response(JSON.stringify({ error: "Invalid client id" }), {
+      status: 400,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+        'Vary': 'Cookie'
+      }
+    });
   }
 
   const query = querySchema.safeParse(
     Object.fromEntries(new URL(request.url).searchParams),
   );
   if (!query.success) {
-    return Response.json(
-      { error: "Invalid query", meta: { issues: query.error.issues } },
-      { status: 400 },
-    );
+    return new Response(JSON.stringify({ error: "Invalid query", meta: { issues: query.error.issues } }), {
+      status: 400,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+        'Vary': 'Cookie'
+      }
+    });
   }
 
   const access = await enforceClientAccess(clientId.data);
   if (!access.allow) {
     const status = access.reason === "unauthenticated" ? 401 : 403;
-    return Response.json({ error: "Forbidden" }, { status });
+    return new Response(JSON.stringify({ error: "Forbidden" }), {
+      status: status,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+        'Vary': 'Cookie'
+      }
+    });
   }
 
   const now = new Date();
@@ -52,7 +70,7 @@ export async function GET(
       from,
       to,
     );
-    return Response.json({
+    return new Response(JSON.stringify({
       data,
       meta: {
         clientId: clientId.data,
@@ -61,8 +79,22 @@ export async function GET(
         to,
         count: data.length,
       },
+    }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=30',
+        'Vary': 'Cookie'
+      }
     });
   } catch {
-    return Response.json({ error: "Database operation failed" }, { status: 503 });
+    return new Response(JSON.stringify({ error: "Database operation failed" }), {
+      status: 503,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+        'Vary': 'Cookie'
+      }
+    });
   }
 }

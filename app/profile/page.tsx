@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: "Profile — JK Intelligence",
 };
 
-export const dynamic = "force-dynamic";
+export const revalidate = 30; // Revalidate every 30 seconds
 
 export default async function ProfilePage() {
   const profile = await getProfileView();
