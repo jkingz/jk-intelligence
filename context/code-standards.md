@@ -125,6 +125,8 @@ const [gsc, ga4, semrush] = await Promise.allSettled([
 - Sync failures → write failed status to sync_logs → mark is_stale → alert admin.
 - Dashboard never shows 500 — always falls back to cached data + stale banner.
 - API errors logged with: clientId, platform, timestamp, error message (no credentials).
+- Client-facing form/action status is a single bottom-right toast lifecycle (`@/lib/toast-status`): `startStatusToast` for processing → `finishStatusToast` flips to success/error. Do not build inline status banners — processing, success, and error all render in the toaster viewport.
+- Interactive submit paths guard against duplicate submissions with a `SlidingWindowLimiter` (`lib/rate-limit.ts`) *and* the component's `pending`/`disabled` state — never rely on button disabling alone.
 
 ## File Organization
 

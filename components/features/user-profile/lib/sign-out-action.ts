@@ -1,15 +1,16 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-export async function signOutAction(): Promise<{ error: string }> {
+export type SignOutResult = { success: true } | { success: false; error: string };
+
+export async function signOutAction(): Promise<SignOutResult> {
   try {
     const supabase = await createServerSupabaseClient();
     const { error } = await supabase.auth.signOut();
-    if (error) return { error: "Unable to log out. Please try again." };
+    if (error) return { success: false, error: "Unable to log out. Please try again." };
   } catch {
-    return { error: "Unable to log out. Please try again." };
+    return { success: false, error: "Unable to log out. Please try again." };
   }
-  redirect("/auth/login");
+  return { success: true };
 }

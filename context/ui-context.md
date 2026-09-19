@@ -180,6 +180,14 @@ bg-warning/10 border border-warning text-warning rounded-xl px-4 py-2
 
 shadcn/ui on Tailwind 4. Components in `components/ui/`. Use `shadcn` CLI to add — never write from scratch. Override styles via token classes only.
 
+## Toasts / Form Feedback
+
+- `components/ui/toast.tsx` (Base UI Toast, added via shadcn) exposes `toast.add({ title, description, type })`; `Toaster` is mounted once in `app/layout.tsx`. The viewport is pinned bottom-right on `sm+` — it is the single feedback surface for form/action status.
+- All form interactions run through one lifecycle (`lib/toast-status.ts`): `startStatusToast(title, description)` adds a persistent `"loading"` (spinner) toast; `finishStatusToast(id, { status, title, description, timeout })` flips it in place to `"success"` or `"error"`. Errors auto-dismiss in 8s, successes in 6s, and `timeout: 0` keeps important confirmations (e.g. "check your email") visible until dismissed.
+- Copy pattern: titles `"Too many attempts"` / `"Could not complete"` / `"Sign out failed"` / `"Profile saved"` / `"Signed in"`; descriptions are generic user-safe messages.
+- Rate limiting: every interactive submit path first checks a per-instance `SlidingWindowLimiter` (`lib/rate-limit.ts`). On rejection show the "Too many attempts" toast and skip the network call; the existing `pending`/`disabled` guard still blocks mid-flight re-submission.
+- Submission controls keep their own pending affordance (button label swap + `aria-busy`) — the toast signals global status, the button signals local state.
+
 ---
 
 ## Motion

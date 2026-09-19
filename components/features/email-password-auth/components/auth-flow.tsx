@@ -3,9 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, UserPlus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { EmailAuthForm } from "./email-auth-form";
 import { GoogleSignInButton } from "./google-sign-in";
+import { AppleSignInButton } from "./apple-sign-in";
 
 type AuthMode = "sign-in" | "sign-up";
 
@@ -17,11 +19,7 @@ interface AuthFlowProps {
 
 export function AuthFlow({ initialMode, next, error }: AuthFlowProps) {
   const [mode, setMode] = useState<AuthMode>(initialMode);
-
-  const headline = {
-    "sign-in": "Welcome back",
-    "sign-up": "Create your account",
-  }[mode];
+  const nextQuery = next ? `?next=${encodeURIComponent(next)}` : "";
 
   return (
     <div className="flex flex-col gap-3">
@@ -45,34 +43,44 @@ export function AuthFlow({ initialMode, next, error }: AuthFlowProps) {
           transition={{ duration: 0.2, ease: "easeOut" }}
           className="flex flex-col gap-3"
         >
-          <h1 className="font-serif text-lg text-foreground">{headline}</h1>
-          <EmailAuthForm mode={mode} next={next} />
+          <EmailAuthForm
+            mode={mode}
+            next={next}
+            switchButton={
+              mode === "sign-in" ? (
+                <Button
+                  type="button"
+                  size="lg"
+                  className="h-10 w-full"
+                  onClick={() => setMode("sign-up")}
+                >
+                  <UserPlus className="size-4" data-icon="inline-start" aria-hidden="true" />
+                  <span className="truncate">Create account</span>
+                </Button>
+              ) : undefined
+            }
+          />
           <div aria-hidden="true" className="flex items-center gap-2">
             <span className="h-px flex-1 bg-border" />
             <span className="text-xs text-muted-foreground">or</span>
             <span className="h-px flex-1 bg-border" />
           </div>
-          <GoogleSignInButton next={next} />
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <GoogleSignInButton next={next} />
+            <AppleSignInButton next={next} />
+          </div>
         </motion.div>
       </AnimatePresence>
 
       {mode === "sign-in" ? (
-        <div className="flex flex-col gap-3 text-xs text-muted-foreground">
-          <div className="flex items-center justify-between gap-3">
-            <Link href="/" className="inline-flex items-center gap-1 underline underline-offset-4 hover:text-foreground">
-              <ArrowLeft className="size-3" aria-hidden="true" />
-              Back to home
-            </Link>
-            <Link href={`/auth/forgot-password${next ? `?next=${encodeURIComponent(next)}` : ""}`} className="underline underline-offset-4 hover:text-foreground">
-              Forgot your password?
-            </Link>
-          </div>
-          <p className="text-center">
-            New to JK Intelligence?{" "}
-            <button type="button" onClick={() => setMode("sign-up")} className="underline underline-offset-4 hover:text-foreground">
-              Create an account
-            </button>
-          </p>
+        <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+          <Link href="/" className="inline-flex items-center gap-1 underline underline-offset-4 hover:text-foreground">
+            <ArrowLeft className="size-3" aria-hidden="true" />
+            Back to home
+          </Link>
+          <Link href={`/auth/forgot-password${nextQuery}`} className="underline underline-offset-4 hover:text-foreground">
+            Forgot your password?
+          </Link>
         </div>
       ) : (
         <div className="flex flex-col gap-3 text-xs text-muted-foreground">

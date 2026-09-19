@@ -1,13 +1,18 @@
 "use client";
 
-import { useId, useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/toast";
+import { SlidingWindowLimiter } from "@/lib/rate-limit";
+import { finishStatusToast, startStatusToast } from "@/lib/toast-status";
 import { submitEmailAuth, type EmailAuthMode } from "../lib/email-password";
 
 interface EmailAuthFormProps {
   mode: EmailAuthMode;
   next?: string;
+  switchButton?: ReactNode;
 }
 
 const labels: Record<EmailAuthMode, string> = {
@@ -17,23 +22,28 @@ const labels: Record<EmailAuthMode, string> = {
   "reset-password": "Update password",
 };
 
-export function EmailAuthForm({ mode, next }: EmailAuthFormProps) {
+export function EmailAuthForm({ mode, next, switchButton }: EmailAuthFormProps) {
   const id = useId();
   const [pending, setPending] = useState(false);
-  const [feedback, setFeedback] = useState<{
-    status: "success" | "error";
-    message: string;
-  } | null>(null);
+  const limiter = useRef(new SlidingWindowLimiter({ max: 5, windowMs: 60_000 })).current;
   const hasEmail = mode !== "reset-password";
   const hasPassword = mode !== "forgot-password";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending) return;
+    if (!limiter.trySubmit()) {
+      toast.add({
+        type: "error",
+        title: "Too many attempts",
+        description: "Please wait a moment before trying again.",
+      });
+      return;
+    }
     const form = event.currentTarget;
     const data = new FormData(form);
+    const statusId = startStatusToast(labels[mode]);
     setPending(true);
-    setFeedback(null);
 
     try {
       const result = await submitEmailAuth(
@@ -46,16 +56,35 @@ export function EmailAuthForm({ mode, next }: EmailAuthFormProps) {
         next,
       );
       if (result.status === "redirect") {
+        finishStatusToast(statusId, {
+          status: "success",
+          title: "Signed in",
+          description: "Welcome back.",
+        });
         window.location.assign(result.destination);
         return;
       }
-      setFeedback(result);
-      if (result.status === "success") form.reset();
+      if (result.status === "success") {
+        finishStatusToast(statusId, {
+          status: "success",
+          title: "Success",
+          description: result.message,
+          timeout: 0,
+        });
+        form.reset();
+      } else {
+        finishStatusToast(statusId, {
+          status: "error",
+          title: "Could not complete",
+          description: result.message,
+        });
+      }
       setPending(false);
     } catch {
-      setFeedback({
+      finishStatusToast(statusId, {
         status: "error",
-        message: "Unable to complete your request. Please try again.",
+        title: "Something went wrong",
+        description: "Unable to complete your request. Please try again.",
       });
       setPending(false);
     }
@@ -97,25 +126,21 @@ export function EmailAuthForm({ mode, next }: EmailAuthFormProps) {
             </p>
           </div>
         )}
-        <Button type="submit" size="lg" className="h-10 w-full" disabled={pending}>
-          {pending ? "Please wait…" : labels[mode]}
-        </Button>
+        {switchButton ? (
+          <div className="grid grid-cols-2 gap-2">
+            <Button type="submit" size="lg" className="h-10 w-full" disabled={pending}>
+              <span className="truncate">{pending ? "Please wait…" : labels[mode]}</span>
+              <LogIn className="size-4" data-icon="inline-end" aria-hidden="true" />
+            </Button>
+            {switchButton}
+          </div>
+        ) : (
+          <Button type="submit" size="lg" className="h-10 w-full" disabled={pending}>
+            {pending ? "Please wait…" : labels[mode]}
+            <LogIn className="size-4" data-icon="inline-end" aria-hidden="true" />
+          </Button>
+        )}
       </fieldset>
-      <div role="status" aria-live="polite" aria-atomic="true">
-        {pending && <p className="text-xs text-muted-foreground">Processing your request…</p>}
-        {feedback?.status === "success" && (
-          <p className="rounded-lg border border-default bg-state-success/10 px-3 py-2 text-xs text-state-success">
-            {feedback.message}
-          </p>
-        )}
-      </div>
-      <div role="alert" aria-atomic="true">
-        {feedback?.status === "error" && (
-          <p className="rounded-lg border border-default bg-state-warning/10 px-3 py-2 text-xs text-state-warning">
-            {feedback.message}
-          </p>
-        )}
-      </div>
     </form>
   );
 }

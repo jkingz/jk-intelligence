@@ -147,7 +147,44 @@ Email + password sign-in/sign-up verified
 
 - Landing footer links removed + full landing palette applied: removed the Sign in / Get started links from `LandingFooter` (Company nav now Privacy Policy + Terms & Conditions only). Landing page now uses every `landing-*` token: hero glow gradients converted from hardcoded `rgba()` to `color-mix()` over `--landing-accent` / `--landing-sky`; metric/feature/step cards gain a `hover:bg-landing-surface-2` elevation (previously unused token); the four feature icon chips vary across the full tint ramp (accent / sky / lilac / blue) instead of accent-only. Verified: typecheck + lint clean, production build green, `color-mix` radial-gradient classes emitted with a plain (non-mix) fallback for older browsers.
 
-## Completed (cont.)
+- Login/AuthFlow updates:
+  - Removed the "Welcome back" headline from the auth card (mode headline deleted from `AuthFlow`; the sign-up card description already carried that message).
+  - Added `AppleSignInButton` (`components/features/email-password-auth/components/apple-sign-in.tsx`, barrel-exported) — Supabase `signInWithOAuth({ provider: "apple" })` → `/auth/callback?next=…`, same loading toast / rate-limiter / pending spinner treatment as Google.
+  - Google + Apple render side by side (`grid sm:grid-cols-2`, stacked on phones so the full "Continue with …" labels never overflow), replacing the single full-width Google button.
+  - Sign in / Create account now render side by side: `EmailAuthForm` gained a `switchButton` slot rendered in a `grid grid-cols-2` with the submit button; `AuthFlow` passes the Create account toggle there (with a leading `UserPlus` icon), and the submit button gained a trailing `LogIn` icon (`data-icon="inline-end"`). Without a switch button (forgot/reset modes) the submit stays full-width. Verified: Sign in (x432 w204) and Create account (x644 w204) share y=555 at 1280px, both SVGs present. Typecheck, lint, 57 tests, build green.
+  - Verified via prod-server Playwright at 1280px: no `<h1>`/"Welcome back", buttons = ["Sign in","Continue with Google","Continue with Apple","Create account"], and the two social buttons share the same baseline (Google x:432 w:204, Apple x:644 w:204, same y). Typecheck, lint, 57 tests, build green. Not committed.
+
+- Forgot-password page cleanup: removed the "Reset password" heading, header, and footer to match the login/sign-up chrome (`AuthPageShell chrome={false}`), and wrapped the form + "Back to sign in" link in a new `AuthPageTransition` client component (`components/features/email-password-auth/components/auth-page-transition.tsx`, exported via barrel) that replays login's enter motion (`opacity 0`/y 8 → visible). Verified: SSR HTML shows the fade start (`opacity:0`) and no "Reset password"/chrome; typecheck, lint, 57 tests, build green.
+- Verified: typecheck, lint, build green.
+
+- Fixed stuck sign-out toast/spinner on the landing page: `signOutAction` previously threw via `redirect("/")` on success, so the `finishStatusToast` call never ran and the loading toast kept spinning after landing. The action now returns `{ success: true } | { success: false; error }`; both sign-out callers (button + account menu) resolve the toast to `success` ("Signed out — You have been logged out.") and navigate to "/" with `router.push()` (lint-clean vs `window.location.assign`; session cookies already cleared server-side). Test updated for the new result shape. Verified: typecheck, lint, 57 tests, build green.
+- Not committed/pushed.
+
+- Dashboard navigation feedback (days + client selectors):
+  - Changing the reporting date range or the selected client now runs the same toast lifecycle as profile edit: a `loading` (spinner) toast "Loading dashboard — Fetching the latest data…" appears bottom-right, flips to `success` "Dashboard updated — Loaded <client> · Last <n> days." when the new server data arrives, and auto-dismisses. Rapid repeat navigations close the previous toast first (`toast.close`).
+  - Selector lock + in-select spinner: `SelectTrigger` (`components/ui/select.tsx`) gained a `loading` prop — renders a `Loader2` spinner in place of the chevron and forces `disabled`, so the user can't change client/range mid-flight. Both the client select (header) and day-range select (hero) pass `loading={switching}` and drop the external standalone spinners; `Building2` stays static in the header. Spinner, disabled state, and the toast all stay in sync while the same `switching` value is active.
+  - Completion is detected in a `useEffect` against a module-level `pendingDashboardNav` record (survives the Dashboard unmount that happens when the server page suspends over `DashboardSkeleton`); `pendingView` state keeps the spinner reactive without setState-in-effect (lint-clean). Replaced the old `switchingClient` single-client spinner state.
+  - Verified: typecheck, lint, 57 tests, build green. Not committed/pushed.
+
+- Profile dialog UX: successful name save now closes the dialog and clears the form field. `EditProfileForm` gained an `onSaved` callback (fires on success, clears the input); `ProfileDialog` passes `onSaved={() => onOpenChange(false)}` and remounts the form per open (keyed on `open`) so the field is re-hydrated with the current `profile.name` the next time the dialog opens. Success toast stays in the bottom-right as confirmation. Verified: typecheck, lint, 57 tests green.
+- Not committed/pushed.
+
+- Bottom-right processing/success/error toasts (replaces inline banners):
+  - `lib/toast-status.ts` — `startStatusToast` adds a persistent `loading` (spinner) toast; `finishStatusToast` flips it in place to `success`/`error` via the Base UI toast manager (`toast.update`, per-toast `timeout`; 0 = persists).
+  - All form/action paths now run this lifecycle: email/password auth, Google OAuth ("Connecting to Google…"), profile edit, sign-out (button + account menu). Inline `role="status"` success blocks and "Processing your request…" text removed — the bottom-right toaster is now the single status surface (loading → success/error). Important confirmations ("check your email") are `timeout: 0` toasts. Rate-limit rejections still fire a direct error toast.
+  - Docs updated (`ui-context.md` → "Toasts / Form Feedback", `code-standards.md` → Error Handling).
+  - Verified: 57 tests, typecheck, lint, build green. Prod-server Playwright: click submit → bottom-right toast enters `loading` (spinner SVG present) → flips to `error` "Could not complete — Sign-in did not complete…" when Supabase rejects the creds.
+  - Not committed/pushed.
+
+- Form errors → toaster + submit rate limiting + sign-out → landing:
+  - `components/ui/toast.tsx` (Base UI Toast via shadcn, barrel-exported); `Toaster` mounted in `app/layout.tsx` inside `ThemeProvider`.
+  - `lib/rate-limit.ts` — pure `SlidingWindowLimiter` (max-submissions/window, `retryAfter`, `reset`); unit tested (`lib/rate-limit.test.ts`).
+  - All interactive submit paths now check the limiter first — rejection shows a "Too many attempts" toast and skips the network call; existing `pending`/`disabled` guard still blocks mid-flight re-submission. Applied to `EmailAuthForm` (5/60s), `EditProfileForm` (5/60s), `GoogleSignInButton` (3/30s), `SignOutButton` + `AccountMenu` (3/30s).
+  - Errors on every form/action now surface as `type: "error"` toasts: email/password auth (`email-auth-form.tsx`), Google OAuth (`google-sign-in.tsx` — was `console.error` only), profile edit (`edit-profile-form.tsx`), sign-out (`sign-out-button.tsx`, `account-menu.tsx`). Success + in-flight states stay inline `role="status"`; inline error banners removed.
+  - `signOutAction` now `redirect("/")` (landing) instead of `/auth/login`; test updated. Proxy already treats `/` as anonymous-pass after the session cookie clears.
+  - Docs: `ui-context.md` → "Toasts / Form Feedback", `code-standards.md` → Error Handling.
+  - Verified: 57 tests (was 53), typecheck, lint, build green. Prod-server Playwright smoke: toast viewport renders, a wrong-password submit pops the error toast and the 6th rapid attempt is blocked with "Too many attempts"; 0 app console errors (400s are the real Supabase auth rejecting the bad credentials).
+  - Not committed/pushed.
 
 - Dashboard LCP skeleton: rewrote `components/features/dashboard/components/dashboard-skeleton.tsx` (the `/dashboard` Suspense fallback) to mirror the real layout 1:1 — header, hero (domain line + 2-line h1 + range/tabs row), 4 metric cards, 2/1 chart + brief grid, query table, AI citation grid, footer. Placeholder blocks are `bg-border/70 motion-safe:animate-pulse` and match real heights (`h-80` chart, `h-9` hero lines, matching card padding) so the early skeleton paint can be the LCP candidate and the real swap-in causes no layout shift. Server component, no client JS; `aria-busy`/`aria-live`/sr-only label retained. `ui-context.md` gained "Loading Skeletons". Verified: typecheck + lint clean.
 

@@ -37,7 +37,11 @@ export function ProfileDialog({
           <DialogDescription>{profile.email ?? "Your account details."}</DialogDescription>
         </DialogHeader>
         <ProfileDetails profile={profile} />
-        <EditProfileForm currentName={profile.name} />
+        <EditProfileForm
+          key={open ? "open" : "closed"}
+          currentName={profile.name}
+          onSaved={() => onOpenChange(false)}
+        />
         <SignOutButton />
       </DialogContent>
     </Dialog>

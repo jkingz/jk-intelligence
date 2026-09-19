@@ -1,27 +1,53 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/toast";
+import { SlidingWindowLimiter } from "@/lib/rate-limit";
+import { finishStatusToast, startStatusToast } from "@/lib/toast-status";
 import { updateProfileAction } from "../lib/update-profile-action";
 
-export function EditProfileForm({ currentName }: { currentName: string | null }) {
+export function EditProfileForm({
+  currentName,
+  onSaved,
+}: {
+  currentName: string | null;
+  onSaved?: () => void;
+}) {
   const id = "profile-name";
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState(currentName ?? "");
-  const [feedback, setFeedback] = useState<{ status: "success" | "error"; message: string } | null>(null);
+  const limiter = useRef(new SlidingWindowLimiter({ max: 5, windowMs: 60_000 })).current;
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setFeedback(null);
+    if (!limiter.trySubmit()) {
+      toast.add({
+        type: "error",
+        title: "Too many attempts",
+        description: "Please wait a moment before trying again.",
+      });
+      return;
+    }
+    const statusId = startStatusToast("Saving profile", "Saving your changes…");
     startTransition(async () => {
       const result = await updateProfileAction({ name });
-      setFeedback(
-        result.status === "success"
-          ? { status: "success", message: "Profile updated." }
-          : result,
-      );
-      if (result.status === "success") setName(result.name);
+      if (result.status === "success") {
+        finishStatusToast(statusId, {
+          status: "success",
+          title: "Profile saved",
+          description: "Profile updated.",
+        });
+        setName("");
+        onSaved?.();
+      } else {
+        finishStatusToast(statusId, {
+          status: "error",
+          title: "Could not save changes",
+          description: result.message,
+        });
+      }
     });
   }
 
@@ -44,18 +70,6 @@ export function EditProfileForm({ currentName }: { currentName: string | null })
           {pending ? "Saving…" : "Save changes"}
         </Button>
       </fieldset>
-      <div role="status" aria-live="polite">
-        {feedback?.status === "success" && (
-          <p className="rounded-lg border border-default bg-state-success/10 px-3 py-2 text-xs text-state-success">
-            Profile updated.
-          </p>
-        )}
-        {feedback?.status === "error" && (
-          <p role="alert" className="rounded-lg border border-default bg-state-warning/10 px-3 py-2 text-xs text-state-warning">
-            {feedback.message}
-          </p>
-        )}
-      </div>
     </form>
   );
 }

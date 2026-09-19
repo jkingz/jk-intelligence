@@ -8,12 +8,13 @@ import { DASHBOARD_RANGES, DashboardOverview, DashboardRange, isDashboardRange }
 interface DashboardHeroProps {
   overview: DashboardOverview;
   days: DashboardRange;
+  switching: boolean;
   onDaysChange: (days: DashboardRange) => void;
 }
 
 const ranges = DASHBOARD_RANGES.map((days) => ({ value: String(days), label: `Last ${days} days` }));
 
-export function DashboardHero({ overview, days, onDaysChange }: DashboardHeroProps) {
+export function DashboardHero({ overview, days, switching, onDaysChange }: DashboardHeroProps) {
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-col md:flex-row md:items-baseline md:justify-between gap-4 border-b border-default pb-4">
@@ -34,7 +35,11 @@ export function DashboardHero({ overview, days, onDaysChange }: DashboardHeroPro
               if (value !== null && isDashboardRange(next)) onDaysChange(next);
             }}
           >
-            <SelectTrigger aria-label="Reporting date range" className="w-36 text-xs h-8">
+            <SelectTrigger
+              aria-label="Reporting date range"
+              className="w-36 text-xs h-8"
+              loading={switching}
+            >
               <SelectValue placeholder="Range" />
             </SelectTrigger>
             <SelectContent>

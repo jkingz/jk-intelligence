@@ -9,4 +9,5 @@ export * from "./select";
 export * from "./badge";
 export * from "./chart";
 export * from "./table";
+export * from "./toast";
 export * from "./in-view";

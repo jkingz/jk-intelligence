@@ -4,7 +4,6 @@ import React, {
   Suspense,
   useState,
   useEffect,
-  useRef,
   startTransition,
   addTransitionType,
   Activity,
@@ -13,6 +12,8 @@ import React, {
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 
+import { toast } from "@/components/ui/toast";
+import { finishStatusToast, startStatusToast } from "@/lib/toast-status";
 import { DashboardHeader } from "./dashboard-header";
 import { DashboardHero } from "./dashboard-hero";
 import { DashboardMetrics } from "./dashboard-metrics";
@@ -36,6 +37,14 @@ import type {
 } from "@/types/dashboard";
 
 const TAB_ORDER: string[] = ["overview", "queries", "ai_visibility"];
+
+interface PendingDashboardNav {
+  clientId: string;
+  days: DashboardRange;
+  toastId: string;
+}
+
+let pendingDashboardNav: PendingDashboardNav | null = null;
 
 const panelTransition: React.ComponentProps<typeof ViewTransition> = {
   enter: {
@@ -106,17 +115,28 @@ export default function Dashboard({
 }: DashboardProps) {
   const [activeTab, setActiveTab] = useState("overview");
   const [syncing, setSyncing] = useState(false);
-  const [switchingClient, setSwitchingClient] = useState(false);
-  const selectedClientRef = useRef(selectedClient?.id);
+  const [pendingView, setPendingView] = useState<{
+    clientId: string;
+    days: DashboardRange;
+  } | null>(null);
   const { resolvedTheme, setTheme } = useTheme();
   const router = useRouter();
 
   useEffect(() => {
-    if (selectedClientRef.current !== selectedClient?.id) {
-      selectedClientRef.current = selectedClient?.id;
-      setSwitchingClient(false);
+    if (!pendingDashboardNav) return;
+    if (
+      pendingDashboardNav.clientId === selectedClient?.id &&
+      pendingDashboardNav.days === days
+    ) {
+      const { toastId } = pendingDashboardNav;
+      pendingDashboardNav = null;
+      finishStatusToast(toastId, {
+        status: "success",
+        title: "Dashboard updated",
+        description: `Loaded ${selectedClient?.name ?? "client"} · Last ${days} days.`,
+      });
     }
-  }, [selectedClient?.id]);
+  }, [selectedClient, days]);
 
   if (!selectedClient) {
     return (
@@ -137,7 +157,11 @@ export default function Dashboard({
   }
 
   const navigate = (clientId: string, range: DashboardRange) => {
+    if (pendingDashboardNav) toast.close(pendingDashboardNav.toastId);
     const params = new URLSearchParams({ client: clientId, days: String(range) });
+    const toastId = startStatusToast("Loading dashboard", "Fetching the latest data…");
+    pendingDashboardNav = { clientId, days: range, toastId };
+    setPendingView({ clientId, days: range });
     startTransition(() => {
       router.replace(`/dashboard?${params.toString()}`, { scroll: false });
     });
@@ -145,7 +169,6 @@ export default function Dashboard({
 
   const handleSelectClient = (client: DashboardClient) => {
     if (client.id === selectedClient.id) return;
-    setSwitchingClient(true);
     navigate(client.id, days);
   };
 
@@ -173,6 +196,10 @@ export default function Dashboard({
     setTheme(resolvedTheme === "dark" ? "light" : "dark");
   };
 
+  const switching =
+    pendingView !== null &&
+    (pendingView.clientId !== selectedClient.id || pendingView.days !== days);
+
   return (
     <div className="min-h-screen w-full min-w-0 flex flex-col font-sans antialiased bg-background text-foreground">
       <DashboardHeader
@@ -182,14 +209,19 @@ export default function Dashboard({
         overview={overview}
         onSelectClient={handleSelectClient}
         syncing={syncing}
-        switchingClient={switchingClient}
+        switching={switching}
         onSync={handleManualSync}
         theme={resolvedTheme}
         onToggleTheme={toggleTheme}
       />
       <main className="max-w-7xl w-full min-w-0 mx-auto px-4 sm:px-6 py-6 sm:py-8 flex-1">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="gap-6 sm:gap-8">
-          <DashboardHero overview={overview} days={days} onDaysChange={handleDaysChange} />
+          <DashboardHero
+            overview={overview}
+            days={days}
+            switching={switching}
+            onDaysChange={handleDaysChange}
+          />
           <TabsContent value="overview" keepMounted>
             <AnimatedPanel active={activeTab === "overview"} className="flex flex-col gap-6 sm:gap-8">
               <DashboardMetrics overview={overview} />

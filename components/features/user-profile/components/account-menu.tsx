@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { LogOut, UserRound } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -13,24 +14,50 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { toast } from "@/components/ui/toast";
+import { SlidingWindowLimiter } from "@/lib/rate-limit";
+import { finishStatusToast, startStatusToast } from "@/lib/toast-status";
 import type { ProfileView } from "../lib/profile";
 import { signOutAction } from "../lib/sign-out-action";
 import { ProfileDialog } from "./profile-dialog";
 
 export function AccountMenu({ profile }: { profile: ProfileView | null }) {
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const limiter = useRef(new SlidingWindowLimiter({ max: 3, windowMs: 30_000 })).current;
+  const router = useRouter();
 
   const name = profile?.name ?? null;
   const email = profile?.email ?? undefined;
   const initial = (name?.trim() || email || "").charAt(0).toUpperCase();
 
   function logOut() {
-    setError(null);
+    if (pending) return;
+    if (!limiter.trySubmit()) {
+      toast.add({
+        type: "error",
+        title: "Too many attempts",
+        description: "Please wait a moment before trying again.",
+      });
+      return;
+    }
+    const statusId = startStatusToast("Sign out");
     startTransition(async () => {
       const result = await signOutAction();
-      setError(result.error);
+      if (!result.success) {
+        finishStatusToast(statusId, {
+          status: "error",
+          title: "Sign out failed",
+          description: result.error,
+        });
+        return;
+      }
+      finishStatusToast(statusId, {
+        status: "success",
+        title: "Signed out",
+        description: "You have been logged out.",
+      });
+      router.push("/");
     });
   }
 
@@ -58,7 +85,6 @@ export function AccountMenu({ profile }: { profile: ProfileView | null }) {
               {pending ? "Logging out…" : "Log out"}
             </DropdownMenuItem>
           </DropdownMenuGroup>
-          {error && <p role="alert" className="px-2 py-1 text-xs text-destructive">{error}</p>}
         </DropdownMenuContent>
       </DropdownMenu>
       {profile && (
