@@ -251,10 +251,12 @@ export async function getDashboardOverview(
   const dayMs = 86_400_000;
   const from = new Date(now.getTime() - days * 2 * dayMs).toISOString();
   const to = now.toISOString();
-  const snapshots = await listMetricSnapshots(client.id, "gsc", from, to);
+  const [snapshots, current] = await Promise.all([
+    listMetricSnapshots(client.id, "gsc", from, to),
+    getCurrentMetrics(client.id, "gsc"),
+  ]);
   if (snapshots.length === 0) return null;
 
-  const current = await getCurrentMetrics(client.id, "gsc");
   return buildOverview({
     client,
     days,
