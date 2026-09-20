@@ -163,6 +163,7 @@ export default function Dashboard({
     pendingDashboardNav = { clientId, days: range, toastId };
     setPendingView({ clientId, days: range });
     startTransition(() => {
+      window.history.replaceState({}, "", `/dashboard?${params.toString()}`);
       router.replace(`/dashboard?${params.toString()}`, { scroll: false });
     });
   };
