@@ -35,6 +35,9 @@ export function DashboardView() {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const payloadsRef = useRef(new Map<string, OverviewPayload>());
+  const inflightRef = useRef(new Map<string, Promise<OverviewPayload>>());
+  const prefetchedClientsRef = useRef(new Set<string>());
 
   useEffect(() => {
     const controller = new AbortController();
@@ -62,29 +65,66 @@ export function DashboardView() {
   const rawClientId = searchParams.get("client") ?? "";
   const targetClient = clients.find((client) => client.id === rawClientId) ?? clients[0] ?? null;
 
+  const cacheKey = (clientId: string, days: DashboardRange) => `${clientId}:${days}`;
+
   useEffect(() => {
     if (!targetClient) return;
+
+    const getPayload = async (
+      clientId: string,
+      days: DashboardRange,
+      signal?: AbortSignal,
+    ): Promise<OverviewPayload> => {
+      const key = cacheKey(clientId, days);
+      const cached = payloadsRef.current.get(key);
+      if (cached) return cached;
+      const pending = inflightRef.current.get(key);
+      if (pending) return pending;
+      const request = (async () => {
+        try {
+          const res = await fetch(`/api/metrics/${clientId}/overview?days=${days}`, { signal });
+          if (!res.ok) throw new Error(`overview ${res.status}`);
+          const payload = (await res.json()) as OverviewPayload;
+          payloadsRef.current.set(key, payload);
+          return payload;
+        } finally {
+          inflightRef.current.delete(key);
+        }
+      })();
+      inflightRef.current.set(key, request);
+      return request;
+    };
+
+    const prefetchClientRanges = (clientId: string, currentDays: DashboardRange) => {
+      if (prefetchedClientsRef.current.has(clientId)) return;
+      prefetchedClientsRef.current.add(clientId);
+      void Promise.allSettled(
+        DASHBOARD_RANGES.filter((range) => range !== currentDays).map((range) =>
+          getPayload(clientId, range),
+        ),
+      );
+    };
 
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
+    const clientId = targetClient.id;
+    const cached = payloadsRef.current.get(cacheKey(clientId, targetDays));
+    if (cached) {
+      setSelection({ client: targetClient, days: targetDays, payload: cached });
+      setError(null);
+      return;
+    }
+
     async function loadOverview() {
       try {
-        const res = await fetch(
-          `/api/metrics/${targetClient.id}/overview?days=${targetDays}`,
-          { signal: controller.signal },
-        );
-        if (!res.ok) throw new Error(`overview ${res.status}`);
-        const payload = (await res.json()) as OverviewPayload;
+        const payload = await getPayload(clientId, targetDays, controller.signal);
         if (controller.signal.aborted) return;
         setSelection({ client: targetClient, days: targetDays, payload });
-        window.history.replaceState(
-          {},
-          "",
-          `/dashboard?client=${targetClient.id}&days=${targetDays}`,
-        );
+        window.history.replaceState({}, "", `/dashboard?client=${clientId}&days=${targetDays}`);
         setError(null);
+        prefetchClientRanges(clientId, targetDays);
       } catch {
         if (controller.signal.aborted) return;
         setError("Failed to load dashboard data");
