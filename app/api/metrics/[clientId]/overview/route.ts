@@ -1,12 +1,11 @@
 import { z } from "zod";
 
-import { enforceClientAccess } from "@/lib/agents/authAgent";
+import { getAuthUser } from "@/lib/agents/authAgent";
 import {
   getCachedDashboardOverview,
   getCachedKeywordHistory,
   listAccessibleClients,
 } from "@/lib/db/repository";
-import { getProfileView } from "@/components/features/user-profile";
 import {
   DASHBOARD_RANGES,
   isDashboardRange,
@@ -32,11 +31,10 @@ export async function GET(
     });
   }
 
-  const access = await enforceClientAccess(clientId.data);
-  if (!access.allow) {
-    const status = access.reason === "unauthenticated" ? 401 : 403;
+  const user = await getAuthUser();
+  if (!user) {
     return new Response(JSON.stringify({ error: "Forbidden" }), {
-      status: status,
+      status: 401,
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-store',
@@ -45,15 +43,14 @@ export async function GET(
     });
   }
 
-  const profile = await getProfileView();
   const clients = await listAccessibleClients({
-    role: profile?.role ?? null,
-    clientId: profile?.clientId ?? null,
+    role: user.role,
+    clientId: user.clientId,
   });
   const client = clients.find((c) => c.id === clientId.data) ?? null;
   if (!client) {
-    return new Response(JSON.stringify({ error: "Client not found" }), {
-      status: 404,
+    return new Response(JSON.stringify({ error: "Forbidden" }), {
+      status: 403,
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-store',

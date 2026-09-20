@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 
 export const revalidate = 0; // dynamic per request
 
-export async function GET(request: Request) {
+export async function GET() {
   const profile = await getProfileView();
   if (!profile) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
