@@ -16,3 +16,7 @@ These are standing constraints for future development in this repo. Read this fi
 - Remove dead imports, stale env vars, unused tokens, orphaned components, and abandoned code paths.
 - If you remove something because it's now unused, say so in the summary.
 - Don't delete things that are still in use — verify before removing.
+
+## 4. Git pull-before-push
+- Before every `git push` to `dev`, first `git pull` from `origin main` (merge into the local branch), then resolve any conflicts, then commit/push.
+- Never push to `dev` without first pulling `origin main`.
