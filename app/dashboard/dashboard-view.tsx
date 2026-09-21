@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-import { Dashboard } from "@/components/features/dashboard";
+import { Dashboard, DashboardSkeleton } from "@/components/features/dashboard";
 import { ExportMenu } from "@/components/features/data-export";
 import { AccountMenu } from "@/components/features/user-profile/components/account-menu";
 import type { ProfileView } from "@/components/features/user-profile/lib/profile";
@@ -36,7 +36,29 @@ interface Selection {
   payload: OverviewPayload;
 }
 
+interface BootResponse {
+  profile: ProfileView;
+  clients: DashboardClient[];
+  selection: {
+    clientId: string;
+    days: DashboardRange;
+    payload: OverviewPayload;
+  } | null;
+}
+
 const cacheKey = (clientId: string, days: DashboardRange) => `${clientId}:${days}`;
+
+/** Forward a deep link's client/range to the boot request so it loads that selection. */
+function bootQuery(): string {
+  const params = new URLSearchParams(window.location.search);
+  const query = new URLSearchParams();
+  for (const key of ["client", "days"] as const) {
+    const value = params.get(key);
+    if (value) query.set(key, value);
+  }
+  const search = query.toString();
+  return search ? `?${search}` : "";
+}
 
 export function DashboardView() {
   const searchParams = useSearchParams();
@@ -77,19 +99,27 @@ export function DashboardView() {
   useEffect(() => {
     const controller = new AbortController();
     async function load() {
-      const [me, all] = await Promise.allSettled([
-        fetch("/api/me", { signal: controller.signal }).then((res) =>
-          res.ok ? res.json() : Promise.reject(new Error(`me ${res.status}`)),
-        ),
-        fetch("/api/clients", { signal: controller.signal }).then((res) =>
-          res.ok ? res.json() : Promise.reject(new Error(`clients ${res.status}`)),
-        ),
-      ]);
-      if (controller.signal.aborted) return;
-      if (me.status === "fulfilled") setProfile(me.value as ProfileView);
-      else setError("Failed to load profile");
-      if (all.status === "fulfilled") setClients(all.value as DashboardClient[]);
-      else setError("Failed to load clients");
+      try {
+        const res = await fetch(`/api/dashboard/boot${bootQuery()}`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error(`boot ${res.status}`);
+        const boot = (await res.json()) as BootResponse;
+        if (controller.signal.aborted) return;
+        if (boot.selection) {
+          // Prime the range cache so the selection effect renders without another fetch.
+          payloadsRef.current.set(
+            cacheKey(boot.selection.clientId, boot.selection.days),
+            { payload: boot.selection.payload, fetchedAt: Date.now() },
+          );
+        }
+        setProfile(boot.profile);
+        setClients(boot.clients);
+        setError(boot.selection ? null : "No client data available for this account");
+      } catch {
+        if (controller.signal.aborted) return;
+        setError("Failed to load dashboard data");
+      }
     }
     void load();
     return () => controller.abort();
@@ -122,7 +152,11 @@ export function DashboardView() {
     const cached = payloadsRef.current.get(cacheKey(clientId, targetDays));
     if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
       setSelection({ client: targetClient, days: targetDays, payload: cached.payload });
+      window.history.replaceState({}, "", `/dashboard?client=${clientId}&days=${targetDays}`);
       setError(null);
+      // The boot payload lands here, so this — not `loadOverview` — is the path
+      // that first sees a client; prefetching it keeps range switches instant.
+      prefetchClientRanges(clientId, targetDays);
       return;
     }
 
@@ -180,9 +214,13 @@ export function DashboardView() {
   }, [getPayload]);
 
   if (!profile || !selection) {
+    // Keep the static shell's skeleton on screen while boot data is in flight —
+    // rendering nothing here replaced it with a blank page for the whole fetch.
     return error ? (
       <div className="p-4 text-error">{error}</div>
-    ) : null;
+    ) : (
+      <DashboardSkeleton />
+    );
   }
 
   return (

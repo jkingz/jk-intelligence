@@ -11,7 +11,23 @@ const authUserSchema = z.object({
 
 export type AuthUser = z.infer<typeof authUserSchema>;
 
-export async function getAuthUser(): Promise<AuthUser | null> {
+/** The auth subject plus the app `users` row, read in one pass. */
+export type AuthSession = {
+  /** Null when the account is authenticated but has no provisioned `users` row. */
+  user: AuthUser | null;
+  email: string | null;
+  name: string | null;
+  providers: string[];
+};
+
+/**
+ * Single source of truth for "who is making this request".
+ *
+ * One `auth.getUser()` + one `users` read per call: callers that need both the
+ * identity and the profile must use this rather than pairing `getUser()` with
+ * `getAuthUser()`, which repeats both round trips.
+ */
+export async function getAuthSession(): Promise<AuthSession | null> {
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) return null;
@@ -21,13 +37,31 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     .select("role,client_id")
     .eq("id", data.user.id)
     .maybeSingle();
-  if (profileError || !profile) return null;
 
-  return authUserSchema.parse({
-    id: data.user.id,
-    role: profile.role,
-    clientId: profile.client_id,
-  });
+  const providers = (data.user.identities ?? [])
+    .map((identity) => identity.provider)
+    .filter((provider): provider is string => typeof provider === "string");
+
+  return {
+    user:
+      profileError || !profile
+        ? null
+        : authUserSchema.parse({
+            id: data.user.id,
+            role: profile.role,
+            clientId: profile.client_id,
+          }),
+    email: data.user.email ?? null,
+    name:
+      typeof data.user.user_metadata?.name === "string"
+        ? data.user.user_metadata.name
+        : null,
+    providers: [...new Set(providers)],
+  };
+}
+
+export async function getAuthUser(): Promise<AuthUser | null> {
+  return (await getAuthSession())?.user ?? null;
 }
 
 export type AccessDecision =
