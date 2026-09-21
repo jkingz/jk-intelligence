@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 
 interface DashboardHeaderProps {
   accountMenu?: React.ReactNode;
+  exportMenu?: React.ReactNode;
   clients: DashboardClient[];
   selectedClient: DashboardClient;
   overview: DashboardOverview;
@@ -30,6 +31,7 @@ interface DashboardHeaderProps {
 
 export function DashboardHeader({
   accountMenu,
+  exportMenu,
   clients,
   selectedClient,
   overview,
@@ -105,6 +107,8 @@ export function DashboardHeader({
             <RefreshCw className={`w-3 h-3 ${syncing ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">{syncing ? "Refreshing..." : "Trigger Sync"}</span>
           </Button>
+
+          {exportMenu}
 
           <Suspense fallback={<span className="h-8 w-8" aria-hidden="true" />}>
             <ThemeToggle theme={theme} onToggle={onToggleTheme} />

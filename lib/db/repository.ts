@@ -200,6 +200,29 @@ export async function listMetricSnapshots(
   });
 }
 
+/** Same as `listMetricSnapshots` without the source filter — CSV/PDF exports need every source. */
+export async function listAllMetricSnapshots(
+  clientId: string,
+  from: string,
+  to: string,
+): Promise<MetricSnapshotInput[]> {
+  return databaseOperation(async () => {
+    const { data, error } = await getAdminDb()
+      .from("metrics_snapshots")
+      .select("source,metrics,synced_at")
+      .eq("client_id", idSchema.parse(clientId))
+      .gte("synced_at", timestampSchema.parse(from))
+      .lte("synced_at", timestampSchema.parse(to))
+      .order("synced_at", { ascending: true });
+    if (error || !data) throw new Error("Database operation failed");
+    return z.array(snapshotSchema).parse(data).map((row) => ({
+      source: row.source,
+      metrics: row.metrics,
+      syncedAt: row.synced_at,
+    }));
+  });
+}
+
 /**
  * Dedicated read path for `keyword_rankings`: the per-keyword, per-date rank
  * history persisted by `persist_metrics`. Time-bounded so API callers can page
@@ -226,6 +249,29 @@ export async function listKeywordRankings(
       rank: row.rank,
       syncedAt: row.synced_at,
     }));
+  });
+}
+
+/**
+ * Newest `synced_at` for one client + source, or null when never synced. Lets a
+ * reader anchor its window to the data rather than to wall-clock time, which a
+ * stale sync would otherwise silently cut off.
+ */
+export async function getLatestSnapshotTime(
+  clientId: string,
+  source: Source,
+): Promise<string | null> {
+  return databaseOperation(async () => {
+    const { data, error } = await getAdminDb()
+      .from("metrics_snapshots")
+      .select("synced_at")
+      .eq("client_id", idSchema.parse(clientId))
+      .eq("source", sourceSchema.parse(source))
+      .order("synced_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error("Database operation failed");
+    return data ? timestampSchema.parse(data.synced_at) : null;
   });
 }
 
