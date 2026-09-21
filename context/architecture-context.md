@@ -66,6 +66,7 @@
 - `GET /api/metrics/{clientId}` — fetch current_metrics for dashboard (fast read).
 - `GET /api/metrics/{clientId}/history` — fetch metrics_snapshots with date range filter.
 - `GET /api/metrics/{clientId}/keywords` — fetch keyword rank time series (`keyword_rankings` grouped per keyword, best rank first); esp: `source` (`gsc` default) + `from`/`to` ISO; `enforceClientAccess` (401/403).
+- `GET /api/dashboard/boot` — the dashboard's single boot request: `{ profile, clients, selection: { clientId, days, payload: { overview, history } } }` for the URL's `?client=&days=` (validated, falling back to the first accessible client and `DASHBOARD_RANGES[0]`). `no-store` + `Vary: Cookie`; 400 malformed id, 401 unauthenticated, 503 on read failure.
 
 Route handlers stay thin: auth check → validate input → delegate to `lib/db` or `lib/queue`.
 
@@ -98,3 +99,4 @@ Route handlers stay thin: auth check → validate input → delegate to `lib/db`
 8. is_stale flag set server-side — client UI reads it, never computes staleness itself.
 9. API credentials never logged, never returned in API responses.
 10. The Next data-cache tag for the dashboard is owned by `lib/cache/invalidate.ts` (`DASHBOARD_OVERVIEW_TAG = "dashboard-overview"`) and only revalidated through `app/api/revalidate/dashboard` (secret-guarded) — never called from the worker process directly.
+11. `/dashboard` stays a prerendered static shell (`○`): all auth-dependent data arrives client-side, and the whole boot payload comes from **one** `GET /api/dashboard/boot` request. While that request is in flight `DashboardView` must render `DashboardSkeleton` — returning `null` there blanks the skeleton the shell already painted. Identity + role reads go through `getAuthSession()` (one `auth.getUser()` + one `users` read per request); do not pair `getUser()` with `getAuthUser()` in a handler, that repeats both round trips.

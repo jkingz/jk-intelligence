@@ -1,7 +1,6 @@
 import "server-only";
 
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { getAuthUser } from "@/lib/agents/authAgent";
+import { getAuthSession } from "@/lib/agents/authAgent";
 
 export interface ProfileView {
   email: string | null;
@@ -12,22 +11,15 @@ export interface ProfileView {
 }
 
 export async function getProfileView(): Promise<ProfileView | null> {
-  const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) return null;
-
-  const authUser = await getAuthUser();
-
-  const providers = (data.user.identities ?? [])
-    .map((identity) => identity.provider)
-    .filter((provider): provider is string => typeof provider === "string");
+  const session = await getAuthSession();
+  if (!session) return null;
 
   return {
-    email: data.user.email ?? null,
-    name: typeof data.user.user_metadata?.name === "string" ? data.user.user_metadata.name : null,
-    role: authUser?.role ?? null,
-    clientId: authUser?.clientId ?? null,
-    providers: [...new Set(providers)],
+    email: session.email,
+    name: session.name,
+    role: session.user?.role ?? null,
+    clientId: session.user?.clientId ?? null,
+    providers: session.providers,
   };
 }
 
