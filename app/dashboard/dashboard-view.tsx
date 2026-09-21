@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { Dashboard } from "@/components/features/dashboard";
+import { ExportMenu } from "@/components/features/data-export";
 import { AccountMenu } from "@/components/features/user-profile/components/account-menu";
 import type { ProfileView } from "@/components/features/user-profile/lib/profile";
 import {
@@ -187,6 +188,7 @@ export function DashboardView() {
   return (
     <Dashboard
       accountMenu={<AccountMenu profile={profile} />}
+      exportMenu={<ExportMenu client={selection.client} days={selection.days} />}
       clients={clients}
       selectedClient={selection.client}
       days={selection.days}

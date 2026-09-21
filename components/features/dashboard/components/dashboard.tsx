@@ -98,6 +98,7 @@ function EmptyShell({ accountMenu, message }: { accountMenu?: React.ReactNode; m
 
 interface DashboardProps {
   accountMenu?: React.ReactNode;
+  exportMenu?: React.ReactNode;
   clients: DashboardClient[];
   selectedClient: DashboardClient | null;
   days: DashboardRange;
@@ -107,6 +108,7 @@ interface DashboardProps {
 
 export default function Dashboard({
   accountMenu,
+  exportMenu,
   clients,
   selectedClient,
   days,
@@ -205,6 +207,7 @@ export default function Dashboard({
     <div className="min-h-screen w-full min-w-0 flex flex-col font-sans antialiased bg-background text-foreground">
       <DashboardHeader
         accountMenu={accountMenu}
+        exportMenu={exportMenu}
         clients={clients}
         selectedClient={selectedClient}
         overview={overview}

@@ -141,7 +141,17 @@ Email + password sign-in/sign-up verified
 - Light-theme contrast fix (Lighthouse): the light palette failed WCAG AA — `text-faint` 2.70, `state-warning` 2.45, `state-success` 3.17, `state-error` 3.91, fire-red accent on its dim chip 3.67 (all vs `#fafafa`). Rewrote the `[data-theme="light"]` block in `globals.css` while keeping the charcoal + fire-red identity: text `#171717`/`#3d3d3d`/`#5c5c5c`/`#616161`, accent deepened to `#b91c1c` (hover `#991b1b`, dim 10%, now 6.20 plain / 4.92 on chip / 6.47 white-on-accent), success `#35701a`, error `#b3261e`, warning `#7d5800`, neutral `#5c5c5c`; borders `#dcdcdc`/`#c8c8c8`. All text roles now ≥4.5:1 on base, surface, and subtle. `ui-context.md` light table updated. Known gap: dark `--color-primary-foreground: #ffffff` on `#ff3b30` is 3.55:1 (primary buttons) — not addressed. Verified: lint clean.
 
 ## In Progress
-- (none — dashboard client/date switching is a static-shell client fetch; see Recent Work)
+- None (data export completed — see Recent Work).
+
+## Recent Work
+
+- Data export (CSV + PDF) — spec: `context/feature-specs/06-data-export.md`. Completed.
+  - `lib/exports/` — `dataset.ts` (`buildExportDataset`, reuses `buildOverview` so export can never disagree with the dashboard), `csv.ts` (RFC 4180 + UTF-8 BOM + formula-injection guard), `filename.ts` (slugged `<client>-<kind>-<days>d-<date>.<ext>`), `pdf.ts` (`renderPdfReport` via pdf-lib, A4, summary/keywords/source-totals sections, page overflow handling, WinAnsi sanitizing), `server.ts` (`loadExportDataset` — shared auth/ownership/validation; invalid `days` → 400, unlike the overview route's silent default).
+  - `lib/db/repository.ts` — `listAllMetricSnapshots(clientId, from, to)` (all sources, admin path).
+  - Routes `app/api/exports/[clientId]/{csv,pdf}/route.ts` — 400/401/403/503, `Cache-Control: no-store`, correct content types + attachment filenames.
+  - UI: `components/features/data-export/` barrel → `ExportMenu` (dropdown in dashboard header via new `exportMenu` slot on `DashboardHeader`/`Dashboard`, rendered by `dashboard-view.tsx` with `selection.client`/`selection.days`); blob download through a hidden anchor, `URL.createObjectURL` → revoke; toast lifecycle + `SlidingWindowLimiter` (6/60s); trigger `aria-label="Export data"`.
+  - `vitest.config.ts` — alias `server-only` → the package's `empty.js` (vitest resolves the bare specifier via `main`, tripping the client guard; the react-server condition doesn't cover it).
+  - Verified: 23 new tests (route 401/403/400/503/200 + headers, dataset/dashboard parity, CSV BOM/injection/quoting, filename slugging, `%PDF-` signature incl. empty dataset); 82/83 total (1 pre-existing revalidate/`CRON_SECRET` failure); typecheck, lint, build clean — both export routes emitted. Live prod server (`pnpm start -p 3001`, demo login): anon CSV/PDF → 401, `?days=14`/bad id → 400; in-session CSV 200 `text/csv` (287 data rows, 3 sources, Sep 12–18 window matching dashboard) + PDF 200 `application/pdf` 4.7KB `%PDF-1.7`, both with correct attachment filenames; header menu opens with both items, CSV download fired via the anchor path, 0 console errors. Not committed.
 
 ## Recent Work
 

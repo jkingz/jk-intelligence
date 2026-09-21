@@ -200,6 +200,29 @@ export async function listMetricSnapshots(
   });
 }
 
+/** Same as `listMetricSnapshots` without the source filter — CSV/PDF exports need every source. */
+export async function listAllMetricSnapshots(
+  clientId: string,
+  from: string,
+  to: string,
+): Promise<MetricSnapshotInput[]> {
+  return databaseOperation(async () => {
+    const { data, error } = await getAdminDb()
+      .from("metrics_snapshots")
+      .select("source,metrics,synced_at")
+      .eq("client_id", idSchema.parse(clientId))
+      .gte("synced_at", timestampSchema.parse(from))
+      .lte("synced_at", timestampSchema.parse(to))
+      .order("synced_at", { ascending: true });
+    if (error || !data) throw new Error("Database operation failed");
+    return z.array(snapshotSchema).parse(data).map((row) => ({
+      source: row.source,
+      metrics: row.metrics,
+      syncedAt: row.synced_at,
+    }));
+  });
+}
+
 /**
  * Dedicated read path for `keyword_rankings`: the per-keyword, per-date rank
  * history persisted by `persist_metrics`. Time-bounded so API callers can page
