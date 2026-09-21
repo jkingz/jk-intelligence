@@ -5,7 +5,9 @@ const CLIENT = "00000000-0000-4000-8000-000000000001";
 const boundary = vi.hoisted(() => ({
   authUser: vi.fn(),
   accessibleClients: vi.fn(),
+  latestSnapshotTime: vi.fn(),
   snapshots: vi.fn(),
+  quota: vi.fn(),
 }));
 
 vi.mock("@/lib/agents/authAgent", () => ({ getAuthUser: boundary.authUser }));
@@ -13,7 +15,10 @@ vi.mock("@/lib/agents/authAgent", () => ({ getAuthUser: boundary.authUser }));
 vi.mock("@/lib/db/repository", () => ({
   listAccessibleClients: boundary.accessibleClients,
   listAllMetricSnapshots: boundary.snapshots,
+  getLatestSnapshotTime: boundary.latestSnapshotTime,
 }));
+
+vi.mock("@/lib/exports/quota", () => ({ consumeExportQuota: boundary.quota }));
 
 import { GET as csv } from "./csv/route";
 import { GET as pdf } from "./pdf/route";
@@ -34,9 +39,15 @@ function get(handler: Handler, clientId: string, days?: string, path?: string) {
   });
 }
 
-function allowAdmin() {
-  boundary.authUser.mockResolvedValue({ id: "u1", role: "admin", clientId: null });
+function allowAdmin(latestGsc: string | null = "2026-09-17T00:00:00.000Z") {
+  boundary.authUser.mockResolvedValue({
+    id: "00000000-0000-4000-8000-0000000000aa",
+    role: "admin",
+    clientId: null,
+  });
   boundary.accessibleClients.mockResolvedValue([dashboardClient]);
+  boundary.latestSnapshotTime.mockResolvedValue(latestGsc);
+  boundary.quota.mockResolvedValue({ allowed: true });
 }
 
 afterEach(() => {
@@ -137,6 +148,33 @@ for (const { name, handler, contentType, extension, suffix } of handlers) {
         expect.any(String),
         expect.any(String),
       );
+    });
+
+    it("reads back far enough for the prior period when sync is stale", async () => {
+      allowAdmin("2026-09-01T00:00:00.000Z");
+      boundary.snapshots.mockResolvedValue([]);
+      const response = await get(handler, CLIENT, "7");
+
+      expect(response.status).toBe(200);
+      expect(boundary.latestSnapshotTime).toHaveBeenCalledWith(CLIENT, "gsc");
+      // 2026-09-01 minus 2×7 days plus one day of slack — never wall-clock based,
+      // so the prior-period rows a stale sync leaves behind are still read.
+      expect(boundary.snapshots.mock.calls[0]![1]).toBe("2026-08-17T00:00:00.000Z");
+      expect(Date.parse(boundary.snapshots.mock.calls[0]![2]!)).toBeGreaterThanOrEqual(
+        Date.parse("2026-09-01T00:00:00.000Z"),
+      );
+    });
+
+    it("returns 429 with Retry-After once the quota is spent", async () => {
+      allowAdmin();
+      boundary.quota.mockResolvedValue({ allowed: false, retryAfterSeconds: 42 });
+      boundary.snapshots.mockResolvedValue([]);
+
+      const response = await get(handler, CLIENT, "7");
+      expect(response.status).toBe(429);
+      expect(response.headers.get("Retry-After")).toBe("42");
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(boundary.snapshots).not.toHaveBeenCalled();
     });
   });
 }

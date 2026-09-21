@@ -15,9 +15,18 @@ export const CSV_HEADERS = [
 
 const FORMULA_PREFIXES = ["=", "+", "-", "@"];
 const BOM = "\uFEFF";
+/**
+ * Spreadheets trim leading whitespace and ignore control characters before
+ * deciding whether a cell is a formula, so the marker test runs on the content
+ * after them — `"  =cmd"` is as dangerous as `"=cmd"`.
+ */
+const LEADING_NOISE = /^[\s\u0000-\u001F\u007F]+/;
 
 function guardFormula(value: string): string {
-  return FORMULA_PREFIXES.some((prefix) => value.startsWith(prefix)) ? `'${value}` : value;
+  const content = value.replace(LEADING_NOISE, "");
+  return FORMULA_PREFIXES.some((prefix) => content.startsWith(prefix))
+    ? `'${value}`
+    : value;
 }
 
 function escapeCell(value: string): string {
@@ -53,10 +62,11 @@ function metricRow(metric: ExportMetricRow): string {
 }
 
 /**
- * RFC 4180 CSV for the raw metrics in a dataset. Cells that begin with a
- * spreadsheet formula character are prefixed with `'` so a keyword named
- * `=cmd` cannot execute when the file is opened in Excel/Sheets. A UTF-8 BOM
- * is prepended so Excel detects the encoding.
+ * RFC 4180 CSV for the raw metrics in a dataset. Cells whose content begins
+ * with a spreadsheet formula character — ignoring leading whitespace and
+ * control characters — are prefixed with `'` so a keyword named `=cmd` cannot
+ * execute when the file is opened in Excel/Sheets. A UTF-8 BOM is prepended so
+ * Excel detects the encoding.
  */
 export function toCsv(dataset: ExportDataset): string {
   const lines = [CSV_HEADERS.join(","), ...dataset.metrics.map(metricRow)];

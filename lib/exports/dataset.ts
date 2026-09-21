@@ -149,21 +149,26 @@ function sourceTotals(snapshots: MetricSnapshotInput[]): ExportSourceTotal[] {
   return totals;
 }
 
-function latestSnapshotTime(snapshots: MetricSnapshotInput[]): number | null {
+/**
+ * Newest snapshot day in a set, or null when it is empty. Bucketed with the same
+ * `dayStart` `buildOverview` uses so both agree on which day is the last one.
+ */
+function latestDay(snapshots: MetricSnapshotInput[]): number | null {
   let latest: number | null = null;
   for (const snapshot of snapshots) {
     const time = new Date(snapshot.syncedAt).getTime();
     if (Number.isNaN(time)) continue;
     if (latest === null || time > latest) latest = time;
   }
-  return latest;
+  return latest === null ? null : dayStart(latest);
 }
 
 /**
  * Pure CSV/PDF export payload for one client + range. `buildOverview` is the
  * single source of truth for the summary and keyword table so an export can
- * never disagree with the dashboard; the raw metric rows come from the
- * unfiltered snapshot set (all sources).
+ * never disagree with the dashboard. Every section anchors to the newest **GSC**
+ * snapshot day — when another source is newer, its rows beyond that day are
+ * dropped rather than reported under a GSC-derived range.
  */
 export function buildExportDataset({
   client,
@@ -171,15 +176,15 @@ export function buildExportDataset({
   snapshots,
   now,
 }: BuildExportDatasetInput): ExportDataset {
-  const endTime = latestSnapshotTime(snapshots) ?? dayStart(now.getTime());
-  const endDay = dayStart(endTime);
+  const gscSnapshots = snapshots.filter((snapshot) => snapshot.source === "gsc");
+  const anchor = latestDay(gscSnapshots) ?? latestDay(snapshots) ?? dayStart(now.getTime());
+  const endDay = anchor;
   const startDay = endDay - (days - 1) * DAY_MS;
   const inWindow = snapshots.filter((snapshot) => {
     const day = dayStart(new Date(snapshot.syncedAt).getTime());
     return day >= startDay && day <= endDay;
   });
 
-  const gscSnapshots = snapshots.filter((snapshot) => snapshot.source === "gsc");
   const overview = buildOverview({
     client,
     days,

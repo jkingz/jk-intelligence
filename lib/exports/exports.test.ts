@@ -9,7 +9,7 @@ import type { NormalizedMetric, Source } from "@/types/metrics";
 import { buildExportDataset } from "./dataset";
 import { CSV_HEADERS, toCsv } from "./csv";
 import { exportFilename } from "./filename";
-import { renderPdfReport } from "./pdf";
+import { renderPdfReport, reportText } from "./pdf";
 
 function metric(overrides: Partial<NormalizedMetric>): NormalizedMetric {
   return {
@@ -103,6 +103,37 @@ describe("buildExportDataset", () => {
     expect(empty.summary.every((row) => row.delta === null)).toBe(true);
     expect(empty.metrics).toEqual([]);
   });
+
+  it("anchors every section on the newest GSC snapshot", () => {
+    // A Semrush-only sync landed two days after the last GSC day.
+    const late = snapshots().concat(
+      snapshot("2026-09-19", "semrush", [metric({ clicks: 9, keyword: "late" })]),
+    );
+    const dataset = buildExportDataset({ client, days: 7, snapshots: late, now: NOW });
+
+    expect(dataset.range).toMatchObject({ from: "2026-09-11", to: "2026-09-17" });
+    expect(dataset.metrics.some((row) => row.date === "2026-09-19")).toBe(false);
+    const overview = buildOverview({
+      client,
+      days: 7,
+      snapshots: late.filter((row) => row.source === "gsc"),
+      stale: false,
+      now: NOW,
+    })!;
+    expect(dataset.keywords).toEqual(overview.keywords);
+  });
+
+  it("falls back to the newest snapshot of any source without gsc data", () => {
+    const onlySemrush = snapshots().filter((row) => row.source === "semrush");
+    const dataset = buildExportDataset({
+      client,
+      days: 7,
+      snapshots: onlySemrush,
+      now: NOW,
+    });
+    expect(dataset.range.to).toBe("2026-09-17");
+    expect(dataset.metrics.every((row) => row.source === "semrush")).toBe(true);
+  });
 });
 
 describe("toCsv", () => {
@@ -118,6 +149,22 @@ describe("toCsv", () => {
 
   it("neutralizes spreadsheet formula injection", () => {
     expect(csv).toContain("'=cmd|'x'!A0");
+  });
+
+  it("neutralizes formulas hidden behind leading whitespace or control characters", () => {
+    const keywords = ["  =cmd|'x'!A0", "\t@SUM(1,2)", " \u001B+1+1", "\u0000-cmd"];
+    for (const keyword of keywords) {
+      const csv = toCsv({
+        ...dataset,
+        metrics: [{ ...dataset.metrics[0]!, keyword }],
+      });
+      // The guard prefixes the cell without dropping the padding it hides behind.
+      expect(csv).toContain(`'${keyword}`);
+    }
+    // Ordinary prose is left alone.
+    expect(
+      toCsv({ ...dataset, metrics: [{ ...dataset.metrics[0]!, keyword: "north star" }] }),
+    ).not.toContain("'north star");
   });
 
   it("quotes cells containing commas or quotes", () => {
@@ -160,6 +207,28 @@ describe("renderPdfReport", () => {
     const header = new TextDecoder().decode(bytes.slice(0, 5));
     expect(header).toBe("%PDF-");
     expect(bytes.length).toBeGreaterThan(1000);
+  });
+
+  it("keeps non-Latin client text instead of blanking it out", () => {
+    // The WinAnsi standard fonts mangled every one of these into a space.
+    expect(reportText("München Ñoño Москва Kraków")).toBe("München Ñoño Москва Kraków");
+    expect(reportText("seo–report · über uns")).toBe("seo–report · über uns");
+    expect(reportText("tab\tnul\u0000esc\u001B")).toBe("tab nul esc ");
+  });
+
+  it("renders a report whose client name and keywords are non-Latin", async () => {
+    const dataset = buildExportDataset({
+      client: toDashboardClient({ id: "c1", name: "München Analyse", domain: "münchen.example" }),
+      days: 7,
+      snapshots: [
+        snapshot("2026-09-17", "gsc", [
+          metric({ clicks: 3, keyword: "über uns", rank: 2, searchVolume: 40, position: 2 }),
+        ]),
+      ],
+      now: NOW,
+    });
+    const bytes = await renderPdfReport(dataset);
+    expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe("%PDF-");
   });
 
   it("tolerates an empty dataset", async () => {

@@ -49,6 +49,13 @@ const nextConfig: NextConfig = {
   // and self-documenting for the Lighthouse "transfer size" audit rather than
   // relying on the implicit default.
   compress: true,
+  // The PDF report embeds the vendored Unicode TTFs in `lib/exports/fonts` and
+  // reads them from disk at render time. Trace static-analysis cannot see a
+  // dynamic `readFile`, so the fonts are declared explicitly for serverless
+  // deployment bundles.
+  outputFileTracingIncludes: {
+    "/api/exports/**": ["./lib/exports/fonts/*.ttf"],
+  },
   experimental: {
     // Tree-shakes the re-export barrels of these two first-party libraries so
     // the dashboard entry only ships the icons/chart primitives actually used

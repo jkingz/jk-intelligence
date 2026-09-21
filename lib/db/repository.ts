@@ -252,6 +252,29 @@ export async function listKeywordRankings(
   });
 }
 
+/**
+ * Newest `synced_at` for one client + source, or null when never synced. Lets a
+ * reader anchor its window to the data rather than to wall-clock time, which a
+ * stale sync would otherwise silently cut off.
+ */
+export async function getLatestSnapshotTime(
+  clientId: string,
+  source: Source,
+): Promise<string | null> {
+  return databaseOperation(async () => {
+    const { data, error } = await getAdminDb()
+      .from("metrics_snapshots")
+      .select("synced_at")
+      .eq("client_id", idSchema.parse(clientId))
+      .eq("source", sourceSchema.parse(source))
+      .order("synced_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error("Database operation failed");
+    return data ? timestampSchema.parse(data.synced_at) : null;
+  });
+}
+
 export async function listAccessibleClients(profile: {
   role: "admin" | "client" | "staff" | null;
   clientId: string | null;
