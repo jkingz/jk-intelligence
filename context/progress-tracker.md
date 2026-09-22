@@ -152,6 +152,15 @@ under Recent Work.
 
 ## Recent Work
 
+- **First CI run was red on `pnpm build`; fixed by vendoring the UI fonts.** The runner cannot reach
+  `fonts.googleapis.com`, and `next/font/google` downloads Geist at build time, so Turbopack failed
+  with 18 × `Can't resolve '@vercel/turbopack-next/internal/font/google/font'`. Reproduced locally by
+  blocking egress (`NODE_USE_ENV_PROXY=1 HTTPS_PROXY=http://127.0.0.1:9 pnpm build`), then switched
+  `app/layout.tsx` to `next/font/local` against the same latin variable woff2 files, now in
+  `app/fonts/` with their OFL 1.1 text. Variables (`--font-geist-sans`, `--font-geist-mono`), the
+  Arial metric fallback and `display: swap` are unchanged; the build no longer needs the network.
+  Verified: offline cold build passes, both woff2 emitted in `.next/static/media`, built CSS carries
+  `font-weight: 100 900`, tests 113/113, typecheck + lint clean.
 - Instruction-layer truth pass (docs only, no code changed):
   - **Two new skills, installed repo-level and user-level.** `babysitting-a-pr` (act only on
     comments/checks newer than the last push; verify every bot finding against the source; no scope

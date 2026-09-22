@@ -83,7 +83,7 @@ Toggle: set `document.documentElement.dataset.theme = 'light' | 'dark'`. Persist
 | Code / mono | Geist Mono | `--font-geist-mono` |
 | Metric numbers | Geist Mono | `--font-geist-mono` |
 
-Both loaded via `next/font/google`, applied as CSS variables on `<html>`. Body uses Geist Sans with `antialiased`. All metric values (traffic, rankings, CTR) displayed in Geist Mono for scan-readability.
+Both served from `app/fonts/` through `next/font/local` (latin variable subsets, weights 100–900, OFL 1.1), applied as CSS variables on `<html>`. The files are vendored because `next/font/google` downloads them at build time, which CI runners cannot reach. Body uses Geist Sans with `antialiased`. All metric values (traffic, rankings, CTR) displayed in Geist Mono for scan-readability.
 
 ---
 
