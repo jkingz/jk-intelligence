@@ -1,39 +1,38 @@
 # JK Intelligence
 
-Multi-client SEO reporting platform built with Next.js, TypeScript, Supabase, and shadcn/ui. Product scope and implementation status live in [context](context/project-overview.md) and the [progress tracker](context/progress-tracker.md).
+Multi-client SEO reporting platform: Next.js 16, React 19, TypeScript, Supabase (Postgres + RLS + auth), shadcn/ui, BullMQ on Upstash.
+
+- Scope and status: [context/project-overview.md](context/project-overview.md), [context/progress-tracker.md](context/progress-tracker.md)
+- Built vs planned: [AGENTS.md](AGENTS.md) describes implemented code only; [docs/target-state.md](docs/target-state.md) holds the rest
 
 ## Dashboard
 
-![JK Intelligence dashboard on the deployed app, with a Lighthouse audit panel beside it](docs/screenshots/dashboard-overview.png)
+![JK Intelligence dashboard, seeded demo data](docs/screenshots/dashboard-overview.png)
 
-Deployed at `jk-intelligence.vercel.app`, dark theme, one client ("Atlas Coffee") on the Last 7 days range.
+Deployed at `jk-intelligence.vercel.app`. Screenshot: dark theme, one client ("Atlas Coffee"), Last 7 days. Header carries the client switcher, sync pill, Trigger Sync, CSV/PDF export, theme toggle and account menu; below it the hero headline, `7 | 30 | 90` range select, metric cards, click-trend chart and query table.
 
-- **Header.** Client switcher, sync-status pill (`Cached data — last sync failed`), Trigger Sync, Export (CSV/PDF), theme toggle, account menu.
-- **Hero.** `ATLAS.EXAMPLE · ORGANIC PERFORMANCE REPORT · SEP 12 – SEP 18, 2026` over the growth headline "Organic momentum up 84.0% over 7 days.", plus the `7 | 30 | 90` day-range select and Overview / Queries / AI Citation tabs.
-- **Stale banner.** Server-set `is_stale` surfaced verbatim: "Data from Sep 18, 2026 — last sync failed. Showing cached results." Dashboard keeps serving cached metrics instead of failing.
-- **Metric cards.** Total Clicks 3,634 (↑84.0% vs 1,975 previous period), Impressions 89,393 with CTR 4.07% · 78 conversions, AI Search Engine Citations "Not available — no AI citation source connected", Avg Position 15.7 with 3 keywords in Top 3.
-- **Trend chart.** Search clicks area series for the selected range, recharts, below the cards.
-- **Audit.** Lighthouse on this page: Performance 99, Accessibility 100, Best Practices 100, SEO 100. The static-shell boot path plus one `/api/dashboard/boot` request is what keeps the login render fast; the accessibility pass covers the skeleton/`aria-busy` loading state and the labelled header controls.
+Not live yet, do not demo them as working:
+
+- **Sync.** No consumer runs the queue — `lib/queue/worker.ts` returns `mock_completed`, and Trigger Sync only animates its own state. All rows come from `pnpm db:seed`.
+- **Stale banner / sync pill.** Reads the stored `is_stale` column; nothing writes it, so it cannot fire outside seed data.
+- **AI citations.** `aiCitations` is a hardcoded `[]`, so the card and grid always render their empty state. No LLM dependency exists.
 
 ## Architecture
 
 ![JK Intelligence architecture](docs/architecture.svg)
 
+Request path, the RLS-backed tenant gate and the HTTP surface: [AGENTS.md](AGENTS.md). Deep boundaries: [context/architecture-context.md](context/architecture-context.md).
+
 ## Development
 
-Requires Node.js >=22.9 and pnpm >=10 (see `package.json`).
+Node `>=24`, pnpm `>=10` (`package.json` engines). pnpm only — `package-lock.json` was deleted on purpose.
 
 ```bash
 pnpm install
-pnpm dev
+pnpm dev    # http://localhost:3000
 ```
 
-Open http://localhost:3000. Auth requires local environment variables:
-
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` supported)
-
-Configure Supabase providers and redirect URLs for the auth flows. Keep credentials out of Git. Live auth verification and outstanding setup are tracked in [progress tracker](context/progress-tracker.md).
+Local auth needs two names in `.env`: `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` still works). Server-side paths also want `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_URL`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `CRON_SECRET`, `NEXT_PUBLIC_APP_URL`. No `.env.example` yet — copy the names, never the values. Register the Supabase providers and add `/auth/callback` to the redirect allowlist, then `pnpm db:migrate && pnpm db:seed` for demo data.
 
 ## Checks
 
@@ -41,31 +40,15 @@ Configure Supabase providers and redirect URLs for the auth flows. Keep credenti
 pnpm test && pnpm typecheck && pnpm lint && pnpm build
 ```
 
-## Feature Workflow
+CI (`.github/workflows/ci.yml`) runs these four on every push and PR.
 
-Read [AGENTS.md](AGENTS.md) and its ordered context files before implementation.
+## Feature workflow
 
-- Specs: `context/feature-specs/<nn>-<slug>.md`.
-- Components: `components/features/<slug>/`, public exports through `index.ts`.
-- Numbers belong only to spec filenames; feature folders/imports stay unnumbered.
-- Mark tracker **In Progress** before implementation; complete after verification.
-- PR branches: `feat/<slug>`; titles: `feat(<slug>): <summary>`. Commit/push/PR only when requested.
+Read [AGENTS.md](AGENTS.md) and its ordered `context/` files before implementing.
 
-Full rules: [feature conventions](docs/conventions/feature-components.md).
+- Specs: `context/feature-specs/<nn>-<slug>.md`. Components: `components/features/<slug>/`, exported through `index.ts`. Numbers belong only to spec filenames.
+- Tracker: mark **In Progress** before implementing, complete after verification.
+- Branches `feat/<slug>`, titles `feat(<slug>): <summary>`. Commit, push and open PRs only when asked.
+- Full rules: [docs/conventions/feature-components.md](docs/conventions/feature-components.md).
 
-## Feature Command
-
-In OpenCode, use the project slash command:
-
-```text
-/feature-component context/feature-specs/03-user-profile.md
-/feature-component add a feature for saved reports
-```
-
-The command loads [feature-component](.claude/skills/feature-component/SKILL.md), follows the spec-first workflow, and wires pages through the feature barrel. With no arguments, it asks which feature to work on.
-
-- Command: `.opencode/commands/feature-component.md`
-- Skill: `.claude/skills/feature-component/SKILL.md`
-- Shared discovery link: `.agents/skills/feature-component`
-
-Quit and restart OpenCode after command/skill changes. `/help` shows OpenCode usage help.
+OpenCode only: `/feature-component <spec>` runs the [feature-component](.claude/skills/feature-component/SKILL.md) skill (command file `.opencode/commands/feature-component.md`, link `.agents/skills/feature-component`). No argument → it asks. Restart OpenCode after editing commands or skills.
