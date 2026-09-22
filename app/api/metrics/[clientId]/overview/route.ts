@@ -31,31 +31,6 @@ export async function GET(
     });
   }
 
-  const user = await getAuthUser();
-  if (!user) {
-    return new Response(JSON.stringify({ error: "Forbidden" }), {
-      status: 401,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-store',
-        'Vary': 'Cookie'
-      }
-    });
-  }
-
-  const clients = await listAccessibleClients();
-  const client = clients.find((c) => c.id === clientId.data) ?? null;
-  if (!client) {
-    return new Response(JSON.stringify({ error: "Forbidden" }), {
-      status: 403,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-store',
-        'Vary': 'Cookie'
-      }
-    });
-  }
-
   const rawDays = Number(
     new URL(request.url).searchParams.get("days") ?? DEFAULT_DAYS,
   );
@@ -64,6 +39,31 @@ export async function GET(
     : DEFAULT_DAYS;
 
   try {
+    const user = await getAuthUser();
+    if (!user) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 401,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+          'Vary': 'Cookie'
+        }
+      });
+    }
+
+    const clients = await listAccessibleClients();
+    const client = clients.find((c) => c.id === clientId.data) ?? null;
+    if (!client) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+          'Vary': 'Cookie'
+        }
+      });
+    }
+
     const [overview, history] = await Promise.all([
       getCachedDashboardOverview(client, days),
       getCachedKeywordHistory(client, days),

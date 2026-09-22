@@ -1,7 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("server-only", () => ({}));
-
 const CLIENT_A = "00000000-0000-4000-8000-000000000001";
 const CLIENT_B = "00000000-0000-4000-8000-000000000002";
 
@@ -135,6 +133,20 @@ describe("GET /api/dashboard/boot", () => {
 
     const response = await get();
     expect(response.status).toBe(503);
+  });
+
+  it("returns 503 when the identity read itself rejects", async () => {
+    boundary.profile.mockRejectedValue(
+      new Error("Supabase client configuration unavailable"),
+    );
+
+    const response = await get();
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "Database operation failed",
+    });
+    expect(boundary.clients).not.toHaveBeenCalled();
+    expect(boundary.overview).not.toHaveBeenCalled();
   });
 
   it("never caches a per-user payload", async () => {

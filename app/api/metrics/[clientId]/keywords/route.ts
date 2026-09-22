@@ -46,24 +46,34 @@ export async function GET(
     });
   }
 
-  const user = await getAuthUser();
-  const allowed = user !== null && (await canAccessClient(clientId.data));
-  if (!allowed) {
-    return new Response(JSON.stringify({ error: "Forbidden" }), {
-      status: user ? 403 : 401,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-store',
-        'Vary': 'Cookie'
-      }
-    });
-  }
-
   const now = new Date();
   const from = query.data.from ?? new Date(now.getTime() - 30 * DAY_MS).toISOString();
   const to = query.data.to ?? now.toISOString();
 
   try {
+    const user = await getAuthUser();
+    if (!user) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 401,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+          'Vary': 'Cookie'
+        }
+      });
+    }
+
+    if (!(await canAccessClient(clientId.data))) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+          'Vary': 'Cookie'
+        }
+      });
+    }
+
     const data = await listKeywordRankings(
       clientId.data,
       query.data.source as Source,

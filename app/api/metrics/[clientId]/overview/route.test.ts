@@ -104,4 +104,32 @@ describe("GET /api/metrics/[clientId]/overview", () => {
     expect(response.status).toBe(503);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
   });
+
+  it("degrades to 503 with no-store when the tenant gate itself rejects", async () => {
+    boundary.user.mockResolvedValue(USER);
+    boundary.clients.mockRejectedValue(new Error("Database operation failed"));
+
+    const response = await get(CLIENT);
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "Database operation failed",
+    });
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(boundary.overview).not.toHaveBeenCalled();
+    expect(boundary.history).not.toHaveBeenCalled();
+  });
+
+  it("degrades to 503 when the identity read itself rejects", async () => {
+    boundary.user.mockRejectedValue(
+      new Error("Supabase client configuration unavailable"),
+    );
+
+    const response = await get(CLIENT);
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "Database operation failed",
+    });
+    expect(boundary.clients).not.toHaveBeenCalled();
+    expect(boundary.overview).not.toHaveBeenCalled();
+  });
 });

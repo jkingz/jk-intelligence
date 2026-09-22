@@ -91,8 +91,13 @@ const row: any = await fetchGSC()
 - Parse the `{clientId}` path param with `z.uuid()` **before** anything else; a malformed id is 400,
   not 403 — never echo whether the id exists for an unauthenticated caller.
 - Order and status codes: 400 malformed input → 401 unauthenticated → 403 not this caller's client
-  → 429 quota spent (exports, with `Retry-After`) → 503 read failure. There is no 500 path and no
+  → 429 quota spent (exports, with `Retry-After`) → 503 database failure. There is no 500 path and no
   404 for another tenant's row.
+- Only pure request validation (parsing the path id and the query) may run before the handler's
+  `try`. Everything that awaits Supabase — the identity read (`getAuthUser()` / `getProfileView()`)
+  and the tenant gate — runs **inside** it, so an outage or missing env config yields the JSON 503
+  rather than an unhandled throw. A rejected read is a 503, not a 401: never turn infrastructure
+  failure into "you are logged out".
 - Bodies: failures are always `{ error: string }` with a fixed, non-reflective message — echoing the
   request or a DB error into the body is a leak. Successes use **two** shapes today, so match the
   route you are extending rather than inventing a third: `/keywords` returns the `{ data, meta }`
@@ -113,16 +118,23 @@ if (!clientId.success) {
   return new Response(JSON.stringify({ error: "Invalid client id" }), { status: 400, headers: NO_STORE });
 }
 
-const user = await getAuthUser();
-if (!user) {
-  return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: NO_STORE });
-}
+try {
+  const user = await getAuthUser();
+  if (!user) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 401, headers: NO_STORE });
+  }
 
-const client = (await listAccessibleClients()).find((c) => c.id === clientId.data);
-if (!client) {
-  return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: NO_STORE });
+  const clients = await listAccessibleClients();
+  const client = clients.find((c) => c.id === clientId.data) ?? null;
+  if (!client) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: NO_STORE });
+  }
+
+  // …reads → 200
+} catch {
+  // identity read, tenant gate and reads share this one failure path
+  return new Response(JSON.stringify({ error: "Database operation failed" }), { status: 503, headers: NO_STORE });
 }
-// read path stays in try/catch → 503 { error: "Database operation failed" }
 ```
 `NO_STORE` above is `{ "Content-Type": "application/json", "Cache-Control": "no-store", Vary: "Cookie" }`,
 written inline per route. `getAuthUser()` takes no request argument — it reads the session from the
@@ -169,8 +181,9 @@ const [gsc, ga4, semrush] = await Promise.allSettled([
 
 ## Error Handling
 
-- Route handlers catch read failures and return 503 — a thrown error in a handler becomes an HTML
-  error page that the client `fetch` cannot parse.
+- Route handlers catch every awaited Supabase failure — identity read, tenant gate, read — and
+  return 503; a thrown error in a handler becomes an HTML error page that the client `fetch` cannot
+  parse.
 - The dashboard has no cached-data fallback yet: a failed boot shows `"Failed to load dashboard
   data"` (`app/dashboard/dashboard-view.tsx`). Do not claim offline resilience until it exists.
 - Sync failures (when built) write `sync_logs` → mark `is_stale` → alert admin. Agents never throw
@@ -222,9 +235,9 @@ Vitest, Node environment. `pnpm test` runs the suite; `pnpm test -- lib/db` narr
 - `vitest.config.ts` aliases `server-only` to its empty module and sets `conditions: ["react-server"]`,
   so a test never needs its own `vi.mock("server-only")` — the few that carry one are dead weight;
   drop it when you touch that file.
-- Route tests assert the four things that matter: 400 on malformed id, 401 with no session,
-  **403 with no body data** for the other tenant's id, and that a read failure yields 503 rather
-  than throwing.
+- Route tests assert the things that matter: 400 on malformed id, 401 with no session, **403 with no
+  body data** for the other tenant's id, and 503 rather than a throw when the identity read, the
+  tenant gate, or the read itself rejects.
 - Tenant isolation is the highest-value test in the repo: two client fixtures (A and B), and every
   assertion checks that B's data never appears in A's response.
 - `@/lib/queue/flow.test.ts` covers cron → queue handoff; `repository.test.ts` covers the RLS gate

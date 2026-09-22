@@ -41,12 +41,12 @@ export async function GET(request: Request) {
   const rawDays = Number(params.get("days") ?? DEFAULT_DAYS);
   const days: DashboardRange = isDashboardRange(rawDays) ? rawDays : DEFAULT_DAYS;
 
-  const profile = await getProfileView();
-  if (!profile) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: NO_STORE });
-  }
-
   try {
+    const profile = await getProfileView();
+    if (!profile) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: NO_STORE });
+    }
+
     const clients = await listAccessibleClients();
     const client = clients.find((entry) => entry.id === rawClientId) ?? clients[0] ?? null;
     if (!client) {
