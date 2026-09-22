@@ -3,10 +3,17 @@
 Update this file after every meaningful implementation change.
 
 ## Current Phase
-Supabase Auth + Google OAuth (implementation order step 2)
+Hardening the built surface: read paths and tenant isolation are done; the **sync pipeline is the
+next unit** and is blocked on a worker-hosting decision (see Open Questions 2).
 
 ## Current Goal
-Email + password sign-in/sign-up verified
+Nothing in flight. Last change was a documentation truth pass — see "Instruction-layer truth pass"
+under Recent Work.
+
+> Entries above this line are a log, not a status. `## Current Phase`, `## In Progress`,
+> `## Open Questions` and the *implemented surface* columns in `AGENTS.md` /
+> `context/architecture-context.md` are the state of record. Test counts quoted inside old entries
+> are frozen at that moment — the live number comes from `pnpm test`.
 
 ## Completed
 - Theme palette (structurewebworks tokens), light/dark mode, dashboard component suite — see prior session notes
@@ -145,6 +152,70 @@ Email + password sign-in/sign-up verified
 
 ## Recent Work
 
+- **First CI run was red on `pnpm build`; fixed by vendoring the UI fonts.** The runner cannot reach
+  `fonts.googleapis.com`, and `next/font/google` downloads Geist at build time, so Turbopack failed
+  with 18 × `Can't resolve '@vercel/turbopack-next/internal/font/google/font'`. Reproduced locally by
+  blocking egress (`NODE_USE_ENV_PROXY=1 HTTPS_PROXY=http://127.0.0.1:9 pnpm build`), then switched
+  `app/layout.tsx` to `next/font/local` against the same latin variable woff2 files, now in
+  `app/fonts/` with their OFL 1.1 text. Variables (`--font-geist-sans`, `--font-geist-mono`), the
+  Arial metric fallback and `display: swap` are unchanged; the build no longer needs the network.
+  Verified: offline cold build passes, both woff2 emitted in `.next/static/media`, built CSS carries
+  `font-weight: 100 900`, tests 113/113, typecheck + lint clean.
+- Instruction-layer truth pass (docs only, no code changed):
+  - **Two new skills, installed repo-level and user-level.** `babysitting-a-pr` (act only on
+    comments/checks newer than the last push; verify every bot finding against the source; no scope
+    creep; no filler comments; rebase onto main; obsolete PR ⇒ stop + ask before closing) and its
+    dependency `leaving-pr-comment` (mandatory "written by an AI agent" disclaimer, ≤6 lines,
+    verdict + evidence, and the rule that silence is often the correct end state). Written
+    test-first: baseline subagent runs produced the failures each rule now forbids. Repo copies are
+    byte-identical to the user-level ones, `.claude/skills/` is the source of truth and
+    `.agents/skills/` holds hardlinks.
+  - `RULES.md` split into a portable core (rules 1–10, reusable in any repo) and a this-repo
+    appendix (11–17). Appendix env names were rewritten to the variables the code actually reads.
+  - `AGENTS.md` cut from 357 → ~145 lines and now describes **only implemented** surface. Its
+    aspirational content (sync/transform/cache/insights agents, retry policy, circuit breaker,
+    planned routes) moved to `docs/target-state.md`, which opens with a verified-status block.
+  - `context/architecture-context.md`: stack table now marks what is partly built; System Boundaries
+    list real modules; Persistence Schema rewritten against the migrations (`clients.domain` exists,
+    `users` has **no** email column, metrics are a JSONB array not typed columns, `sync_logs`
+    stage/status enums); HTTP API split into the 7 real handlers with their actual status codes and
+    cache headers vs 4 planned ones.
+  - `context/development-workflow.md` rewritten as portable core + repo appendix (real commands,
+    verification order, docs-are-defects rule). The old 14-step POC order moved to
+    `docs/target-state.md` with each step marked built / partial / missing.
+  - `context/code-standards.md`: added the missing **Testing** section (Vitest, colocated
+    `*.test.ts`, boundary mocks, the four assertions a route test must make, tenant-isolation test
+    shape) and corrected real falsehoods — the invented `MetricSnapshot` example, the `{ data, error,
+    meta }` "convention" (both shapes actually coexist), `getAuthUser(req)`'s signature, the
+    non-existent Tailwind utilities (`bg-base`, `text-brand`, `text-success`…), and "dashboard falls
+    back to cached data" (it shows an error; reads return 503).
+  - `context/ui-context.md`: token tables verified hex-for-hex against `globals.css`; stale-banner
+    and sync-pill patterns corrected to the real classes in `dashboard-hero.tsx` /
+    `dashboard-header.tsx`; the ranking-badge scale replaced with what the query table actually
+    renders; the phantom "Sync Status Indicators" list and unbuilt admin-panel layout marked.
+  - `context/project-overview.md` now opens with a built-vs-spec block, including that there is no
+    LLM dependency anywhere in the repo and `aiCitations` is a hardcoded `[]`.
+  - `context/pm-conventions.md`: dropped the rotting hardcoded test count from the review gate.
+  - **Out of scope, reported not fixed:** no `.env.example`; `README.md` says Node `>=22.9` while
+    `engines` requires `>=24`; `.opencode/` carries an untracked 61 MB `node_modules`; several
+    `current_metrics`/`is_stale` write paths exist with zero callers. (`DATABASE_URL` and `REDIS_URL`
+    are read only as optional fallbacks to `SUPABASE_DB_URL` / the Upstash pair, so their absence
+    from `.env` is not a defect.)
+  - Verified: `pnpm test` 113/113, `pnpm typecheck`, `pnpm lint` green after the doc edits (no code
+    changed). Not committed.
+- Production-readiness step 2 — tenant gate moved behind RLS:
+  - `lib/db/repository.ts` — `listAccessibleClients()` takes **no arguments** and reads `clients` via `createServerSupabaseClient()` (publishable key + session cookie), so `clients_select_authenticated` decides visibility instead of the old `profile.role` branching. New `canAccessClient(clientId)` is the single-client probe on the same path: no visible row → `false`, read error → throws (fails closed). `listActiveClients` keeps `getAdminDb()` and is documented as cron-only (no session to scope by). `getActiveClient` deleted (its only caller was the branching it replaced). Keyset paging extracted to `selectActiveClients(db)` and shared by both.
+  - `lib/agents/authAgent.ts` — `enforceClientAccess` deleted: it was a second, TypeScript-side copy of the ownership rule. `requireAdmin` stays (role gate; RLS cannot express "admin only" at the route level).
+  - Call sites: `overview` + `exports/server` drop the profile argument; `keywords` route now does `getAuthUser()` → 401, then `canAccessClient()` → 403.
+  - Kept on service role deliberately: `metrics_snapshots` / `current_metrics` / `keyword_rankings` reads. They run inside `unstable_cache`, and a cookie-bound client inside a cached function would key the entry on nothing while deriving its rows from the caller — i.e. exactly the cross-user leak this change is closing. Trade-off recorded as invariant 4-5 in `context/architecture-context.md`.
+  - Tests: `lib/db/repository.test.ts` (new, 8) asserts the gate uses the user client and **never** `getAdminDb`, returns `[]`/`false` when RLS hides rows, fails closed on error, and still pages; `app/api/metrics/[clientId]/overview/route.test.ts` (new, 6) asserts a forged client id gets 403 with zero data reads; keywords route test rewritten for the new gate and now also asserts no read happens after a denied gate. 105 → **113 tests**.
+  - Docs updated for the removed API: `AGENTS.md` (authAgent section now shows real code + the actual policy names), `context/architecture-context.md`, feature specs 04/05/06.
+  - **Not verified:** every claim above is from unit tests with a faked PostgREST. The policies themselves have not been exercised against a live Supabase project (no provisioned `authenticated` role here) — see Open Questions.
+- Production-readiness step 1 (repo audit + hardening):
+  - `app/api/revalidate/dashboard/route.ts` — the `denied` branch returned `Response.json({ status: 401 })`, putting the status in the **body** so the HTTP response was **200**. Now `Response.json({ error: "Unauthorized" }, { status: 401 })`. `app/api/revalidate/dashboard/route.test.ts` was already failing on this (105th test); it asserts 401 and that revalidation is not called.
+  - `.github/workflows/ci.yml` (new) — first CI in the repo (`.github/` was empty). Runs `pnpm test` / `typecheck` / `lint` / `build` on Node 24 + pnpm from `packageManager`, on PRs and pushes to `main`/`dev`. Needs placeholder `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: `/profile` builds a Supabase client during export, and without them `pnpm build` fails with "Supabase client configuration unavailable". Verified locally — build passes with placeholders alone.
+  - Removed `package-lock.json` (pnpm is the declared manager; the stale npm lock also risks Vercel picking the wrong installer) and the empty `tests/` dir (tests are colocated `**/*.test.ts` — 17 files).
+  - Verified: `pnpm test` 105/105, `typecheck`, `lint`, `build` all green.
 - Fixed the ~2–3s **blank screen on first login** (measured before changing anything, prod build + live DB):
   - Cause 1 (the blank itself): `/dashboard` prerenders a full-page `DashboardSkeleton`, but `DashboardView` returned `null` while booting, so hydration wiped the skeleton and left nothing until data arrived.
   - Cause 2 (the duration): boot was three serialized client requests — `/api/me` (593ms) + `/api/clients` (732ms) in parallel, then `/api/metrics/[id]/overview?days=7` (started only at 1036ms, done at **1417ms** from navigation start, FCP 232ms → ~1.1s blank locally; 2–3s on Vercel where each route is its own function). Each of `/api/me` and `/api/clients` also paid **two** `auth.getUser()` round trips, because `getProfileView()` called it and then `getAuthUser()` called it again.
@@ -244,7 +315,22 @@ Email + password sign-in/sign-up verified
 - Dashboard determinant-of-lazy-fallback split: `DashboardChartFallback` extracted out of `dashboard-chart.tsx` (the recharts-home) to a recharts-free sibling `dashboard-chart-fallback.tsx`, and the chart is now loaded via `next/dynamic(() => import("./dashboard-chart"))` mapped to `{ default: m.DashboardChart }` behind the existing `<Suspense>` boundary (`dashboard.tsx:22`). recharts is no longer in the initial parse of `/dashboard` — it ships in the split chunk only when the Suspense boundary resolves. Convention documented in `code-standards.md` §Next.js. Verified: tsc silent, tests 53/53, no commit.
 - Async-token-vault wires-up, parallelized: `getCachedDashboardOverview` (indexed metrics reads) and the `/api/revalidate/dashboard` route.dashboard APIs (queued sync agent) verified registered + wired to BullMQ/Upstash with Supabase client (admin key) — recharts not involved in this seam. Committed `7314633` + pushed `7fd0d3c`.
 
+- Nothing awaited from Supabase escapes its handler any more. The identity read and the RLS tenant gates were called *before* each route's `try`, so a rejection (`createServerSupabaseClient()` throws on missing env; `databaseOperation` rethrows on a DB error) surfaced as an unhandled 500 instead of the documented JSON 503. Fixed by moving every awaited Supabase call inside the existing database-error handling at the four API sites: `app/api/dashboard/boot/route.ts` (`getProfileView()`), `app/api/metrics/[clientId]/overview/route.ts` and `keywords/route.ts` (`getAuthUser()` + gate; keywords' combined `user ? 403 : 401` return split so the gate still stays behind the auth check), and `lib/exports/server.ts` (identity + gate + quota moved into the `try`, so a failed read cannot burn export quota). Precedence is unchanged (400 → 401 → 403 → 429 → 503); a rejected identity or gate read is now a 503, deliberately not a 401, so an outage never looks like "logged out". Tests: 9 new cases reject the gate and the identity read at each site, asserting 503 + `{"error":"Database operation failed"}` + `no-store` + no downstream read/quota. Docs updated: `code-standards.md` (handler snippet now shows the `try`, API-route and testing rules, Error Handling) and `architecture-context.md` (precedence). Verified: 122 tests (was 113), typecheck, lint, hermetic build green. Not committed/pushed.
+
 ## Open Questions
+
+- Audit findings still open (from the 2026-09-23 architecture review, in fix order):
+  1. **Sync pipeline is not implemented.** `lib/queue/worker.ts` returns `status: "mock_completed"`; `lib/agents/` holds only `authAgent`. `persistMetrics`, `markMetricsStale` and `writeSyncLog` in `lib/db/repository.ts` have zero non-test callers, and `api_credentials` is never read — all dashboard data comes from `scripts/seed.mjs`. ~~`AGENTS.md` documents the agents as if built.~~ **Docs fixed 2026-09-23:** unbuilt design now lives in `docs/target-state.md` and `AGENTS.md`/`architecture-context.md` describe only implemented code. The code itself is unchanged and still needs a real `syncAgent`.
+  2. **No host for the BullMQ worker.** Vercel has only the cron, so jobs enqueue with no consumer. Needs a decision: always-on worker (Fly/Render), cron calls sync inline, or QStash.
+  3. ~~**Tenant isolation is one layer.**~~ **Fixed 2026-09-23 (step 2).** The tenant gate (`listAccessibleClients`, new `canAccessClient`) now reads `clients` through `createServerSupabaseClient()`, so Postgres RLS decides visibility. Metric reads stay on `getAdminDb()` by design (see Recent Work) — reachable only with a `client_id` that already passed the gate.
+  4. **`NEXT_PUBLIC_DEMO_PASSWORD` ships in the client bundle** (`components/features/email-password-auth/components/demo-access.tsx`) — move to a server-only credential minted through an endpoint.
+  5. Missing: `lib/api/guard.ts` (routes hand-roll auth + responses in two styles), rate limiting on login/signup/reset, Sentry/OTel, `.env.example` (the 11 required names are currently documented only in `RULES.md` §16 and `AGENTS.md`), generated `types/database.ts` (currently handwritten), and auth limiter reuse of the Upstash quota helper.
+  6. **`is_stale` has no writer.** `markMetricsStale()` exists and nothing calls it, so the stale banner and the "Cached data" sync pill can never appear. Falls out of #1.
+  7. **`aiCitations` is hardcoded `[]`** (`lib/dashboard/overview.ts:231`), so `AICitationGrid` always renders its empty state — UI for a data source that does not exist. There is no LLM dependency in the repo at all.
+  8. **README contradicts `package.json`:** it says "Requires Node.js >=22.9" while `engines` pins
+     `node >=24.0.0` and `pnpm >=10` (and `packageManager` is `pnpm@10.18.3`). One-line doc fix,
+     left alone here because it is outside the docs scope agreed for this pass.
+- RLS policies are still unproven against a live database. The step-2 tests fake PostgREST, so they lock in *which client the app uses*, not that `clients_select_authenticated` etc. behave as written. Needs one pass with two provisioned users in different clients: `select` on `metrics_snapshots` as `anon` (expect permission denied — `revoke` strips the grant) and as a foreign `authenticated` user (expect 0 rows).
 - Profile: no display-name column exists (`users` has only id/role/client_id) — name editing deferred until schema decision.
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` now set in `.env` (208 chars) — auth login flows can be exercised at runtime; needs mirroring in Vercel.
 - Mirror into Vercel so prod actually gates: `CRON_SECRET` (same 64-char value as `.env`), `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_DEMO_EMAIL`/`NEXT_PUBLIC_DEMO_PASSWORD`, and `UPSTASH_REDIS_REST_URL`/`_TOKEN`. A cron/queue/revalidate worker is live only where these env vars are set.

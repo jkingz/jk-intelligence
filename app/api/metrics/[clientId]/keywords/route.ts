@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { enforceClientAccess } from "@/lib/agents/authAgent";
-import { listKeywordRankings } from "@/lib/db/repository";
+import { getAuthUser } from "@/lib/agents/authAgent";
+import { canAccessClient, listKeywordRankings } from "@/lib/db/repository";
 import { SOURCES, type Source } from "@/types/metrics";
 
 export const runtime = "nodejs";
@@ -46,24 +46,34 @@ export async function GET(
     });
   }
 
-  const access = await enforceClientAccess(clientId.data);
-  if (!access.allow) {
-    const status = access.reason === "unauthenticated" ? 401 : 403;
-    return new Response(JSON.stringify({ error: "Forbidden" }), {
-      status: status,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-store',
-        'Vary': 'Cookie'
-      }
-    });
-  }
-
   const now = new Date();
   const from = query.data.from ?? new Date(now.getTime() - 30 * DAY_MS).toISOString();
   const to = query.data.to ?? now.toISOString();
 
   try {
+    const user = await getAuthUser();
+    if (!user) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 401,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+          'Vary': 'Cookie'
+        }
+      });
+    }
+
+    if (!(await canAccessClient(clientId.data))) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+          'Vary': 'Cookie'
+        }
+      });
+    }
+
     const data = await listKeywordRankings(
       clientId.data,
       query.data.source as Source,

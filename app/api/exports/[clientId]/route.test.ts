@@ -114,6 +114,37 @@ for (const { name, handler, contentType, extension, suffix } of handlers) {
       expect(response.status).toBe(503);
     });
 
+    it("returns 503 without spending quota when the tenant gate rejects", async () => {
+      allowAdmin();
+      boundary.accessibleClients.mockRejectedValue(
+        new Error("Database operation failed"),
+      );
+
+      const response = await get(handler, CLIENT, "30");
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toEqual({
+        error: "Database operation failed",
+      });
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(boundary.quota).not.toHaveBeenCalled();
+      expect(boundary.snapshots).not.toHaveBeenCalled();
+    });
+
+    it("returns 503 before the gate when the identity read rejects", async () => {
+      allowAdmin();
+      boundary.authUser.mockRejectedValue(
+        new Error("Supabase client configuration unavailable"),
+      );
+
+      const response = await get(handler, CLIENT, "30");
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toEqual({
+        error: "Database operation failed",
+      });
+      expect(boundary.accessibleClients).not.toHaveBeenCalled();
+      expect(boundary.quota).not.toHaveBeenCalled();
+    });
+
     it("downloads with the right content type, filename and no-store", async () => {
       allowAdmin();
       boundary.snapshots.mockResolvedValue([

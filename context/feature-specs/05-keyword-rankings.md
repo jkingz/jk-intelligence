@@ -9,7 +9,7 @@ Provide a dedicated read/history path for `keyword_rankings` (table is seeded/pe
 - **Shared types** (`types/dashboard.ts`): `RankPoint { date, rank }`, `KeywordRankSeries { keyword, currentRank, points }`.
 - **Pure builder** (`lib/dashboard/keywords.ts`): `buildKeywordSeries(rows, now)` groups `keyword_rankings` rows per keyword, discards any keyword whose latest rank is missing (`null` rank rows are skipped), sorts series by current rank (best first), and sorts each series chronologically. First-class `ready()/done()` observability in the pure builder (used by tests).
 - **Repository** (`lib/db/repository.ts`): `keywordRankingRowSchema` (`rank` coerced with `z.coerce.number()` — PostgREST can return `numeric` as a string), `listKeywordRankings(clientId, source, from, to)`, `getKeywordRankingHistory(client, days, now)` (2× window, `<= now`), and `getCachedKeywordHistory(client, days)` — `unstable_cache` keyed by client+days, tagged with the shared `DASHBOARD_OVERVIEW_TAG` so sync revalidation refreshes the keyword series too.
-- **API route** (`app/api/metrics/[clientId]/keywords/route.ts`): GET, zod-validated `clientId` (a `RouteContext` param, awaited in Next 16) + query (`source` enum default `gsc`, `from`/`to` ISO). `enforceClientAccess` (401 unauthenticated / 403 cross-client). Returns `{ data: KeywordRankSeries[], meta: { source, range } }`.
+- **API route** (`app/api/metrics/[clientId]/keywords/route.ts`): GET, zod-validated `clientId` (a `RouteContext` param, awaited in Next 16) + query (`source` enum default `gsc`, `from`/`to` ISO). `getAuthUser()` then `canAccessClient` (401 unauthenticated / 403 cross-client, both resolved through RLS). Returns `{ data: KeywordRankSeries[], meta: { source, range } }`.
 - **Dashboard view**: `query-table.tsx` gains a `history` prop; each row's Trend cell opens the chart. Buttons are keyboard-reachable; clicking the row itself also toggles. `keyword-rank-chart.tsx` renders a recharts `LineChart` with a reversed Y axis (rank 1 at top of the plot), `ResponsiveContainer initialDimension` (silences the width/height −1 first-measure warning), token colors, and a `#rank` header (current rank + gained/lost delta). `app/page.tsx` fetches the overview and keyword history in parallel; `Dashboard`/`QueryTable` pass `history` through; both the keyword button (chip) and Trend button open the same chart, filtered rows keep working, and search behavior is preserved.
 - Scope: `types/dashboard.ts`, `lib/dashboard/keywords.ts`, `lib/db/repository.ts`, `app/api/metrics/[clientId]/keywords/route.ts`, `components/features/dashboard/components/query-table.tsx`, `.components/keyword-rank-chart.tsx, dashboard.tsx`, `app/page.tsx`.
 
@@ -23,7 +23,7 @@ Provide a dedicated read/history path for `keyword_rankings` (table is seeded/pe
 
 ## Security
 - Revalidation route and cron are guarded by `verifyCronSecret` (same secret Vercel sends; disabled effectively when unset).
-- Keyword read shares the existing `enforceClientAccess` path (401/403), matching the repo's RLS-backed ownership model.
+- Keyword read shares the RLS-backed tenant gate (`getAuthUser` → 401, `canAccessClient` → 403) rather than a second ownership rule.
 - No credentials in logs or responses.
 
 ## Verification

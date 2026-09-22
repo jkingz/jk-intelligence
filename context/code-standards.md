@@ -5,36 +5,42 @@
 - Keep modules small and single-purpose.
 - Fix root causes — do not layer workarounds.
 - Do not mix unrelated concerns in one component or route.
-- Respect system boundaries defined in `architecture-context.md`.
-- Every agent (sync, transform, cache, auth) lives in its own file.
+- Respect the system boundaries in `architecture-context.md`; a helper belongs in the layer that owns the data.
+- One agent per file, and one file per concern — `lib/agents/authAgent.ts` is the template. Agents other than `authAgent` do not exist yet; when added they follow `docs/target-state.md`.
+- Import within the app with the `@/` alias (`@/lib/db/repository`), never `../../..` climbing.
+- Any module reading env secrets or the service-role client starts with `import "server-only"`.
 
 ## TypeScript
 
 - Strict mode required throughout.
 - No `any` — use explicit interfaces or narrowly scoped types.
-- Validate all external API responses at boundary before storing (use Zod).
+- Validate all external input at the boundary before any logic runs (Zod). DB/JSONB payloads are
+  external input too: `lib/db/repository.ts` parses rows through Zod instead of casting.
 - Use `interface` for object contracts, `type` for unions/aliases.
+- Contracts live in `types/`, not at the call site. `Source`, `NormalizedMetric`, `CurrentMetrics`,
+  `Client` and `SyncLogInput` are in `types/metrics.ts`; `Database` in `types/database.ts` is
+  handwritten — if you add a column, update it in the same change.
 
 ```ts
-// ✅
-interface MetricSnapshot {
-  clientId: string
-  date: string
-  platform: Platform
-  metricType: MetricType
-  value: number
-  metadata?: Record<string, unknown>
-}
+// ✅ the real stored shape: one JSONB array per (client, source) run
+export type CurrentMetrics = {
+  client_id: string;
+  source: Source;               // "gsc" | "ga4" | "semrush"
+  metrics: NormalizedMetric[];  // non-empty array, validated
+  synced_at: string;
+  is_stale: boolean;
+};
 
-// ❌
-const data: any = await fetchGSC()
+// ❌ there is no per-metric row: no metric_type column, no single numeric value column
+const row: any = await fetchGSC()
 ```
 
 ## Next.js
 
 - Default to React Server Components.
 - Add `"use client"` only for interactive UI: charts, date pickers, real-time stale banners, and auth forms.
-- Route handlers handle one responsibility: auth → validate → delegate to lib.
+- Route handlers do one thing: validate → authenticate → tenant-gate → read/delegate to `lib/*`.
+  Never inline a query, and never re-implement the ownership rule (see invariant 4).
 - Never run sync jobs inline in route handlers — always queue via BullMQ.
 - Long-running work belongs in BullMQ jobs, not request handlers.
 - Load heavy first-party chart libraries (recharts) via `next/dynamic` behind the nearest `<Suspense>`, and keep the Suspense fallback in its **own recharts-free module**. Never co-locate the fallback with the chart import — co-location defeats the split by pulling the chart barrel back into the initial route JS.
@@ -67,64 +73,123 @@ const data: any = await fetchGSC()
 
 ## Styling
 
-- Use CSS custom property tokens defined in `globals.css` — no raw Tailwind color classes like `zinc-*` or hardcoded hex values.
-- Reference tokens through Tailwind utility names: `bg-base`, `text-copy-primary`, `border-surface-border`, `text-brand`.
-- Border radius scale: `rounded-xl` small elements, `rounded-2xl` cards, `rounded-3xl` modals.
-- Dashboard metric cards always use `rounded-2xl`.
-- Stale-data banner uses warning token — never hardcoded yellow.
+- Colour comes only from tokens declared in `app/globals.css`. No raw Tailwind palette classes
+  (`zinc-*`, `slate-*`), no hex literals in JSX, no `style={{}}` colour overrides.
+- Tailwind utilities are generated from the `@theme inline` block's `--color-*` names, so the
+  utility is `--color-` stripped: `bg-surface`, `bg-elevated`, `text-text-primary`,
+  `text-text-muted`, `border-border-default`, `text-state-success`, `bg-accent-primary-dim`.
+  The raw primitives (`--bg-base`, `--text-primary`, `--accent-ai`) are **not** utilities —
+  `bg-base`, `text-copy-primary`, `text-brand` generate nothing and fail silently.
+  When unsure, `grep -- "--color-" app/globals.css`.
+- Opacity modifiers on state tokens are the standard tint pattern: `bg-state-warning/10` +
+  `text-state-warning`.
+- Border radius scale: `rounded-xl` small elements, `rounded-2xl` cards (metric cards always),
+  `rounded-3xl` modals.
 
 ## API Routes
 
-- Validate and parse request input (Zod) before any logic runs.
-- Enforce auth + client ownership checks before any mutation.
-- Return consistent response shapes: `{ data, error, meta }`.
-- Keep handlers thin — push complexity into `lib/db`, `lib/agents`, `lib/queue`.
+- Parse the `{clientId}` path param with `z.uuid()` **before** anything else; a malformed id is 400,
+  not 403 — never echo whether the id exists for an unauthenticated caller.
+- Order and status codes: 400 malformed input → 401 unauthenticated → 403 not this caller's client
+  → 429 quota spent (exports, with `Retry-After`) → 503 database failure. There is no 500 path and no
+  404 for another tenant's row.
+- Only pure request validation (parsing the path id and the query) may run before the handler's
+  `try`. Everything that awaits Supabase — the identity read (`getAuthUser()` / `getProfileView()`)
+  and the tenant gate — runs **inside** it, so an outage or missing env config yields the JSON 503
+  rather than an unhandled throw. A rejected read is a 503, not a 401: never turn infrastructure
+  failure into "you are logged out".
+- Bodies: failures are always `{ error: string }` with a fixed, non-reflective message — echoing the
+  request or a DB error into the body is a leak. Successes use **two** shapes today, so match the
+  route you are extending rather than inventing a third: `/keywords` returns the `{ data, meta }`
+  envelope, while `/dashboard/boot` and `/overview` return the composite resource directly
+  (`{ profile, clients, selection }`, `{ overview, history }`). Unifying them is an open item, not a
+  change to make while doing something else.
+- Every authenticated response sends `Cache-Control: no-store` (or an explicit short `s-maxage`)
+  plus `Vary: Cookie`, so a shared cache can't serve one tenant to another.
+- Keep handlers thin — push complexity into `lib/db`, `lib/dashboard`, `lib/exports`, `lib/queue`.
 - Never return raw API credentials in any response.
 
 ```ts
-// ✅ thin handler pattern
-export async function GET(req: Request, { params }) {
-  const user = await getAuthUser(req)
-  if (!user) return unauthorized()
-  const metrics = await getClientMetrics(params.clientId, user)
-  return json({ data: metrics })
+// ✅ real handler shape from app/api/metrics/[clientId]/overview/route.ts
+//    (Next 16 fork: ctx is typed and awaited; there is no json()/unauthorized() helper)
+const { clientId: rawClientId } = await ctx.params;
+const clientId = clientIdSchema.safeParse(rawClientId);
+if (!clientId.success) {
+  return new Response(JSON.stringify({ error: "Invalid client id" }), { status: 400, headers: NO_STORE });
+}
+
+try {
+  const user = await getAuthUser();
+  if (!user) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 401, headers: NO_STORE });
+  }
+
+  const clients = await listAccessibleClients();
+  const client = clients.find((c) => c.id === clientId.data) ?? null;
+  if (!client) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: NO_STORE });
+  }
+
+  // …reads → 200
+} catch {
+  // identity read, tenant gate and reads share this one failure path
+  return new Response(JSON.stringify({ error: "Database operation failed" }), { status: 503, headers: NO_STORE });
 }
 ```
+`NO_STORE` above is `{ "Content-Type": "application/json", "Cache-Control": "no-store", Vary: "Cookie" }`,
+written inline per route. `getAuthUser()` takes no request argument — it reads the session from the
+cookie store; routes needing identity + role in one round trip use `getAuthSession()`.
 
 ## Data & Storage
 
 - All metric data in Supabase Postgres — no external blob storage.
-- metrics_snapshots is append-only — never update or delete historical rows.
-- current_metrics is the only mutable cache layer — updated after each sync.
-- API credentials stored in Supabase Vault only — never in .env, logs, or API responses.
-- Never expose service-role key to client components or `NEXT_PUBLIC_*` vars.
-- RLS enabled on every table — policies must match role model (admin/client/staff).
-- is_stale computed server-side and stored — client reads flag, never computes it.
+- metrics_snapshots is append-only — never update or delete historical rows. `keyword_rankings`
+  cascades from it, so a delete silently destroys keyword history too.
+- current_metrics is the only mutable cache layer — one row per `(client_id, source)`.
+- `api_credentials` holds a `vault:<uuid>` **reference**, never key material, and RLS denies direct
+  select. Nothing in `.env`, logs, or responses may carry a provider key.
+- Never expose the service-role key to client components or `NEXT_PUBLIC_*` vars. It is read only
+  in `lib/db/admin.ts`, which is `server-only`.
+- RLS enabled on every table — policies must match the role model (admin/client/staff), with
+  role/client resolved by `security definer` helpers rather than parsed JWT claims.
+- is_stale is computed server-side and stored — client reads the flag, never computes it.
+- A new table ships with its policies in the same migration. "Table exists, RLS later" is a
+  tenant-isolation bug, not a TODO.
 
-## Agent Standards
+## Standards for new agents
 
-- Each agent is a pure function where possible (input → output, no side effects).
-- Sync agent uses Promise.allSettled — never let one API failure block others.
-- Transform agent validates schema with Zod before writing to DB.
-- Cache agent reads/writes Redis only — no direct DB calls.
-- Circuit breaker state stored in Redis — not in memory (survives restarts).
+`lib/agents/` currently holds `authAgent` only. These rules apply to the sync/transform/cache/insights
+agents when they are built to the contracts in `docs/target-state.md`.
+
+- Each agent is a pure function where possible: input → output, side effects at the edges.
+- Sync uses `Promise.allSettled` — one source's failure never blocks the others, and a partial
+  success still writes what arrived.
+- Transform validates with Zod per row and discards only the bad rows, logging the reason; it never
+  aborts the whole run.
+- Redis is for TTL/flags/circuit state, never for metric payloads — Postgres owns the data.
+- Circuit-breaker state lives in Redis, not in process memory, so it survives restarts.
 
 ```ts
 // ✅ partial failure safe
 const [gsc, ga4, semrush] = await Promise.allSettled([
-  syncGSC(creds.gsc),
-  syncGA4(creds.ga4),
-  syncSemrush(creds.semrush),
-])
-// handle each result independently
+  syncGSC(creds),
+  syncGA4(creds),
+  syncSemrush(creds),
+]);
+// settle each independently; write what succeeded
 ```
 
 ## Error Handling
 
-- Every agent wraps in try/catch — log to sync_logs, never throw to client.
-- Sync failures → write failed status to sync_logs → mark is_stale → alert admin.
-- Dashboard never shows 500 — always falls back to cached data + stale banner.
-- API errors logged with: clientId, platform, timestamp, error message (no credentials).
+- Route handlers catch every awaited Supabase failure — identity read, tenant gate, read — and
+  return 503; a thrown error in a handler becomes an HTML error page that the client `fetch` cannot
+  parse.
+- The dashboard has no cached-data fallback yet: a failed boot shows `"Failed to load dashboard
+  data"` (`app/dashboard/dashboard-view.tsx`). Do not claim offline resilience until it exists.
+- Sync failures (when built) write `sync_logs` → mark `is_stale` → alert admin. Agents never throw
+  to a client.
+- API errors logged with: clientId, source, timestamp, sanitized message. **No credentials, no
+  tokens, no `console.log` of request headers.**
 - Client-facing form/action status is a single bottom-right toast lifecycle (`@/lib/toast-status`): `startStatusToast` for processing → `finishStatusToast` flips to success/error. Do not build inline status banners — processing, success, and error all render in the toaster viewport.
 - Interactive submit paths guard against duplicate submissions with a `SlidingWindowLimiter` (`lib/rate-limit.ts`) *and* the component's `pending`/`disabled` state — never rely on button disabling alone.
 
@@ -132,20 +197,50 @@ const [gsc, ga4, semrush] = await Promise.allSettled([
 
 ```
 lib/
-  agents/       — syncAgent, transformAgent, cacheAgent, authAgent
-  db/           — metrics, clients, credentials, syncLogs persistence
-  queue/        — BullMQ job definitions, circuit breaker
-  supabase/     — client construction, vault access
-components/     — UI only, no business logic
+  agents/       — authAgent (identity + role). Other agents: not built
+  auth/         — cron secret check, proxy routing decisions, safe `next`
+  cache/        — tag ownership (`invalidate.ts`), worker→app ping (`notify.ts`)
+  dashboard/    — read models shared by the boot and metrics routes
+  db/           — repository (reads, tenant gate, writes) + `admin.ts` service-role client
+  exports/      — dataset builder, CSV, PDF + `fonts/`, quota, filename
+  queue/        — BullMQ queue definition + worker entrypoint
+  rate-limit.ts — `SlidingWindowLimiter`
+  supabase/     — client construction (protected)
+components/
+  ui/           — shadcn primitives (protected, do not hand-edit)
+  features/     — dashboard, data-export, email-password-auth, landing, user-profile
 app/
-  api/          — thin route handlers (auth, metrics, sync trigger, cron)
-  dashboard/    — server components, client charts
-types/          — shared interfaces (MetricSnapshot, Client, SyncLog, etc.)
+  api/          — thin route handlers (7 today; see architecture-context.md)
+  dashboard/    — static shell + client-side boot fetch
+types/          — shared contracts: metrics.ts, dashboard.ts, database.ts (handwritten)
 supabase/
-  migrations/   — versioned schema, RLS policies, indexes
+  migrations/   — append-only, timestamped; schema + RLS together
+scripts/        — migrations runner, seed, demo user (the only way data lands today)
 ```
 
 - Name files after responsibility, not technology.
 - No business logic in `components/`.
-- No DB calls in `app/api/` — delegate to `lib/db`.
+- No DB calls in `app/api/` — delegate to `lib/db` / `lib/dashboard`.
 - No sync logic in route handlers — delegate to `lib/queue`.
+- Tests sit next to what they cover as `<name>.test.ts`; there is no root `tests/` directory.
+
+## Testing
+
+Vitest, Node environment. `pnpm test` runs the suite; `pnpm test -- lib/db` narrows by path.
+
+- New behavior gets a test in the same change; a bugfix gets a test that fails without the fix.
+- Mock the **module boundary** with `vi.mock("@/lib/db/repository", …)`, never an internal function
+  or a real network/DB call. Use `vi.hoisted(() => ({ fn: vi.fn() }))` so the mock factory can close
+  over the spies, and `afterEach(() => vi.resetAllMocks())`.
+- `vitest.config.ts` aliases `server-only` to its empty module and sets `conditions: ["react-server"]`,
+  so a test never needs its own `vi.mock("server-only")` — the few that carry one are dead weight;
+  drop it when you touch that file.
+- Route tests assert the things that matter: 400 on malformed id, 401 with no session, **403 with no
+  body data** for the other tenant's id, and 503 rather than a throw when the identity read, the
+  tenant gate, or the read itself rejects.
+- Tenant isolation is the highest-value test in the repo: two client fixtures (A and B), and every
+  assertion checks that B's data never appears in A's response.
+- `@/lib/queue/flow.test.ts` covers cron → queue handoff; `repository.test.ts` covers the RLS gate
+  contract. Change either and those tests must change with it.
+- No browser/component-render tests exist yet. Adding a testing-library dependency is a decision to
+  raise, not one to make silently.

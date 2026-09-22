@@ -41,7 +41,7 @@ Two GET handlers under `app/api/exports/[clientId]/`:
 - Wiring: `DashboardHeader` gains an `exportMenu?: React.ReactNode` slot; `app/dashboard/dashboard-view.tsx` renders `<ExportMenu client={...} days={...} />` through the feature barrel. No cross-feature imports.
 
 ## Security
-- Auth + ownership enforced before any read via `listAccessibleClients({ role, clientId })`; admin sees any client, client/staff only their own — identical to `/api/metrics/[clientId]/overview`.
+- Auth + ownership enforced before any read via `getAuthUser()` then `listAccessibleClients()` (RLS-scoped); admin sees any client, client/staff only their own — identical to `/api/metrics/[clientId]/overview`.
 - Rate limit enforced at the API boundary (`lib/exports/quota.ts`), not only in the browser component: a direct request cannot bypass it, and each request performs at most one bounded read.
 - Service-role reads stay server-side; never returned to the client.
 - No credentials in responses or logs.

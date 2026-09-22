@@ -63,32 +63,29 @@ export async function loadExportDataset(
   }
   const days: DashboardRange = rawDays;
 
-  const user = await getAuthUser();
-  if (!user) {
-    return { ok: false, response: jsonError("Forbidden", 401) };
-  }
-
-  const clients = await listAccessibleClients({
-    role: user.role,
-    clientId: user.clientId,
-  });
-  const client = clients.find((entry) => entry.id === clientId.data) ?? null;
-  if (!client) {
-    return { ok: false, response: jsonError("Forbidden", 403) };
-  }
-
-  const quota = await consumeExportQuota(user.id);
-  if (!quota.allowed) {
-    return {
-      ok: false,
-      response: jsonError("Export limit reached", 429, {
-        "Retry-After": String(quota.retryAfterSeconds),
-      }),
-    };
-  }
-
   const now = new Date();
   try {
+    const user = await getAuthUser();
+    if (!user) {
+      return { ok: false, response: jsonError("Forbidden", 401) };
+    }
+
+    const clients = await listAccessibleClients();
+    const client = clients.find((entry) => entry.id === clientId.data) ?? null;
+    if (!client) {
+      return { ok: false, response: jsonError("Forbidden", 403) };
+    }
+
+    const quota = await consumeExportQuota(user.id);
+    if (!quota.allowed) {
+      return {
+        ok: false,
+        response: jsonError("Export limit reached", 429, {
+          "Retry-After": String(quota.retryAfterSeconds),
+        }),
+      };
+    }
+
     // Anchor the read on the newest GSC snapshot, not on wall-clock time: the
     // export window (and `buildOverview`'s prior period) are derived from that
     // snapshot, so a sync that is days behind would otherwise cut off the

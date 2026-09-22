@@ -27,331 +27,123 @@ Update `context/progress-tracker.md` after each meaningful implementation change
 
 If implementation changes the architecture, scope, or standards documented in the context files, update the relevant file before continuing.
 
-# AGENTS & SERVICE ARCHITECTURE
+# SERVICE ARCHITECTURE — implemented surface
 
-## Core Agents (Autonomous Processes)
+This file describes only code that exists. Design intent for what is **not** built lives in
+`docs/target-state.md`; never cite that file as current behavior.
 
-### 1. API Sync Agent (`lib/agents/syncAgent.ts`)
-**Responsibility:** Daily data retrieval from all sources
-- Pulls from: GSC, GA4, SEO platform APIs (Semrush/Ahrefs)
-- Runs: 2 AM daily via BullMQ queue (triggered by Vercel cron)
-- Handles: OAuth token refresh, retry logic, partial failures
-- Input: clientId, API credentials from Supabase Vault
-- Output: appended metrics_snapshots rows + updated current_metrics cache
+## Request path
 
-**Tech Stack:**
-- BullMQ queue (replaces Bull, Redis-backed)
-- Upstash Redis for queue storage
-- Promise.allSettled for parallel API calls (partial failure safe)
-- Exponential backoff retry (3 attempts per source: 1s → 4s → 16s)
-- Circuit breaker after 5 consecutive failures per client, pause sync + alert admin
+```
+proxy.ts (session refresh via updateSession)
+  → app/api route handler
+    → lib/agents/authAgent      — identity + role
+    → lib/db/repository         — RLS-backed tenant gate, then metric reads
+  → components/features/*       — dashboard reads /api/dashboard/boot client-side
+```
 
-**Implementation:**
+## Agents (`lib/agents/`)
+
+| Module | Status |
+| --- | --- |
+| `authAgent.ts` | implemented: `getAuthSession()`, `getAuthUser()`, `requireAdmin()` |
+| `syncAgent` / `transformAgent` / `cacheAgent` / `insightsAgent` | **do not exist** — spec only, see `docs/target-state.md` |
+
+`authAgent` answers identity and role. It must not grow a copy of the client-ownership rule.
+
+## Tenant isolation — one gate, enforced by RLS
+
+- `canAccessClient(clientId)` and `listAccessibleClients()` in `lib/db/repository.ts` read the
+  `clients` table through the per-request Supabase client (`createServerSupabaseClient()`:
+  publishable key + session cookie), so Postgres decides visibility. Both fail closed.
+- No route or helper may re-implement "is this the caller's client?" in TypeScript.
+- Metric/keyword reads deliberately use the service-role client (`getAdminDb()`, RLS bypassed)
+  because they run inside `unstable_cache`; they are reachable only with a `client_id` that already
+  cleared the gate.
+- Roles `admin | client | staff` come from the `users` row via `security definer` helpers
+  (`private.current_user_role()`, `private.current_user_client_id()`) — never from JWT claims.
+
 ```ts
-// lib/agents/syncAgent.ts
-export async function syncClient(clientId: string) {
-  try {
-    const creds = await getClientCredentials(clientId) // Supabase Vault
-    const [gsc, ga4, semrush] = await Promise.allSettled([
-      syncGSC(creds.gsc_token),
-      syncGA4(creds.ga4_token),
-      syncSemrush(creds.semrush_api_key)
-    ])
-    // handle each result independently
-    const normalized = await transformData(gsc, ga4, semrush)
-    await insertSnapshots(clientId, normalized)
-    await updateCurrentMetrics(clientId, normalized)
-    await logSync(clientId, 'success', records.length)
-  } catch (error) {
-    await handleSyncFailure(clientId, error)
-  }
+// lib/db/repository.ts — the gate
+export async function canAccessClient(clientId: string): Promise<boolean> {
+  const db = await createServerSupabaseClient();          // user-scoped: RLS applies
+  const { data } = await db.from("clients").select("id")
+    .eq("id", idSchema.parse(clientId)).eq("is_active", true).maybeSingle();
+  return data !== null;                                   // no visible row == no access
 }
 ```
 
----
+Policies: `supabase/migrations/20260917000000_seo_poc.sql`,
+`20260920000000_add_staff_role.sql`, `20260920000001_rls_hardening.sql`. `api_credentials` has a
+`using (false)` select policy and is never read by the app today.
 
-### 2. Data Transform Agent (`lib/agents/transformAgent.ts`)
-**Responsibility:** Normalize API responses into dashboard schema
-- Input: Raw API data from GSC, GA4, Semrush (varies by source)
-- Transform: Standardize to MetricSnapshot interface
-- Validate: Zod schema validation, log errors separately
-- Output: Normalized array of snapshots + current_metrics updates
+## HTTP surface (what actually exists)
 
-**Tech Stack:**
-- Zod for schema validation (typed, strict)
-- TypeScript interfaces: MetricSnapshot, KeywordRanking
-- Separate error logging (log transformation failure, don't block sync)
+| Route | Method | Auth | Notes |
+| --- | --- | --- | --- |
+| `/api/dashboard/boot` | GET | session | one payload for the whole dashboard boot: profile + accessible clients + selection |
+| `/api/metrics/[clientId]/overview` | GET | session + gate | `?days=` (default 7), `unstable_cache` |
+| `/api/metrics/[clientId]/keywords` | GET | session + gate | `?source=gsc\|ga4\|semrush`, rank history |
+| `/api/exports/[clientId]/csv` | GET | session + gate | streams via `lib/exports/server.ts` |
+| `/api/exports/[clientId]/pdf` | GET | session + gate | pdf-lib + vendored Noto Sans TTFs |
+| `/api/revalidate/dashboard` | POST | `CRON_SECRET` bearer | the only path that revalidates `DASHBOARD_OVERVIEW_TAG` |
+| `/api/cron/sync` | GET | `CRON_SECRET` bearer | enqueues one job per active client; Vercel cron `0 2 * * *` |
 
-**Implementation:**
-```ts
-// lib/agents/transformAgent.ts
-import { z } from 'zod'
+Planned and absent: `POST /api/sync/trigger`, `GET /api/metrics/{clientId}`,
+`GET /api/metrics/{clientId}/history`, `GET /api/sync/logs/{clientId}`.
 
-const MetricSnapshotSchema = z.object({
-  clientId: z.string().uuid(),
-  date: z.string(),
-  platform: z.enum(['gsc', 'ga4', 'semrush']),
-  metricType: z.enum(['organic_traffic', 'conversions', 'clicks', 'impressions', 'ctr', 'position']),
-  value: z.number(),
-  metadata: z.record(z.unknown()).optional(),
-})
+## Queue, worker, cron
 
-export async function transformData(gsc, ga4, semrush) {
-  const snapshots = []
-  try {
-    snapshots.push(...transformGSC(gsc))
-    snapshots.push(...transformGA4(ga4))
-    snapshots.push(...transformSemrush(semrush))
-  } catch (err) {
-    logTransformError(err)
-  }
-  return snapshots.map(s => MetricSnapshotSchema.parse(s))
-}
+- `lib/queue/syncQueue.ts` — BullMQ on Upstash Redis, queue name `seo-sync`, zod-guarded job body.
+- `lib/queue/worker.ts` — `pnpm worker` runs it locally. It currently revalidates the dashboard and
+  returns `status: "mock_completed"`: no API fetch, no rows written.
+- **Nothing consumes the queue in production.** Vercel hosts only the cron; hosting the worker
+  (always-on process, inline-in-cron, or QStash) is an open decision — see
+  `context/progress-tracker.md`.
+- `persistMetrics`, `markMetricsStale` and `writeSyncLog` in `lib/db/repository.ts` exist but have
+  zero callers. All dashboard rows today come from `scripts/seed.mjs`.
+
+## Pages and caching
+
+`app/` routes: `/` (landing), `/dashboard`, `/profile`, `/auth/{login,sign-up,forgot-password,
+reset-password}`, `/privacy`, `/terms`, plus `app/auth/callback/route.ts` (PKCE exchange).
+There is **no** admin panel page, no `sitemap.ts`/`robots.ts`, and no LLM/Claude dependency.
+
+`lib/cache/invalidate.ts` owns `DASHBOARD_OVERVIEW_TAG = "dashboard-overview"`; revalidation happens
+only through `POST /api/revalidate/dashboard` (`revalidateTag(tag, profile)`), never from the worker.
+`/dashboard` stays a prerendered static shell. `is_stale` is a stored column the UI only reads —
+`markMetricsStale()` exists but nothing calls it, so the stale banner can never fire yet.
+
+## Verification
+
+```bash
+pnpm test && pnpm typecheck && pnpm lint && pnpm build
 ```
 
----
+`.github/workflows/ci.yml` runs those four on every push to `main`/`dev` and on pull requests, with
+non-secret Supabase env placeholders so the build can prerender. Tests colocate as `*.test.ts`;
+mock at module boundaries, never inside business logic.
 
-### 3. Cache/Freshness Agent (`lib/agents/cacheAgent.ts`)
-**Responsibility:** Manage stale-data flags & fallbacks
-- Monitors: Last sync time per client per source (Upstash Redis TTL)
-- Flags: is_stale = true if sync missed > 24hrs
-- Fallback: Serves cached data from current_metrics + warning banner
-- Cleanup: old snapshots archived weekly (separate job)
+## Repo skills
 
-**Tech Stack:**
-- Upstash Redis for TTL management (key: `stale:{clientId}:{platform}`)
-- Supabase current_metrics table stores is_stale flag
-- Dashboard reads is_stale from DB (client never computes staleness)
+`.claude/skills/` is the source of truth; `.agents/skills/` holds hardlinked copies for other
+loaders. `.opencode/` carries only `commands/feature-component.md` — its own `.gitignore` keeps
+the tool's `node_modules/` and `package.json` untracked, so do not expect skills there.
 
-**Implementation:**
-```ts
-// lib/agents/cacheAgent.ts
-export async function markStale(clientId: string, platform: string) {
-  const key = `stale:${clientId}:${platform}`
-  await redis.setex(key, 86400, '1') // 24hr TTL
-  await supabase
-    .from('current_metrics')
-    .update({ is_stale: true })
-    .eq('client_id', clientId)
-    .eq('platform', platform)
-}
+- `babysitting-a-pr` + `leaving-pr-comment` — how PR review bots, comments and checks get handled
+  and worded. Also installed user-level, so they apply to every repo.
+- Stack: `code-review`, `feature-component`, `frontend-design`, `shadcn`, `supabase`,
+  `supabase-postgres-best-practices`, `tailwind-design-system`, `motion-design`, `playwright-cli`,
+  `migrate-radix-to-base`.
+- Visual direction: `design-taste-frontend`, `stitch-design-taste`, `high-end-visual-design`,
+  `redesign-existing-projects`, `minimalist-ui`, `brandkit`, `gpt-taste`, `image-to-code`,
+  `imagegen-frontend-web`, `imagegen-frontend-mobile`.
+- `.agents/skills/` mirrors only a 13-entry subset. `ls` both before assuming a skill is reachable
+  from another loader, and never edit a skill in one place without the other.
 
-export async function checkStale(clientId: string, platform: string) {
-  const key = `stale:${clientId}:${platform}`
-  return !!(await redis.exists(key))
-}
-```
+## Editing this file
 
----
-
-### 4. Auth & Access Control Agent (`lib/agents/authAgent.ts`)
-**Responsibility:** Validate client sessions, enforce data isolation
-- OAuth: Google login via Supabase Auth
-- Row-Level Security (RLS): Supabase policies block cross-client access (enforced at DB layer, not bypassable)
-- Roles: admin (full access) | client (own data only) | staff (assigned clients)
-- Session: JWT token from Supabase Auth
-
-**Tech Stack:**
-- Supabase Auth + Google OAuth
-- Supabase JWT tokens (sub claim = user ID, role claim = admin|client|staff)
-- Database policies (SQL-based RLS) on every exposed table
-
-**Implementation:**
-```ts
-// lib/agents/authAgent.ts
-export async function enforceClientAccess(req: Request, clientId: string) {
-  const user = await getAuthUser(req) // from Supabase JWT
-  if (!user) return unauthorized()
-  
-  // Admin sees all
-  if (user.role === 'admin') return true
-  
-  // Client sees only own data
-  if (user.role === 'client' && user.client_id === clientId) return true
-  
-  return forbidden()
-}
-```
-
-**RLS Policies:**
-```sql
--- metrics_snapshots: clients see only their data
-CREATE POLICY "clients_see_own_metrics" ON metrics_snapshots
-  FOR SELECT USING (client_id = (SELECT client_id FROM users WHERE id = auth.uid()));
-
--- admins see all
-CREATE POLICY "admins_see_all" ON metrics_snapshots
-  FOR SELECT USING (auth.jwt() ->> 'role' = 'admin');
-```
-
----
-
-### 5. AI Insights Agent (`lib/agents/insightsAgent.ts`)
-**Responsibility:** AI-powered insight summaries
-- Input: current_metrics + last 30-day metrics_snapshots for client
-- Claude API call: summarize ranking changes, top gains/losses, focus areas
-- Output: plain-English insights cached in current_metrics as `ai_summary` metric
-- Cache: cached 24hrs (don't regenerate every request, cost control)
-
-**Tech Stack:**
-- Claude API (claude-sonnet-4-6 model)
-- Prompt template per insight type (ranking summary, traffic analysis, etc.)
-- Upstash Redis cache for response
-
-**Implementation:**
-```ts
-// lib/agents/insightsAgent.ts
-export async function generateInsights(clientId: string) {
-  const cacheKey = `insight:${clientId}`
-  const cached = await redis.get(cacheKey)
-  if (cached) return JSON.parse(cached)
-  
-  const metrics = await getClientMetrics(clientId)
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 500,
-      messages: [{
-        role: 'user',
-        content: `Summarize performance: ${JSON.stringify(metrics)}`
-      }]
-    })
-  })
-  
-  const insight = await response.json()
-  await redis.setex(cacheKey, 86400, JSON.stringify(insight))
-  return insight
-}
-```
-
----
-
-## Agent Interaction Map
-
-```
-[Vercel Cron: 2 AM daily]
-     ↓
-[POST /api/cron/sync] 
-     ↓
-[BullMQ Queue: Queue sync job per active client]
-     ↓
-[syncAgent(clientId)]
-  ├─ Fetch creds from Supabase Vault
-  ├─ Promise.allSettled([GSC, GA4, Semrush])
-  │    ├─ GSC → transformAgent → normalize
-  │    ├─ GA4 → transformAgent → normalize
-  │    └─ Semrush → transformAgent → normalize
-  ├─ insertSnapshots(clientId, normalized)
-  ├─ updateCurrentMetrics(clientId, normalized)
-  ├─ cacheAgent.markStale(clientId, platform)
-  └─ logSync(clientId, status, error)
-     ↓
-[Supabase: metrics_snapshots + current_metrics updated]
-     ↓
-[Dashboard reads from current_metrics (fast)]
-     ↓
-[UI checks is_stale flag → shows stale banner if true]
-     ↓
-[User requests insights → insightsAgent(clientId)]
-     ↓
-[Claude API generates summary, cache 24hrs]
-```
-
----
-
-## Deployment Strategy
-
-| Service | Provider | Purpose |
-|---------|----------|---------|
-| Next.js App | Vercel | Frontend + API routes |
-| Database | Supabase | Postgres: metrics, clients, creds, logs |
-| Queue | BullMQ + Upstash Redis | Job processing, retry, circuit breaker |
-| Cron Trigger | Vercel Functions | POST /api/cron/sync @ 2 AM daily |
-| Credentials | Supabase Vault | Encrypted API keys, not in .env |
-| Auth | Supabase Auth | Google OAuth, JWT tokens |
-| Logging | Supabase table | sync_logs for audit trail |
-| Cache | Upstash Redis | Stale flags, AI insight cache |
-
----
-
-## Error Handling Per Agent
-
-| Agent | Failure Mode | Behavior |
-|-------|--------------|----------|
-| API Sync | API down | Retry 3x (1s → 4s → 16s), mark stale, log error, continue with other APIs |
-| API Sync | 5+ consecutive failures | Pause client sync, fire circuit breaker, alert admin |
-| Transform | Invalid schema | Log error, discard bad row, continue (partial insert) |
-| Cache | Redis down | Fallback to direct DB queries (slower), continue sync |
-| Auth | Session expired | Redirect to login, preserve session state in localStorage |
-| Insights | Claude timeout | Show "insights unavailable" widget, no crash |
-| Cron | Job queue full | Retry job next run (BullMQ handles backpressure) |
-
-**Logging Pattern:**
-```ts
-// Never log credentials
-await logSync({
-  clientId,
-  platform, // 'gsc' | 'ga4' | 'semrush'
-  status, // 'success' | 'partial' | 'failed'
-  error: sanitizedMessage, // no API keys
-  recordsSynced: count,
-  durationMs: elapsed,
-  createdAt: new Date()
-})
-```
-
----
-
-## API Route Definitions
-
-### Cron Trigger
-```
-POST /api/cron/sync
-Authorization: Vercel cron secret
-Body: { secret: VERCEL_CRON_SECRET }
-Response: { queued: number, errors: [] }
-
-Purpose: Vercel cron calls this @ 2 AM daily. Queues sync job per active client.
-```
-
-### Manual Sync Trigger (Admin)
-```
-POST /api/sync/trigger
-Authorization: Bearer JWT (admin only)
-Body: { clientId: string }
-Response: { jobId: string, status: 'queued' }
-
-Purpose: Admin manually trigger sync for one client.
-```
-
-### Metrics Read (Client/Admin)
-```
-GET /api/metrics/{clientId}
-Authorization: Bearer JWT
-Query: ?days=30 (optional, defaults to last 30)
-Response: { data: current_metrics[], is_stale: bool, last_updated: timestamp }
-
-Purpose: Dashboard loads current metrics fast (from current_metrics cache).
-```
-
-### Metrics History (Client/Admin)
-```
-GET /api/metrics/{clientId}/history
-Authorization: Bearer JWT
-Query: ?start=2024-01-01&end=2024-01-31&metric_type=organic_traffic
-Response: { data: metrics_snapshots[], metadata: {} }
-
-Purpose: Fetch historical trends for date range comparison.
-```
-
-### Sync Logs (Admin)
-```
-GET /api/sync/logs/{clientId}
-Authorization: Bearer JWT (admin only)
-Query: ?limit=20
-Response: { data: sync_logs[], total: number }
-
-Purpose: View sync history and failure reasons.
-```
+`AGENTS.md`'s top block ("This is NOT the Next.js you know" through the context-file list) is
+regenerated by `next dev` — commit it with your work rather than deleting it. Everything below the
+`# SERVICE ARCHITECTURE` heading is hand-maintained: update it in the same change that alters the
+surface described here, and move newly built modules out of `docs/target-state.md`.

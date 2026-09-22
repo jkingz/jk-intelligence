@@ -4,6 +4,7 @@ import { unstable_cache } from "next/cache";
 import { z } from "zod";
 import { DASHBOARD_OVERVIEW_TAG } from "@/lib/cache/invalidate";
 import { getAdminDb } from "@/lib/db/admin";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   buildOverview,
   toDashboardClient,
@@ -77,39 +78,35 @@ async function databaseOperation<T>(operation: () => Promise<T>): Promise<T> {
   }
 }
 
-export async function listActiveClients(): Promise<Client[]> {
-  return databaseOperation(async () => {
-    const clients: Client[] = [];
-    let cursor: string | undefined;
-    for (;;) {
-      let query = getAdminDb()
-        .from("clients")
-        .select("id,name,domain,is_active")
-        .eq("is_active", true)
-        .order("id")
-        .limit(500);
-      if (cursor) query = query.gt("id", cursor);
-      const { data, error } = await query;
-      if (error || !data) throw new Error("Database operation failed");
-      const page = z.array(clientSchema).parse(data);
-      if (page.length === 0) return clients;
-      clients.push(...page);
-      cursor = page[page.length - 1].id;
-    }
-  });
-}
+type ScopedDb = Awaited<ReturnType<typeof getAdminDb>>;
 
-export async function getActiveClient(id: string): Promise<Client | null> {
-  return databaseOperation(async () => {
-    const { data, error } = await getAdminDb()
+/** Cursor-paged `clients` read. Which rows come back is the caller's concern. */
+async function selectActiveClients(db: ScopedDb): Promise<Client[]> {
+  const clients: Client[] = [];
+  let cursor: string | undefined;
+  for (;;) {
+    let query = db
       .from("clients")
       .select("id,name,domain,is_active")
-      .eq("id", idSchema.parse(id))
       .eq("is_active", true)
-      .maybeSingle();
-    if (error) throw new Error("Database operation failed");
-    return data ? clientSchema.parse(data) : null;
-  });
+      .order("id")
+      .limit(500);
+    if (cursor) query = query.gt("id", cursor);
+    const { data, error } = await query;
+    if (error || !data) throw new Error("Database operation failed");
+    const page = z.array(clientSchema).parse(data);
+    if (page.length === 0) return clients;
+    clients.push(...page);
+    cursor = page[page.length - 1].id;
+  }
+}
+
+/**
+ * Cron only — it has no session to scope by, so the queue must see every
+ * active client. User-facing reads must use `listAccessibleClients`.
+ */
+export async function listActiveClients(): Promise<Client[]> {
+  return databaseOperation(() => selectActiveClients(getAdminDb()));
 }
 
 export async function persistMetrics(
@@ -275,18 +272,37 @@ export async function getLatestSnapshotTime(
   });
 }
 
-export async function listAccessibleClients(profile: {
-  role: "admin" | "client" | "staff" | null;
-  clientId: string | null;
-}): Promise<DashboardClient[]> {
-  if (profile.role === "admin") {
-    return (await listActiveClients()).map(toDashboardClient);
-  }
-  if ((profile.role === "client" || profile.role === "staff") && profile.clientId) {
-    const client = await getActiveClient(profile.clientId);
-    return client ? [toDashboardClient(client)] : [];
-  }
-  return [];
+/**
+ * The tenant gate for a request. Reads as the signed-in user, so Postgres RLS
+ * (`clients_select_authenticated`) decides visibility: admins see every active
+ * client, client/staff users see only their own. Re-deriving that rule here in
+ * TypeScript meant a bug in this function silently widened access while the
+ * database stayed correct, and nothing downstream would notice.
+ */
+export async function listAccessibleClients(): Promise<DashboardClient[]> {
+  return (
+    await databaseOperation(async () =>
+      selectActiveClients(await createServerSupabaseClient()),
+    )
+  ).map(toDashboardClient);
+}
+
+/**
+ * Single-client probe for routes that only need allow/deny — same RLS path as
+ * `listAccessibleClients`, one row instead of the whole list.
+ */
+export async function canAccessClient(clientId: string): Promise<boolean> {
+  return databaseOperation(async () => {
+    const db = await createServerSupabaseClient();
+    const { data, error } = await db
+      .from("clients")
+      .select("id")
+      .eq("id", idSchema.parse(clientId))
+      .eq("is_active", true)
+      .maybeSingle();
+    if (error) throw new Error("Database operation failed");
+    return data !== null;
+  });
 }
 
 export async function getDashboardOverview(

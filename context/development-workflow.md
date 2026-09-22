@@ -1,114 +1,120 @@
 # Development Workflow
 
-## Approach
-
-Build incrementally using spec-driven workflow. Context files define what to build, how to build it, current progress. Always implement against specs — never infer or invent behavior.
-
-Context files:
-- `architecture-context.md` — stack, boundaries, storage, auth model
-- `agents.md` — sync, transform, cache, auth agent contracts
-- `code-standards.md` — TypeScript, Next.js, styling, file org rules
-- `ui-context.md` — tokens, components, layout patterns
-- `progress-tracker.md` — current state of implementation
+Two parts: a **portable core** that applies to any project, then **this repo's appendix** with the
+concrete paths and commands. When the two disagree, the appendix wins for this repo.
 
 ---
 
-## Scoping Rules
+## Portable core
 
-- One feature unit or agent at a time.
-- Small, verifiable increments over large speculative changes.
-- Do not combine unrelated system boundaries in one step.
+### The loop, per unit of work
+1. Read what governs the change — root rules first, then the context files for the touched module.
+2. Say the scope out loud in one sentence: what changes, and what explicitly does not.
+3. Implement the smallest increment that can be verified on its own.
+4. Verify with a command, never with a claim.
+5. Update the docs that the change made untrue — in the same change.
+6. Report: what changed, what was verified, what is still unknown.
 
----
+### Scoping
+- One feature unit or one agent at a time.
+- Split when a step crosses boundaries: UI + sync agent, schema + API route, cache + auth,
+  queue/cron + dashboard, or anything whose behavior is not written down.
+- If end-to-end verification of a step is not quick, the scope is too broad — split it.
+- **The request is the scope.** An adjacent improvement you noticed is a finding to report,
+  not work to do. Fixing a real defect you were asked to fix is not a licence to tidy its neighbours.
+- No "while I'm here": no renames, no dependency swaps, no formatting of untouched files.
 
-## When To Split Work
+### Requirements
+- Do not invent behavior that is not in the context files.
+- Ambiguous → resolve it in the relevant context file, then implement.
+- Missing → record it as an open question in the status doc and stop that branch of work.
+- A guessed constant, threshold, or policy is a requirement you invented. Label it or drop it.
 
-Split if a step combines any of:
+### Verification
+A unit is done when, in this order:
+1. tests covering the changed paths pass (new behavior gets a new test in the same change);
+2. typecheck passes;
+3. lint passes;
+4. the production build passes;
+5. anything a test cannot reach (a page, a migration, a queue job) was exercised for real, and
+   the observation is reported. "It should work" is not a status.
 
-- UI changes + sync agent changes
-- DB schema changes + API route changes
-- Multiple unrelated agents (e.g. cache agent + auth agent)
-- Cron/queue changes + dashboard changes
-- Behavior not clearly defined in context files
+### Docs and truth
+- Code is the source of truth. Where a doc and the code disagree, the doc is the defect.
+- Design intent that is **not built** belongs in a clearly-named target-state doc, never inline in
+  the docs that describe current behavior.
+- Status docs record actual state, not intended state. Delete or re-mark an entry the moment its
+  claim stops being true.
+- Do not restate the spec in a doc — link it. Duplication is how docs go stale silently.
 
-If end-to-end verification isn't quick — scope is too broad, split it.
+### Protected foundations
+- Never patch a vendored component, framework file, or third-party internals to make a feature
+  work. Project logic goes in project layers.
+- If a foundation file seems to need editing, the real problem is upstream of it — say so instead
+  of working around it.
 
----
-
-## Implementation Order (POC)
-
-Follow this sequence. Do not skip ahead.
-
-```
-1. DB schema + migrations (Supabase)
-2. Supabase Auth + Google OAuth + RLS policies
-3. API credentials model (Vault integration)
-4. GSC sync agent (fetch → transform → store)
-5. GA4 sync agent
-6. Semrush/Ahrefs sync agent
-7. BullMQ queue + cron endpoint
-8. current_metrics cache layer + is_stale logic
-9. /api/metrics route (read from cache)
-10. Dashboard UI (metric cards, trends, date range)
-11. Stale data banner + last_updated display
-12. Admin panel (add client, manage credentials, view logs)
-13. AI insight generation (Claude API)
-14. CSV/PDF export
-```
-
-Each step must be verified before moving to the next.
-
----
-
-## Handling Missing Requirements
-
-- Do not invent behavior not defined in context files.
-- Ambiguous requirement → resolve in relevant context file first.
-- Missing requirement → add as open question in `progress-tracker.md` before continuing.
-
----
-
-## Protected Foundation Components
-
-Do not modify unless explicitly instructed:
-
-- `components/ui/*` (shadcn/ui)
-- `lib/supabase/*` (client construction)
-- Third-party library internals
-
-Project-specific logic goes in app-level components and `lib/agents`, `lib/db`, `lib/queue`. Never patch foundation files to make a feature work.
+### Git and review
+- One logical change per commit; conventional prefix.
+- Long-lived branch: pull/rebase the trunk before pushing; `--force-with-lease` only.
+- Never skip hooks. A failing hook is a finding, not an obstacle.
+- Review bots are leads, not evidence. Use the PR-babysitting skill for the loop and the
+  PR-comment skill for anything written on the owner's behalf.
 
 ---
 
-## Keeping Docs In Sync
+## This repo — appendix
 
-Update relevant context file when any of these change:
+### Read order before implementing
+`RULES.md` → `AGENTS.md` → `context/project-overview.md` → `context/architecture-context.md` →
+`context/ui-context.md` → `context/code-standards.md` → `context/progress-tracker.md`.
+Unbuilt design lives in `docs/target-state.md`; treat it as requirements, never as description.
 
-- System boundaries or storage model
-- Agent contracts or error handling behavior
-- API route shapes
-- Code conventions
-- Feature scope (in or out)
+### Commands
+| Need | Command |
+|------|---------|
+| Dev server | `pnpm dev` |
+| Tests | `pnpm test` (Vitest; `pnpm test -- <path>` for one file) |
+| Types | `pnpm typecheck` (runs `next typegen` first) |
+| Lint | `pnpm lint` |
+| Build | `pnpm build` |
+| Migrations | `pnpm db:migrate` |
+| Seed demo data | `pnpm db:seed` |
+| Demo user | `pnpm db:demo-user` |
+| Queue worker | `pnpm worker` (manual only — no production host yet) |
 
-`progress-tracker.md` reflects actual state — not intended state.
+`pnpm` only (`packageManager` is pinned); Node ≥ 24. npm/yarn produce a lockfile this repo does not use.
 
----
+### Where logic goes
+`lib/agents` identity/role only · `lib/db` persistence + the RLS-backed tenant gate ·
+`lib/dashboard` read models shared by routes · `lib/queue` queue + worker · `lib/cache` tag ownership ·
+`lib/exports` CSV/PDF · `app/api` thin handlers.
+Protected: `components/ui/*` (shadcn) and `lib/supabase/*` (client construction).
 
-## Agent Development Rules
+### Next.js 16 fork
+This is not the Next you may remember. Read the matching guide in `node_modules/next/dist/docs/`
+before touching a framework API: `proxy.ts` replaces `middleware.ts`, route handlers take a
+`RouteContext<"/path">` second arg, `revalidateTag(tag, profile)` is two-argument, and
+`next typegen` generates route types. Do not hand-write a `Middleware` export.
 
-- Build and test each agent in isolation before wiring into queue.
-- Mock external API responses during development (realistic dummy data).
-- Verify partial failure handling: kill one mock API, confirm others still write.
-- Confirm circuit breaker fires after 5 consecutive failures.
-- Confirm is_stale flag set correctly when sync misses 24hr window.
+### Schema changes
+Never edit an applied migration — add a timestamped one. Every new table needs RLS enabled with a
+policy matching the role/tenant model in `context/architecture-context.md`, in the same change.
 
----
+### Data today
+The dashboard's rows come from `scripts/seed.mjs`. `pnpm worker` consumes the queue and returns
+`mock_completed`; it writes nothing. Anything you observe about "sync" is therefore not evidence
+about sync.
 
-## Before Moving To Next Unit
+### Agent development rules
+- Build each agent in isolation before wiring it into the queue; mock the external API responses.
+- Verify partial failure: kill one mock source, confirm the others still write.
+- Verify the circuit breaker fires after 5 consecutive failures and that a paused client is alerted.
+- Verify `is_stale` flips when a sync misses the 24-hour window — the banner depends on it.
 
-1. Current unit works end to end within defined scope.
-2. No invariant from `architecture-context.md` violated.
-3. `progress-tracker.md` updated to reflect completed work.
-4. No console errors, no TypeScript errors, no unhandled promise rejections.
-5. Sync agent: confirm data visible in Supabase table after run.
-6. Dashboard: confirm stale banner shows when cache is expired.
+### Before moving to the next unit
+1. The unit works end to end inside the scope you stated in step 2 of the loop.
+2. No invariant in `context/architecture-context.md` was violated (read the list; #4 tenant
+   isolation and #12 the static dashboard shell are the ones that break silently).
+3. `context/progress-tracker.md` reflects what actually happened.
+4. `pnpm test && pnpm typecheck && pnpm lint && pnpm build` are green.
+5. No orphaned dev server, worker, or background process left running.

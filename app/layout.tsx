@@ -1,21 +1,21 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toast";
 import "./globals.css";
 
-const geistSans = Geist({
+// Same latin variable files next/font/google used to download from
+// fonts.gstatic.com at build time; CI runners cannot reach Google Fonts.
+const geistSans = localFont({
+  src: [{ path: "./fonts/Geist-Latin.woff2", weight: "100 900", style: "normal" }],
   variable: "--font-geist-sans",
-  subsets: ['latin'],
-  weight: ['400', '600', '700'],
-  display: 'swap',
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: [{ path: "./fonts/GeistMono-Latin.woff2", weight: "100 900", style: "normal" }],
   variable: "--font-geist-mono",
-  subsets: ['latin'],
-  weight: ['400', '600', '700'],
-  display: 'swap',
+  display: "swap",
 });
 
 export const metadata: Metadata = {
