@@ -1,5 +1,16 @@
 # SEO Reporting Platform
 
+> **This file is the product spec — what the product is meant to do, not what the code does.**
+> Built today: Supabase Auth (Google + email/password) with RLS-backed tenant isolation; a
+> multi-client dashboard (metric cards, trends, keyword rank chart, query table, date ranges) that
+> boots from one `GET /api/dashboard/boot`; CSV/PDF export behind a sliding-window quota.
+> Not built: real sync (worker returns `mock_completed`, data comes from `scripts/seed.mjs`), the
+> admin panel, and any LLM integration — there is no `@anthropic-ai/sdk`, `ANTHROPIC_API_KEY`, or
+> Claude call anywhere in the repo. The "AI" surfaces are presentation only:
+> `autonomous-brief.tsx` phrases numbers it is handed, and `lib/dashboard/overview.ts` hardcodes
+> `aiCitations: []`, so the citation grid always renders its empty state.
+> State of record: `context/progress-tracker.md`. Unbuilt design: `docs/target-state.md`.
+
 ## Overview
 
 Multi-client automated SEO reporting platform. Clients and internal staff log in to view marketing and SEO performance data pulled daily from GSC, GA4, and SEO APIs. AI generates plain-English performance summaries. Admins manage clients, credentials, and sync jobs from a central admin panel.

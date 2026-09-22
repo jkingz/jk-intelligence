@@ -122,40 +122,56 @@ DropdownMenuContent: w-60 (primitive default p-1)
 ### Metric Cards
 
 ```
-bg-surface rounded-2xl border border-default p-5
-├── Label: text-muted text-xs uppercase tracking-wide
-├── Value: text-primary text-2xl font-mono font-semibold
-├── Delta: text-success/error text-sm (↑ 4.2% / ↓ 1.8%)
-└── Sparkline: accent-primary color, 48px height
+Card className="rounded-2xl p-4 sm:p-5 flex flex-col justify-between"   (shadcn Card supplies surface + border)
+├── Label: text-xs text-text-muted        (CardHeader, p-0)
+├── Value: text-2xl font-mono font-medium tracking-tight text-text-primary
+├── Delta: text-xs font-mono + state utility (↑ 4.2% / ↓ 1.8%)
+└── Footnote: text-[11px] text-text-muted (CardFooter, p-0 border-none bg-transparent)
 ```
 
 ### Trend Indicators
 
-- Up: `text-success` + `↑` prefix
-- Down: `text-error` + `↓` prefix
-- Flat: `text-neutral` + `→` prefix
-- Never use raw green/red — always state tokens
+- Up: `text-state-success` · Down: `text-state-error` · Flat/absent: `text-text-muted`
+- The arrow is a lucide icon (`ArrowUpRight` / `ArrowDownRight`, `size-3`, `aria-hidden="true"`) —
+  never a raw `↑`/`↓` character. Direction and magnitude must also be in the text
+  ("`{n} gained`" / "`{n} lost`" in the query table), because color and an aria-hidden glyph are
+  invisible to screen readers.
+- Never use raw green/red — always state tokens.
+
+Utility names come from the `@theme inline` block in `globals.css` (`--color-state-success` →
+`text-state-success`), **not** from the raw primitives. The primitive tables above are the values a
+token resolves to; `text-success`, `bg-warning` and `text-neutral` are not utilities in this project
+and silently produce no style. Check `app/globals.css` before inventing one.
 
 ### Stale Data Banner
 
+Rendered by `dashboard-hero.tsx` when `overview.staleSource` is true:
+
 ```
-bg-warning/10 border border-warning text-warning rounded-xl px-4 py-2
-"Data from [timestamp] — syncing failed. Showing cached results."
+role="status" bg-state-warning/10 border border-state-warning text-state-warning
+rounded-xl px-4 py-2 text-xs
+"Data from {lastUpdated} — last sync failed. Showing cached results."
 ```
 
-### Keyword Ranking Badges
+`staleSource` mirrors `current_metrics.is_stale`, which nothing writes yet, so this banner is
+reachable in code but not in practice (see `context/progress-tracker.md`).
 
-- Top 3: `bg-accent-primary-dim text-accent-primary`
-- Top 10: `bg-success/10 text-success`
-- Top 20: `bg-neutral/10 text-neutral`
-- Outside 20: `text-muted`
+### Sync Status Pill
 
-### Sync Status Indicators
+`dashboard-header.tsx`: a rounded-full chip with a pulsing `h-1.5 w-1.5` dot, hidden below `md`.
 
-- Active / success: `bg-success/10 text-success` dot + label
-- Failed: `bg-error/10 text-error` dot + label
-- Stale (>24hrs): `bg-warning/10 text-warning` dot + label
-- Pending: `bg-muted/10 text-muted` animated dot
+- Stale: `bg-state-warning/10 text-state-warning` + `bg-state-warning` dot
+- Fresh: `bg-secondary text-primary` + `bg-primary` dot
+- Label is `overview.syncStatus`, assembled in `lib/dashboard/overview.ts` — the component never
+  computes freshness itself (invariant 9).
+
+### Keyword Rank Display
+
+Today the query table renders rank as plain `#{rank}` in `font-mono font-medium`, with no
+tier colouring; `--color-accent-primary-dim` and `--color-state-neutral` exist as tokens but no
+component uses them yet. If rank tiers are ever introduced, keep them on the
+`bg-state-*/10 + text-state-*` pair (10% tint + full-strength text) rather than adding new raw
+colours, and note `--accent-primary-dim` is a red tint — it is the brand accent, not a "top 3" signal.
 
 ### Loading Skeletons
 
@@ -169,7 +185,8 @@ bg-warning/10 border border-warning text-warning rounded-xl px-4 py-2
 
 - **Dashboard:** full-viewport, top navbar, left sidebar (collapsible), main content area.
 - **Sidebar:** `bg-surface border-r border-default`, client nav + metric categories.
-- **Admin panel:** same layout, additional client list in sidebar.
+- **Admin panel:** *(not built — no `/admin` route and no admin-only API; target-state layout kept
+  here so the eventual shell matches the dashboard.)*
 - **Modals:** centered overlay, `rounded-3xl`, `bg-elevated`, backdrop blur.
 - **Navbar:** `bg-surface border-b border-default`, logo + client name + theme toggle + user avatar.
 - **Data tables:** `bg-surface`, alternating `bg-subtle` rows, sticky header.
