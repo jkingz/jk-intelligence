@@ -1,17 +1,21 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const CLIENT = "00000000-0000-4000-8000-000000000001";
+const OWN_CLIENT = "00000000-0000-4000-8000-00000000000b";
+const USER = { id: "00000000-0000-4000-8000-00000000000c", role: "client", clientId: OWN_CLIENT };
 
 const boundary = vi.hoisted(() => ({
-  enforce: vi.fn(),
+  user: vi.fn(),
+  canAccess: vi.fn(),
   rankings: vi.fn(),
 }));
 
 vi.mock("@/lib/agents/authAgent", () => ({
-  enforceClientAccess: boundary.enforce,
+  getAuthUser: boundary.user,
 }));
 
 vi.mock("@/lib/db/repository", () => ({
+  canAccessClient: boundary.canAccess,
   listKeywordRankings: boundary.rankings,
 }));
 
@@ -29,24 +33,29 @@ function get(
 }
 
 afterEach(() => {
-  boundary.enforce.mockReset();
+  boundary.user.mockReset();
+  boundary.canAccess.mockReset();
   boundary.rankings.mockReset();
 });
 
 describe("GET /api/metrics/[clientId]/keywords", () => {
-  it("returns 401 for unauthenticated requests", async () => {
-    boundary.enforce.mockResolvedValue({ allow: false, reason: "unauthenticated" });
+  it("returns 401 without probing the tenant gate when there is no session", async () => {
+    boundary.user.mockResolvedValue(null);
 
     const response = await get(CLIENT);
     expect(response.status).toBe(401);
+    expect(boundary.canAccess).not.toHaveBeenCalled();
     expect(boundary.rankings).not.toHaveBeenCalled();
   });
 
-  it("returns 403 for cross-tenant access", async () => {
-    boundary.enforce.mockResolvedValue({ allow: false, reason: "forbidden" });
+  it("returns 403 for a forged client id and never reads rankings", async () => {
+    boundary.user.mockResolvedValue(USER);
+    boundary.canAccess.mockResolvedValue(false);
 
     const response = await get(CLIENT);
     expect(response.status).toBe(403);
+    expect(boundary.canAccess).toHaveBeenCalledWith(CLIENT);
+    expect(boundary.rankings).not.toHaveBeenCalled();
   });
 
   it("returns 400 for a malformed client id", async () => {
@@ -55,14 +64,16 @@ describe("GET /api/metrics/[clientId]/keywords", () => {
   });
 
   it("returns 400 for an invalid source", async () => {
-    boundary.enforce.mockResolvedValue({ allow: true });
+    boundary.user.mockResolvedValue(USER);
+    boundary.canAccess.mockResolvedValue(true);
 
     const response = await get(CLIENT, { source: "gscx" });
     expect(response.status).toBe(400);
   });
 
-  it("returns rank history with meta for an admin caller", async () => {
-    boundary.enforce.mockResolvedValue({ allow: true });
+  it("returns rank history with meta once the gate allows the client", async () => {
+    boundary.user.mockResolvedValue(USER);
+    boundary.canAccess.mockResolvedValue(true);
     boundary.rankings.mockResolvedValue([
       { keyword: "alpha", rank: 3, syncedAt: "2026-09-16T00:00:00.000Z" },
     ]);

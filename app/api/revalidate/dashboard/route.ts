@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Cron unavailable" }, { status: 503 });
   }
   if (verdict === "denied") {
-    return Response.json({ status: 401 });
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   revalidateDashboardOverview();

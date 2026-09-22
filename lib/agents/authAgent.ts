@@ -68,15 +68,11 @@ export type AccessDecision =
   | { allow: true }
   | { allow: false; reason: "unauthenticated" | "forbidden" };
 
-export async function enforceClientAccess(clientId: string): Promise<AccessDecision> {
-  const user = await getAuthUser();
-  if (!user) return { allow: false, reason: "unauthenticated" };
-  if (user.role === "admin") return { allow: true };
-  return (user.role === "client" || user.role === "staff") && user.clientId === clientId
-    ? { allow: true }
-    : { allow: false, reason: "forbidden" };
-}
-
+/**
+ * Role gate only. Tenant gates (`canAccessClient`, `listAccessibleClients`)
+ * live in `lib/db/repository.ts` and go through RLS, so this file must not
+ * grow a second, TypeScript-side copy of the client-ownership rule.
+ */
 export async function requireAdmin(): Promise<AccessDecision> {
   const user = await getAuthUser();
   if (!user) return { allow: false, reason: "unauthenticated" };

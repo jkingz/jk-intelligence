@@ -47,7 +47,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const clients = await listAccessibleClients(profile);
+    const clients = await listAccessibleClients();
     const client = clients.find((entry) => entry.id === rawClientId) ?? clients[0] ?? null;
     if (!client) {
       return NextResponse.json({ profile, clients, selection: null }, { headers: NO_STORE });

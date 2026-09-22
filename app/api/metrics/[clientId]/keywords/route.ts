@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { enforceClientAccess } from "@/lib/agents/authAgent";
-import { listKeywordRankings } from "@/lib/db/repository";
+import { getAuthUser } from "@/lib/agents/authAgent";
+import { canAccessClient, listKeywordRankings } from "@/lib/db/repository";
 import { SOURCES, type Source } from "@/types/metrics";
 
 export const runtime = "nodejs";
@@ -46,11 +46,11 @@ export async function GET(
     });
   }
 
-  const access = await enforceClientAccess(clientId.data);
-  if (!access.allow) {
-    const status = access.reason === "unauthenticated" ? 401 : 403;
+  const user = await getAuthUser();
+  const allowed = user !== null && (await canAccessClient(clientId.data));
+  if (!allowed) {
     return new Response(JSON.stringify({ error: "Forbidden" }), {
-      status: status,
+      status: user ? 403 : 401,
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-store',

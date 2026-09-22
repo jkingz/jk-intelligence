@@ -43,10 +43,7 @@ export async function GET(
     });
   }
 
-  const clients = await listAccessibleClients({
-    role: user.role,
-    clientId: user.clientId,
-  });
+  const clients = await listAccessibleClients();
   const client = clients.find((c) => c.id === clientId.data) ?? null;
   if (!client) {
     return new Response(JSON.stringify({ error: "Forbidden" }), {

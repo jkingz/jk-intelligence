@@ -68,10 +68,7 @@ export async function loadExportDataset(
     return { ok: false, response: jsonError("Forbidden", 401) };
   }
 
-  const clients = await listAccessibleClients({
-    role: user.role,
-    clientId: user.clientId,
-  });
+  const clients = await listAccessibleClients();
   const client = clients.find((entry) => entry.id === clientId.data) ?? null;
   if (!client) {
     return { ok: false, response: jsonError("Forbidden", 403) };
