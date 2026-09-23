@@ -222,11 +222,14 @@ scripts/        — migrations runner, seed, demo user (the only way data lands 
 - No business logic in `components/`.
 - No DB calls in `app/api/` — delegate to `lib/db` / `lib/dashboard`.
 - No sync logic in route handlers — delegate to `lib/queue`.
-- Tests sit next to what they cover as `<name>.test.ts`; there is no root `tests/` directory.
+- Tests live in `tests/<feature>/<tier>/`; nothing is colocated beside the module it covers. Import
+  the subject through `@/` — a relative `./` specifier cannot survive the move.
 
 ## Testing
 
-Vitest, Node environment. `pnpm test` runs the suite; `pnpm test -- lib/db` narrows by path.
+Vitest, Node environment, split into `unit` and `integration` projects. `pnpm test` runs the unit
+project (19 files / 122 tests); `pnpm test lib/db` narrows by path — `pnpm test -- lib/db` does not,
+it silently runs the whole tier. `pnpm test:all` adds integration, `pnpm test:e2e` is Playwright.
 
 - New behavior gets a test in the same change; a bugfix gets a test that fails without the fix.
 - Mock the **module boundary** with `vi.mock("@/lib/db/repository", …)`, never an internal function
@@ -240,7 +243,10 @@ Vitest, Node environment. `pnpm test` runs the suite; `pnpm test -- lib/db` narr
   tenant gate, or the read itself rejects.
 - Tenant isolation is the highest-value test in the repo: two client fixtures (A and B), and every
   assertion checks that B's data never appears in A's response.
-- `@/lib/queue/flow.test.ts` covers cron → queue handoff; `repository.test.ts` covers the RLS gate
-  contract. Change either and those tests must change with it.
-- No browser/component-render tests exist yet. Adding a testing-library dependency is a decision to
-  raise, not one to make silently.
+- `@/tests/sync/unit/flow.test.ts` covers cron → queue handoff;
+  `tests/tenant-isolation/unit/repository.test.ts` covers the RLS gate contract. Change either and
+  those tests must change with it.
+- e2e lives in `tests/<feature>/e2e/*.spec.ts` and is Playwright: a `public` project that runs in CI
+  against placeholder env, and an `@auth` project that runs only locally. Component-render tests remain
+  deliberately absent — adding a testing-library dependency is a decision to raise, not one to make
+  silently (see `docs/superpowers/specs/2026-09-23-test-suite-architecture-design.md` §2).

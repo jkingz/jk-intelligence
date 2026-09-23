@@ -211,8 +211,9 @@ Each is a single specifier change; nothing else in the file moves.
 
 - [ ] **Step 3: Run the moved set**
 
-Run: `pnpm test -- dashboard export sync`
-Expected: `Test Files 5 passed (5)`, `Tests 53 passed (53)` (10 + 8 + 7 + 20 + 8).
+Run: `pnpm exec vitest run --project unit dashboard export sync`
+Expected: the five moved files green. **The subset total is not 53** — `revalidate-route` holds 3 tests,
+not 8, so these five are 48. The number that actually matters is the 122 below.
 
 - [ ] **Step 4: If a bracketed path fails to resolve**
 
