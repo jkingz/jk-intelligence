@@ -143,8 +143,10 @@ A test goes in the feature that owns the *invariant the test protects*, not the 
 
 ## Repo skills
 
-`.claude/skills/` is the source of truth; `.agents/skills/` holds hardlinked copies for other
-loaders. `.opencode/` carries only `commands/feature-component.md` — its own `.gitignore` keeps
+`.claude/skills/` is the source of truth; `.agents/skills/` mirrors it for other loaders, and the
+mirror is **not** one mechanism: some entries are symlinks, some are genuine hardlinks (shared
+inode), and some are plain independent copies. Edit the `.claude/` file and then check the
+counterpart with `ls -i` / `readlink` rather than assuming either propagates. `.opencode/` carries only `commands/feature-component.md` — its own `.gitignore` keeps
 the tool's `node_modules/` and `package.json` untracked, so do not expect skills there.
 
 - `babysitting-a-pr` + `leaving-pr-comment` — how PR review bots, comments and checks get handled

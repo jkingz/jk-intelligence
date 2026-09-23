@@ -400,12 +400,24 @@ keeps its current meaning and the four-command gate is unchanged.
 | `.claude/skills/feature-component/SKILL.md:25-26` | same two lines |
 | `context/progress-tracker.md` | entry recording the reversal of `:217`, its reason, and the new commands |
 
-**Hardlink hazard.** `.claude/skills/feature-component/SKILL.md` and
-`.agents/skills/feature-component/SKILL.md` are the same inode (both `104056145`, confirmed with
-`ls -i`). An in-place edit updates both; an editor that writes a new file and renames it will break
-the link and leave one copy stale — silently, and `AGENTS.md`'s "never edit a skill in one place
-without the other" is exactly the failure this invites. The change must verify the inode still
-matches afterwards, and re-create the hardlink with `ln -f` if it does not.
+**The skill-copy hazard, measured — and it is not one mechanism but three.** This section asserted
+that `.claude/skills/` and `.agents/skills/` are "hardlinked copies". Sampling five entries with
+`ls -i`, `readlink` and `realpath` shows three different situations, and only one of them is a
+hardlink:
+
+| `.agents/skills/<name>` | reality | consequence |
+|---|---|---|
+| `feature-component` | **symlink** → `../../.claude/skills/feature-component` | one file, two paths. Editing either updates both; drift is impossible. `git check-ignore` on the inner path dies with `pathspec … is beyond a symbolic link`, and git tracks the symlink as a single blob — so `git add .agents/skills/feature-component/SKILL.md` fails and must not be in any command list. |
+| `code-review`, `frontend-design` | real directories, **same inode** as the `.claude` twin | genuine hardlinks. In-place writes (`open(f,'w')`, `ln -f`) propagate; an editor that writes-then-renames breaks the link and leaves one copy stale in silence. Verify with `ls -i` after editing. |
+| `babysitting-a-pr`, `leaving-pr-comment` | real directories, **different inodes** | independent copies. Byte-identical today, and free to diverge tomorrow. |
+
+The practical rule is the one `AGENTS.md` already gives — edit `.claude/` as the source of truth — but
+its stated reason ("hardlinked copies") is wrong for three of the five sampled, and wrong in the
+direction that hides work: a reader who believes everything is linked will edit one path and never
+look at the other, which is precisely how the third group breaks. The inode of
+`feature-component/SKILL.md` cited in the original version of this paragraph was real and identical on
+both paths, and was read as proof of a hardlink when a symlink produces exactly the same `ls -i`
+output. Confirm with `readlink` before concluding anything from an inode.
 
 ## 9. Acceptance
 
@@ -431,7 +443,8 @@ The change is done when each line prints what it claims:
     quoted specifier starting with `./`, not just `from "./` — the narrower grep passes while three
     dynamic `await import("./x")` specifiers sit undetected (§3.1), which is the exact hole this
     check exists to close.
-11. Both SKILL.md inodes still identical.
+11. `.agents/skills/feature-component` still resolves to the `.claude` file (it is a symlink, so
+    `realpath` on both paths must be identical — an inode match alone would not prove the mechanism).
 
 ## 10. Open questions
 

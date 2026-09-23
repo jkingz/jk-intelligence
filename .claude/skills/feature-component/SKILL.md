@@ -22,9 +22,12 @@ User asks to "add feature X", "scaffold feature <slug>", "wire up a new feature"
    ├── index.ts        # only public exports
    ├── components/     # presentational, no data fetching
    ├── hooks/          # use<X> hooks
-   ├── lib/            # pure helpers + colocated .test.ts
-   └── tests/          # render/interaction tests
+   └── lib/            # pure helpers + types
    ```
+   Tests do **not** go in the feature folder: they live in `tests/<feature>/<tier>/`
+   (`unit` / `integration` / `e2e`), where `<feature>` is the domain that owns the invariant —
+   `identity`, `tenant-isolation`, `dashboard`, `export`, `sync`, `landing`, `platform`. Import the
+   subject through `@/`, never a relative path.
 4. Implement inside folder. Allowed imports: `components/ui/*`, own folder, `lib/*`, `types/*`. Never `components/ui/*` edits, never cross-feature imports.
 5. Wire pages/routes via barrel only: `import { X } from "@/components/features/<slug>"`.
 6. PR (when requested): branch `feat/<slug>`, title `feat(<slug>): <what>`, body links spec + tracker note.
