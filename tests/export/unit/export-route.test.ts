@@ -20,8 +20,8 @@ vi.mock("@/lib/db/repository", () => ({
 
 vi.mock("@/lib/exports/quota", () => ({ consumeExportQuota: boundary.quota }));
 
-import { GET as csv } from "./csv/route";
-import { GET as pdf } from "./pdf/route";
+import { GET as csv } from "@/app/api/exports/[clientId]/csv/route";
+import { GET as pdf } from "@/app/api/exports/[clientId]/pdf/route";
 
 const dashboardClient = {
   id: CLIENT,

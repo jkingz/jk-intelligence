@@ -19,7 +19,7 @@ vi.mock("@/lib/db/repository", () => ({
   listKeywordRankings: boundary.rankings,
 }));
 
-import { GET } from "./route";
+import { GET } from "@/app/api/metrics/[clientId]/keywords/route";
 
 function get(
   clientId: string,

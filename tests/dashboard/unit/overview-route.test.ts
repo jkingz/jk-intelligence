@@ -20,7 +20,7 @@ vi.mock("@/lib/db/repository", () => ({
   listAccessibleClients: boundary.clients,
 }));
 
-import { GET } from "./route";
+import { GET } from "@/app/api/metrics/[clientId]/overview/route";
 
 function get(clientId: string, searchParams: Record<string, string> = {}) {
   const qs = new URLSearchParams(searchParams).toString();

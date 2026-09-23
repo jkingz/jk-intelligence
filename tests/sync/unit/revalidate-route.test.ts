@@ -8,7 +8,7 @@ vi.mock("@/lib/cache/invalidate", () => ({
   revalidateDashboardOverview: boundary.revalidate,
 }));
 
-import { POST } from "./route";
+import { POST } from "@/app/api/revalidate/dashboard/route";
 
 function post(headers: Record<string, string> = {}) {
   return POST(new Request("http://localhost/api/revalidate/dashboard", { method: "POST", headers }));

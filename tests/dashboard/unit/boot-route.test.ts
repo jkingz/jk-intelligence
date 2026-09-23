@@ -28,7 +28,7 @@ vi.mock("@/lib/db/repository", () => ({
   getCachedKeywordHistory: boundary.history,
 }));
 
-import { GET } from "./route";
+import { GET } from "@/app/api/dashboard/boot/route";
 import type { ProfileView } from "@/components/features/user-profile/lib/profile";
 
 const PROFILE: ProfileView = {
