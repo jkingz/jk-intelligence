@@ -23,15 +23,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: "unit",
-          include: [
-            "tests/*/unit/**/*.test.ts",
-            // Transitional: the 18 files still colocated stay in scope until
-            // Task 3 removes these three globs. Deleting them early drops
-            // tests silently while still reporting green.
-            "app/**/*.test.ts",
-            "lib/**/*.test.ts",
-            "components/**/*.test.ts",
-          ],
+          include: ["tests/*/unit/**/*.test.ts"],
         },
       },
       {

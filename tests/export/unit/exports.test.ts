@@ -6,10 +6,10 @@ import {
   type MetricSnapshotInput,
 } from "@/lib/dashboard/overview";
 import type { NormalizedMetric, Source } from "@/types/metrics";
-import { buildExportDataset } from "./dataset";
-import { CSV_HEADERS, toCsv } from "./csv";
-import { exportFilename } from "./filename";
-import { renderPdfReport, reportText } from "./pdf";
+import { buildExportDataset } from "@/lib/exports/dataset";
+import { CSV_HEADERS, toCsv } from "@/lib/exports/csv";
+import { exportFilename } from "@/lib/exports/filename";
+import { renderPdfReport, reportText } from "@/lib/exports/pdf";
 
 function metric(overrides: Partial<NormalizedMetric>): NormalizedMetric {
   return {

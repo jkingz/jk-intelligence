@@ -16,7 +16,7 @@ async function loadQuota(configured: boolean) {
   vi.resetModules();
   vi.stubEnv("UPSTASH_REDIS_REST_URL", configured ? URL : undefined);
   vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", configured ? TOKEN : undefined);
-  return import("./quota");
+  return import("@/lib/exports/quota");
 }
 
 afterEach(() => {

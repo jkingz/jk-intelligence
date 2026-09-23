@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveProxyAction } from "./routing";
+import { resolveProxyAction } from "@/lib/auth/routing";
 
 describe("resolveProxyAction", () => {
   it("passes public auth pages without a session", () => {

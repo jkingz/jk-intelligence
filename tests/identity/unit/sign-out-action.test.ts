@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { signOutAction } from "./sign-out-action";
+import { signOutAction } from "@/components/features/user-profile/lib/sign-out-action";
 
 const { signOut, createClient } = vi.hoisted(() => ({
   signOut: vi.fn(),

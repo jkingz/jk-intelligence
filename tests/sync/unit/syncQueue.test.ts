@@ -7,7 +7,7 @@ vi.mock("bullmq", () => ({
   },
 }));
 
-import { redisConnection } from "./syncQueue";
+import { redisConnection } from "@/lib/queue/syncQueue";
 
 afterEach(() => {
   vi.unstubAllEnvs();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { verifyCronSecret } from "./cron";
+import { verifyCronSecret } from "@/lib/auth/cron";
 
 function request(headers: Record<string, string> = {}) {
   return new Request("http://localhost/api/cron/sync", { headers });

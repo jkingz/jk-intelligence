@@ -291,10 +291,25 @@ git mv lib/queue/flow.test.ts              tests/sync/unit/flow.test.ts
 | `tests/sync/unit/syncQueue.test.ts:10` | `"./syncQueue"` | `"@/lib/queue/syncQueue"` |
 | `tests/sync/unit/flow.test.ts:66` | `"./syncQueue"` | `"@/lib/queue/syncQueue"` |
 
-- [ ] **Step 3: Prove no relative specifier survived**
+- [x] **Step 3: Prove no relative specifier survived — the command below was insufficient.**
 
-Run: `grep -rn 'from "\./' tests --include='*.test.ts'`
-Expected: **no output.** Any hit is an unconverted import that Vitest may still resolve from a neighbouring directory — which is worse than a failure, because it can pass while testing the wrong module.
+Run: `grep -rn '["'"'"']\./' tests --include='*.test.ts'`
+Expected: **no output.**
+
+`grep -rn 'from "\./'` as originally written here returned empty while three files were still broken,
+because it cannot see `await import("./worker")`. The plan's own safety net had the same blind spot as
+the failure it was meant to catch, and only the 122-test count exposed it. Use the broader pattern.
+
+**Step 2's table missed those three, and they are the reason "17 of 19" was wrong.** Add to it:
+
+| file:line | before | after |
+|---|---|---|
+| `tests/sync/unit/flow.test.ts:69` | `await import("./worker")` | `await import("@/lib/queue/worker")` |
+| `tests/export/unit/quota.test.ts:19` | `import("./quota")` | `import("@/lib/exports/quota")` |
+| `tests/identity/unit/update-profile-action.test.ts:25` | `await import("./update-profile-action")` | `await import("@/components/features/user-profile/lib/update-profile-action")` |
+
+The last two are the files Step 1 called import-free. They re-import their subject dynamically to get
+a fresh module after `vi.resetModules()`, so they collect 0 tests and the run reports 118, not 122.
 
 - [ ] **Step 4: Remove the transitional globs**
 

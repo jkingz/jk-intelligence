@@ -20,7 +20,7 @@ vi.mock("@/lib/supabase/server", () => ({
   })),
 }));
 
-import { getAuthUser, requireAdmin } from "./authAgent";
+import { getAuthUser, requireAdmin } from "@/lib/agents/authAgent";
 
 const ADMIN = "00000000-0000-4000-8000-000000000002";
 const CLIENT = "00000000-0000-4000-8000-000000000001";

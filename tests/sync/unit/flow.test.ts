@@ -63,10 +63,10 @@ vi.mock("@/lib/db/repository", () => ({
 }));
 
 import { GET } from "@/app/api/cron/sync/route";
-import { closeSyncQueue } from "./syncQueue";
+import { closeSyncQueue } from "@/lib/queue/syncQueue";
 
 vi.stubEnv("REDIS_URL", "redis://localhost:6379");
-await import("./worker");
+await import("@/lib/queue/worker");
 
 const processor = boundary.processor;
 if (!processor) throw new Error("Worker did not register a processor");

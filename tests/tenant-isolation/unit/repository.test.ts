@@ -16,7 +16,7 @@ vi.mock("@/lib/db/admin", () => ({
   getAdminDb: boundary.admin,
 }));
 
-import { canAccessClient, listAccessibleClients, listActiveClients } from "./repository";
+import { canAccessClient, listAccessibleClients, listActiveClients } from "@/lib/db/repository";
 
 type Result = { data: unknown; error: { message: string } | null };
 

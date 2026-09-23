@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { NormalizedMetric } from "@/types/metrics";
-import { buildOverview, initialsOf, toDashboardClient, type MetricSnapshotInput } from "./overview";
+import { buildOverview, initialsOf, toDashboardClient, type MetricSnapshotInput } from "@/lib/dashboard/overview";
 
 function metric(overrides: Partial<NormalizedMetric>): NormalizedMetric {
   return {

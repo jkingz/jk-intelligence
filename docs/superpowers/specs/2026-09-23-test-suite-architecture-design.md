@@ -114,24 +114,31 @@ bare `route.test.ts` would collide with a future sibling, prefix with the SUT (`
 Post-move per-tier counts: `identity/6 · tenant-isolation/1 · dashboard/5 · export/3 · sync/3 ·
 platform/1 = 19`.
 
-**What the move actually edits.** The `git mv` is the cheap half. **17 of the 19** import their
-subject relatively (`import { GET } from "./route"`, `from "./rate-limit"`, `from "./csv/route"`) and
-every one of those specifiers must become `@/app/api/dashboard/boot/route`-style, because the file is
-no longer beside what it tests. Only `lib/exports/quota.test.ts` and
-`components/features/user-profile/lib/update-profile-action.test.ts` move untouched.
+**What the move actually edited.** The `git mv` was the cheap half. **19 of 19** files needed a
+specifier rewrite, not 17: 15 static `from "./x"` lines across 11 files, **plus three dynamic
+`await import("./x")` specifiers** that a `from "` grep cannot see —
+`tests/sync/unit/flow.test.ts:69` (`./worker`), `tests/export/unit/quota.test.ts:19` (`./quota`), and
+`tests/identity/unit/update-profile-action.test.ts:25` (`./update-profile-action`). Those three are
+also why the two files this section originally called "move untouched" were not untouched: their
+*static* imports already went through `@/`, but each re-imports its subject dynamically to get a fresh
+module instance after `vi.resetModules()`. Left alone they fail at collection, and the failure is quiet
+in the worst way — the file reports 0 tests, so the suite count drops (118, not 122) while every other
+file is green.
 
-The good news, verified: **no `vi.mock()` call in the repo uses a relative specifier** — they all
+The good news held: **no `vi.mock()` call in the repo uses a relative specifier** — they all
 already name `@/lib/db/repository`, `@/components/features/user-profile/lib/profile` and so on, so
-the boundary mocks that make these tests work survive the move unchanged, and the edit is confined to
-`import` lines.
+the boundary mocks that make these tests work survived the move unchanged.
 
 Two specifics to get right. `app/api/exports/[clientId]/route.test.ts` imports `./csv/route` and
 `./pdf/route`, so its new specifiers embed a bracketed dynamic segment
 (`@/app/api/exports/[clientId]/csv/route`) — brackets are legal in a path but read as glob syntax to
-some resolvers, so `pnpm typecheck` is the arbiter there. And the 5 `app/api/**` files sit under
-Next's generated-types world; moving the file out of the route folder does not touch the route itself,
-so `RouteContext<"/path">` generics in the handler are unaffected — worth stating because it is the
-obvious thing to worry about and it is not a risk.
+some resolvers, so `pnpm typecheck` was the arbiter. **Resolved during implementation: they resolve
+cleanly** under both `tsc` and Vite's alias, all 20 tests in that file pass, and the bracket-free
+`lib/test-entrypoints.ts` shim the plan held in reserve was not needed. And the 5 `app/api/**` files
+sit under Next's generated-types world; moving the file out of the route folder does not touch the
+route itself, so `RouteContext<"/path">` generics in the handler are unaffected — worth stating
+because it is the obvious thing to worry about and it proved not to be a risk: `pnpm build` still
+emits all seven `/api/*` handlers after the move.
 
 `tsconfig.json` needs no change — `include: ["**/*.ts"]` already covers `tests/`, and `@/*` maps to
 the repo root, so `tests/**` resolves app imports unchanged. `pnpm lint` still covers them (only
@@ -382,8 +389,10 @@ The change is done when each line prints what it claims:
 8. `pnpm test:e2e:auth` → exercised locally against a seeded demo user; the observation is
    reported, not just the exit code.
 9. `git ls-files 'app/**/*.test.ts' 'lib/**/*.test.ts' 'components/**/*.test.ts'` → empty.
-10. `grep -rn 'from "\./' tests --include='*.test.ts'` → empty, proving all 17 rewrites landed
-    rather than assuming it.
+10. `grep -rn '["'"'"']\./' tests --include='*.test.ts'` → empty. The pattern must cover **any**
+    quoted specifier starting with `./`, not just `from "./` — the narrower grep passes while three
+    dynamic `await import("./x")` specifiers sit undetected (§3.1), which is the exact hole this
+    check exists to close.
 11. Both SKILL.md inodes still identical.
 
 ## 10. Open questions

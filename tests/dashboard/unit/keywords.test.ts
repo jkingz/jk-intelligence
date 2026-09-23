@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { KeywordRankingRow } from "./keywords";
-import { buildKeywordSeries } from "./keywords";
+import type { KeywordRankingRow } from "@/lib/dashboard/keywords";
+import { buildKeywordSeries } from "@/lib/dashboard/keywords";
 
 const row = (
   keyword: string,

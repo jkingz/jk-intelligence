@@ -22,7 +22,7 @@ beforeEach(() => {
 
 describe("updateProfileAction", () => {
   async function call(name: string) {
-    const { updateProfileAction } = await import("./update-profile-action");
+    const { updateProfileAction } = await import("@/components/features/user-profile/lib/update-profile-action");
     return updateProfileAction({ name });
   }
 

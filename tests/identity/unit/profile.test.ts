@@ -20,7 +20,7 @@ vi.mock("@/lib/supabase/server", () => ({
   })),
 }));
 
-import { getProfileView } from "./profile";
+import { getProfileView } from "@/components/features/user-profile/lib/profile";
 
 const USER_ID = "00000000-0000-4000-8000-000000000001";
 
