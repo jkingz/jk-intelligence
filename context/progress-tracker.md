@@ -7,8 +7,9 @@ Hardening the built surface: read paths and tenant isolation are done; the **syn
 next unit** and is blocked on a worker-hosting decision (see Open Questions 2).
 
 ## Current Goal
-Nothing in flight. Last change was a documentation truth pass — see "Instruction-layer truth pass"
-under Recent Work.
+Nothing in flight. Last change fixed the dashboard at phone widths — page-level horizontal overflow
+and a header picker that painted over the actions; see "Dashboard phone-width layout" under Recent
+Work.
 
 > Entries above this line are a log, not a status. `## Current Phase`, `## In Progress`,
 > `## Open Questions` and the *implemented surface* columns in `AGENTS.md` /
@@ -152,6 +153,49 @@ under Recent Work.
 
 ## Recent Work
 
+- Dashboard phone-width layout (`320–414px`) — two independent defects, both fixed, tests:
+  `tests/dashboard/e2e/mobile-layout.spec.ts`.
+  - **The page reserved 73–97px of empty horizontal scroll.** `documentElement.scrollWidth` exceeded
+    `clientWidth` while nothing painted out there, so a horizontal scroll slid the whole column left
+    and left a dead band at the right. Cause: `sr-only` is `position: absolute`, and the `<caption>`
+    and `<th>` labels inside `query-table.tsx`'s `overflow-x-auto` box had **no positioned ancestor**,
+    so their containing block was the initial one — they escaped the clip and sized the document to
+    the table's 527px min-content. Fix: `relative` on that scroll box. Evidence that this was the
+    mechanism, not a guess: `contain: paint` on the clipper cleared it and `body { overflow-x: clip }`
+    did not (fixed/abspos escapes body clipping), and hiding the one `sr-only` span alone dropped
+    487 → 414.
+  - **The client picker painted over the header actions.** At 390 the picker's box reached x=303 while
+    Trigger Sync started at 214. The left group is `min-w-0`, but its brand child is `shrink-0`, so
+    the wordmark's `truncate` never engaged and the squeeze landed on the picker, which then overflowed
+    visibly. Fix: wordmark `hidden sm:block` (the logo mark and footer carry the brand below `sm`) and
+    `min-w-0` on the trigger so it truncates rather than painting over its neighbours.
+  - `keepMounted`/`<Activity mode="hidden">` was the obvious suspect and is **not** involved: the
+    hidden panels measure `display: none`, width 0. Measured 0 page overflow and a clear picker at
+    320/360/390/414/640/768/1024/1440; the table still scrolls inside its own box below 640.
+  - Verified: `pnpm test` (129), `pnpm typecheck`, `pnpm lint`, `pnpm build` (`/dashboard` still `○`),
+    and 9/9 dashboard e2e incl. the existing `?tab=` spec.
+- Dashboard section deep links (`?tab=`) — spec: `context/feature-specs/04-dashboard.md`.
+  - `types/dashboard.ts` gains `DASHBOARD_TABS` / `DashboardTab` / `DEFAULT_DASHBOARD_TAB` /
+    `isDashboardTab` (mirroring `DASHBOARD_RANGES`); the local `TAB_ORDER` copy in `dashboard.tsx`
+    deleted (grep: declared once, read once).
+  - `lib/dashboard/url-state.ts` (new, pure): `readDashboardTab(search)` and
+    `withDashboardParams(search, updates)`. The merge helper is the point — the URL is shared by
+    three params written from three sites, and `dashboard-view.tsx`'s hardcoded
+    `/dashboard?client=…&days=…` erased any tab the panel had just written.
+  - `dashboard.tsx`: `activeTab` seeds from `?tab=` and writes with `window.history.replaceState`,
+    deliberately **not** `router.replace` (panels are already mounted, so a router navigation would
+    cost an RSC request per click). `navigate()` merges client/days instead of rebuilding the query,
+    so changing the range keeps the open panel.
+  - `dashboard-view.tsx`: both `replaceState` sites now use
+    `withDashboardParams(window.location.search, …)`.
+  - Perf measured against a production build (`pnpm start -p 3001`, Playwright request log):
+    tab switch = **0 requests**; range switch = 1 `_rsc` and no `/api/` call — **identical with and
+    without `?tab=`** in a control run (no-tab: 7→30 = 1, 30→7 = 1; on `tab=queries`: 7→90 = 1,
+    90→30 = 1). `/dashboard` still prerenders `○` after `Dashboard` began reading `useSearchParams`.
+  - Tests: 7 unit (`url-state.test.ts`) + 1 authed e2e (`tab-deep-link.spec.ts` — click writes
+    `?tab=queries`, metrics region hides, reload restores the selection). 122 → **129 unit**;
+    e2e 6 public + 3 authed green. Typecheck, lint, build clean. Committed to `dev` as `ad5ccdf`;
+    not pushed.
 - **First CI run was red on `pnpm build`; fixed by vendoring the UI fonts.** The runner cannot reach
   `fonts.googleapis.com`, and `next/font/google` downloads Geist at build time, so Turbopack failed
   with 18 × `Can't resolve '@vercel/turbopack-next/internal/font/google/font'`. Reproduced locally by
@@ -317,7 +361,7 @@ under Recent Work.
 
 - Nothing awaited from Supabase escapes its handler any more. The identity read and the RLS tenant gates were called *before* each route's `try`, so a rejection (`createServerSupabaseClient()` throws on missing env; `databaseOperation` rethrows on a DB error) surfaced as an unhandled 500 instead of the documented JSON 503. Fixed by moving every awaited Supabase call inside the existing database-error handling at the four API sites: `app/api/dashboard/boot/route.ts` (`getProfileView()`), `app/api/metrics/[clientId]/overview/route.ts` and `keywords/route.ts` (`getAuthUser()` + gate; keywords' combined `user ? 403 : 401` return split so the gate still stays behind the auth check), and `lib/exports/server.ts` (identity + gate + quota moved into the `try`, so a failed read cannot burn export quota). Precedence is unchanged (400 → 401 → 403 → 429 → 503); a rejected identity or gate read is now a 503, deliberately not a 401, so an outage never looks like "logged out". Tests: 9 new cases reject the gate and the identity read at each site, asserting 503 + `{"error":"Database operation failed"}` + `no-store` + no downstream read/quota. Docs updated: `code-standards.md` (handler snippet now shows the `try`, API-route and testing rules, Error Handling) and `architecture-context.md` (precedence). Verified: 122 tests (was 113), typecheck, lint, hermetic build green. Not committed/pushed.
 
-- Test suite restructured: all 19 suites moved out of `app/`, `lib/` and `components/` into a feature-first `tests/<feature>/unit/` tree (`identity`, `tenant-isolation`, `dashboard`, `export`, `sync`, `landing`, `platform`), with `integration/` and `e2e/` tiers alongside. `vitest.config.ts` now declares `unit` and `integration` projects sharing one root `resolve` via `extends: true`; the colocation mandate is gone from `RULES.md` §13, `AGENTS.md`, `code-standards.md`, `development-workflow.md`, `docs/conventions/feature-components.md` and the `feature-component` skill. Every test imports its subject through `@/` — including the bracketed dynamic segments (`@/app/api/metrics/[clientId]/overview/route`), which resolve fine. Five commands: `test` (unit) · `test:integration` · `test:all` · `test:e2e` · `test:e2e:auth`. New: Playwright (`@playwright/test` 1.63.0) with `public`/`auth` projects split by an `@auth` tag — 6 public tests (structure + client-side `required` validation only; they run in CI after the build) and 2 authed tests (dashboard overview, CSV download incl. its UTF-8 BOM and CRLF), local-only because they need real credentials. Design + plan: `docs/superpowers/{specs,plans}/2026-09-23-test-suite-architecture*.md`. Verified: 19 files / 122 tests (unchanged across the move — the count was the safety net, and it caught 3 dynamic `await import()` specifiers the grep-based check missed), typecheck + lint clean, build green, public e2e 6 passed and authed 2 passed against `pnpm dev`. Not pushed.
+- Test suite restructured: all 19 suites moved out of `app/`, `lib/` and `components/` into a feature-first `tests/<feature>/unit/` tree (`identity`, `tenant-isolation`, `dashboard`, `export`, `sync`, `landing`, `platform`), with `integration/` and `e2e/` tiers alongside. `vitest.config.ts` now declares `unit` and `integration` projects sharing one root `resolve` via `extends: true`; the colocation mandate is gone from `RULES.md` §13, `AGENTS.md`, `code-standards.md`, `development-workflow.md`, `docs/conventions/feature-components.md`, the `feature-component` skill and `README.md`'s Checks block (added after verifying that README still described CI as running four commands). Every test imports its subject through `@/` — including the bracketed dynamic segments (`@/app/api/metrics/[clientId]/overview/route`), which resolve fine. Five commands: `test` (unit) · `test:integration` · `test:all` · `test:e2e` · `test:e2e:auth`. New: Playwright (`@playwright/test` 1.63.0) with `public`/`auth` projects split by an `@auth` tag — 6 public tests (structure + client-side `required` validation only; they run in CI after the build) and 2 authed tests (dashboard overview, CSV download incl. its UTF-8 BOM and CRLF), local-only because they need real credentials. Design + plan: `docs/superpowers/{specs,plans}/2026-09-23-test-suite-architecture*.md`. Verified: 19 files / 122 tests (unchanged across the move — the count was the safety net, and it caught 3 dynamic `await import()` specifiers the grep-based check missed), typecheck + lint clean, build green, public e2e 6 passed and authed 2 passed against `pnpm dev`. Not pushed.
 
 ## Open Questions
 
@@ -329,9 +373,14 @@ under Recent Work.
   5. Missing: `lib/api/guard.ts` (routes hand-roll auth + responses in two styles), rate limiting on login/signup/reset, Sentry/OTel, `.env.example` (the 11 required names are currently documented only in `RULES.md` §16 and `AGENTS.md`), generated `types/database.ts` (currently handwritten), and auth limiter reuse of the Upstash quota helper.
   6. **`is_stale` has no writer.** `markMetricsStale()` exists and nothing calls it, so the stale banner and the "Cached data" sync pill can never appear. Falls out of #1.
   7. **`aiCitations` is hardcoded `[]`** (`lib/dashboard/overview.ts:231`), so `AICitationGrid` always renders its empty state — UI for a data source that does not exist. There is no LLM dependency in the repo at all.
-  8. **README contradicts `package.json`:** it says "Requires Node.js >=22.9" while `engines` pins
-     `node >=24.0.0` and `pnpm >=10` (and `packageManager` is `pnpm@10.18.3`). One-line doc fix,
-     left alone here because it is outside the docs scope agreed for this pass.
+  8. ~~**README contradicts `package.json`.~~ **Closed.** README now says Node `>=24`, pnpm `>=10`,
+     matching `engines`. Its Checks block was stale against the test tiers and was rewritten in the
+     same pass that found it.
+  9. **The three-way cache bound no longer holds.** This file claims `s-maxage` was raised to 300 to
+     match `CACHE_TTL_MS` and `unstable_cache revalidate: 300`; `2a46881` did set it, and `58599ac`
+     reverted it to 60. Code today: CDN 60s, client 300s, server 300s. `architecture-context.md`
+     already records 60. Decide whether the revert was deliberate, then align the two or drop the
+     invariant — do not "fix" the header back without knowing why it was lowered.
 - RLS policies are still unproven against a live database. The step-2 tests fake PostgREST, so they lock in *which client the app uses*, not that `clients_select_authenticated` etc. behave as written. Needs one pass with two provisioned users in different clients: `select` on `metrics_snapshots` as `anon` (expect permission denied — `revoke` strips the grant) and as a foreign `authenticated` user (expect 0 rows).
 - **The `integration` tier is wired but holds no test.** `tests/<feature>/integration/` exists in
   the config and the `TEST_*` env plumbing is in place (`tests/helpers/load-test-env.ts`,

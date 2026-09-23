@@ -52,7 +52,7 @@ export function DashboardHeader({
             <div className="h-8 w-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-serif text-lg font-bold">
               J
             </div>
-            <span className="font-serif text-base sm:text-lg tracking-tight font-medium truncate">
+            <span className="hidden truncate font-serif text-lg tracking-tight font-medium sm:block">
               JK Intelligence
             </span>
           </div>
@@ -73,7 +73,7 @@ export function DashboardHeader({
             >
               <SelectTrigger
                 aria-label="Select reporting client"
-                className="w-36 sm:w-56 text-xs h-8"
+                className="w-36 min-w-0 text-xs h-8 sm:w-56"
                 loading={switching}
               >
                 <SelectValue placeholder="Select client" />

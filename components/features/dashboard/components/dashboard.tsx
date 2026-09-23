@@ -10,10 +10,14 @@ import React, {
   ViewTransition,
 } from "react";
 import { useTheme } from "next-themes";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { toast } from "@/components/ui/toast";
 import { finishStatusToast, startStatusToast } from "@/lib/toast-status";
+import {
+  readDashboardTab,
+  withDashboardParams,
+} from "@/lib/dashboard/url-state";
 import { DashboardHeader } from "./dashboard-header";
 import { DashboardHero } from "./dashboard-hero";
 import { DashboardMetrics } from "./dashboard-metrics";
@@ -29,14 +33,15 @@ import { QueryTable } from "./query-table";
 import { AICitationGrid } from "./ai-citation-grid";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import type {
-  DashboardClient,
-  DashboardOverview,
-  DashboardRange,
-  KeywordRankSeries,
+import {
+  DASHBOARD_TABS,
+  isDashboardTab,
+  type DashboardClient,
+  type DashboardOverview,
+  type DashboardRange,
+  type DashboardTab,
+  type KeywordRankSeries,
 } from "@/types/dashboard";
-
-const TAB_ORDER: string[] = ["overview", "queries", "ai_visibility"];
 
 interface PendingDashboardNav {
   clientId: string;
@@ -115,7 +120,10 @@ export default function Dashboard({
   overview,
   history,
 }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState("overview");
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<DashboardTab>(() =>
+    readDashboardTab(searchParams.toString()),
+  );
   const [syncing, setSyncing] = useState(false);
   const [pendingView, setPendingView] = useState<{
     clientId: string;
@@ -160,13 +168,16 @@ export default function Dashboard({
 
   const navigate = (clientId: string, range: DashboardRange) => {
     if (pendingDashboardNav) toast.close(pendingDashboardNav.toastId);
-    const params = new URLSearchParams({ client: clientId, days: String(range) });
+    const url = `/dashboard${withDashboardParams(window.location.search, {
+      client: clientId,
+      days: range,
+    })}`;
     const toastId = startStatusToast("Loading dashboard", "Fetching the latest data…");
     pendingDashboardNav = { clientId, days: range, toastId };
     setPendingView({ clientId, days: range });
     startTransition(() => {
-      window.history.replaceState({}, "", `/dashboard?${params.toString()}`);
-      router.replace(`/dashboard?${params.toString()}`, { scroll: false });
+      window.history.replaceState({}, "", url);
+      router.replace(url, { scroll: false });
     });
   };
 
@@ -186,9 +197,16 @@ export default function Dashboard({
   };
 
   const handleTabChange = (value: string) => {
-    if (value === activeTab) return;
+    if (!isDashboardTab(value) || value === activeTab) return;
     const direction =
-      TAB_ORDER.indexOf(value) > TAB_ORDER.indexOf(activeTab) ? "forward" : "backward";
+      DASHBOARD_TABS.indexOf(value) > DASHBOARD_TABS.indexOf(activeTab) ? "forward" : "backward";
+    // replaceState, not router.replace: every panel is already mounted, so a router
+    // navigation here would spend an RSC round trip on each tab click.
+    window.history.replaceState(
+      {},
+      "",
+      `/dashboard${withDashboardParams(window.location.search, { tab: value })}`,
+    );
     startTransition(() => {
       addTransitionType(direction);
       setActiveTab(value);

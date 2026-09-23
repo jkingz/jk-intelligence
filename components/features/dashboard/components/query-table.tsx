@@ -52,7 +52,9 @@ export function QueryTable({ keywords, history }: QueryTableProps) {
           onClose={() => setSelectedKeyword(null)}
         />
       ) : null}
-      <div className="overflow-x-auto">
+      {/* positioned so this box is the containing block for the sr-only caption and
+          cell labels — otherwise they escape the clip and widen the page, not the table */}
+      <div className="relative overflow-x-auto">
         <table className="w-full text-left text-xs">
           <caption className="sr-only">Keyword performance for the selected client and date range</caption>
           <thead className="bg-surface border-b border-default text-text-muted font-medium font-mono text-[11px]">
