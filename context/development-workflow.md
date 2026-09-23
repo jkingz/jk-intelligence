@@ -73,7 +73,7 @@ Unbuilt design lives in `docs/target-state.md`; treat it as requirements, never 
 | Need | Command |
 |------|---------|
 | Dev server | `pnpm dev` |
-| Tests | `pnpm test` (Vitest; `pnpm test -- <path>` for one file) |
+| Tests | `pnpm test` (Vitest unit project) · `pnpm test:all` (+ integration) · `pnpm test:e2e` · narrow with `pnpm test <path>`, not `pnpm test -- <path>` |
 | Types | `pnpm typecheck` (runs `next typegen` first) |
 | Lint | `pnpm lint` |
 | Build | `pnpm build` |

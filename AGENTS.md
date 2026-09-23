@@ -117,17 +117,36 @@ only through `POST /api/revalidate/dashboard` (`revalidateTag(tag, profile)`), n
 ## Verification
 
 ```bash
-pnpm test && pnpm typecheck && pnpm lint && pnpm build
+pnpm test && pnpm typecheck && pnpm lint && pnpm build   # the gate
+pnpm test:all                                            # + integration (tier is EMPTY today — collects 0 and passes)
+pnpm test:e2e                                            # public Playwright specs
 ```
 
-`.github/workflows/ci.yml` runs those four on every push to `main`/`dev` and on pull requests, with
-non-secret Supabase env placeholders so the build can prerender. Tests colocate as `*.test.ts`;
-mock at module boundaries, never inside business logic.
+`.github/workflows/ci.yml` runs those four plus the public e2e tier on every push to `main`/`dev`
+and on pull requests, with non-secret Supabase env placeholders so the build can prerender and the
+guard/landing specs can serve without a database. Tests live in `tests/<feature>/<tier>/`
+(`unit`, `integration`, `e2e`), never beside the module; mock at module boundaries, never inside
+business logic.
+
+| test folder | owns |
+| --- | --- |
+| `identity` | `lib/agents/authAgent`, `lib/auth/{cron,routing}`, `lib/supabase/*`, `proxy.ts`, the `/auth/*` pages, `components/features/{user-profile,email-password-auth}/lib` |
+| `tenant-isolation` | `canAccessClient` / `listAccessibleClients` and the RLS policies in `supabase/migrations/` behind them |
+| `dashboard` | `/api/dashboard/boot`, both `/api/metrics/*` routes, `lib/dashboard/*`, `lib/cache/*` tag ownership, `/dashboard` |
+| `export` | `/api/exports/[clientId]/{csv,pdf}`, `lib/exports/*`, the export menu |
+| `sync` | `/api/cron/sync`, `/api/revalidate/dashboard`, `lib/queue/*` |
+| `landing` | `/`, `/privacy`, `/terms`, `components/features/landing/*` |
+| `platform` | cross-cutting primitives with no owning feature — today that is `lib/rate-limit.ts` alone |
+
+A test goes in the feature that owns the *invariant the test protects*, not the file it imports.
+`lib/rate-limit.ts` has consumers in three features, so it belongs to none of them.
 
 ## Repo skills
 
-`.claude/skills/` is the source of truth; `.agents/skills/` holds hardlinked copies for other
-loaders. `.opencode/` carries only `commands/feature-component.md` — its own `.gitignore` keeps
+`.claude/skills/` is the source of truth; `.agents/skills/` mirrors it for other loaders, and the
+mirror is **not** one mechanism: some entries are symlinks, some are genuine hardlinks (shared
+inode), and some are plain independent copies. Edit the `.claude/` file and then check the
+counterpart with `ls -i` / `readlink` rather than assuming either propagates. `.opencode/` carries only `commands/feature-component.md` — its own `.gitignore` keeps
 the tool's `node_modules/` and `package.json` untracked, so do not expect skills there.
 
 - `babysitting-a-pr` + `leaving-pr-comment` — how PR review bots, comments and checks get handled

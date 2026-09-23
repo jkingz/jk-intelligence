@@ -8,7 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --project unit",
+    "test:integration": "vitest run --project integration --passWithNoTests",
+    "test:all": "vitest run",
+    "test:e2e": "playwright test --project public",
+    "test:e2e:auth": "playwright test --project auth",
     "db:migrate": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/run-migrations.mjs",
     "db:seed": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed.mjs",
     "db:demo-user": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/create-demo-user.mjs",
@@ -45,6 +49,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^22.20.3",
     "@types/react": "19.3.0",

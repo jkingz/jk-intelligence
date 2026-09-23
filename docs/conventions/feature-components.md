@@ -19,10 +19,14 @@ components/features/<slug>/
 ├── components/         # presentational components (no data fetching)
 │   └── <component>.tsx
 ├── hooks/              # use<X> hooks (state, polling, derived data)
-├── lib/                # pure helpers/types for this feature (unit-testable)
-│   └── <helper>.test.ts
-└── tests/              # render/interaction tests, fixtures
+└── lib/                # pure helpers/types for this feature
 ```
+
+Nothing test-shaped goes in the feature folder. Tests live in `tests/<feature>/<tier>/`
+(`unit` / `integration` / `e2e`), named after the invariant they protect — see `AGENTS.md` for the
+feature list and `RULES.md` §13 for the placement rule. A feature slug used as a test folder name must
+already exist there; if it does not, the feature owns no test folder yet and the test belongs under the
+domain that owns the invariant.
 
 ## Wiring Rules
 
@@ -39,6 +43,6 @@ components/features/<slug>/
 1. Spec in `context/feature-specs/<nn>-<slug>.md`
 2. Tracker "In Progress" entry added before implementation
 3. Folder `components/features/<slug>/` with barrel
-4. Implement components/hooks/lib in folder; tests colocated
+4. Implement components/hooks/lib in folder; tests in `tests/<feature>/<tier>/`, not here
 5. Wire via barrel in `app/` pages/routes
 6. Checks green, tracker moved to Completed

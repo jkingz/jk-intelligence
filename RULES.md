@@ -69,9 +69,11 @@ Rules 1–10 are the **portable core** — they hold in every repo this workspac
 - The `## Standing Rules` / context block at the top of `AGENTS.md` is written by `next dev`; committing it keeps the tree clean.
 
 ### 13. Verification gates
-- `pnpm test && pnpm typecheck && pnpm lint && pnpm build` must be green before reporting work complete; CI (`.github/workflows/ci.yml`) runs exactly these.
-- Tests colocate as `*.test.ts` beside the module. Mock at the boundary (`@/lib/agents/...`, `@/lib/db/repository`) — never inside business logic.
-- Route handlers get a `route.test.ts` covering 401 / 403 / 400 and the no-data-leaked-before-auth path.
+- `pnpm test && pnpm typecheck && pnpm lint && pnpm build` must be green before reporting work complete; CI (`.github/workflows/ci.yml`) runs these four plus `pnpm test:e2e` (public tier only).
+- Tests live in `tests/<feature>/<tier>/` — features `identity`, `tenant-isolation`, `dashboard`, `export`, `sync`, `landing`, `platform`; tiers `unit`, `integration`, `e2e`. `AGENTS.md` lists what each feature owns. Name the file `<sut>.test.ts` (unit/integration) or `<flow>.spec.ts` (e2e); import the **subject under test** through `@/`, never relatively — a `./` specifier can silently resolve to a neighbouring file of the same name. Shared helpers under `tests/helpers/` are the one exception and may be imported relatively.
+- Unit tests mock at the boundary (`@/lib/agents/...`, `@/lib/db/repository`) — never inside business logic, and never make a real network or DB call. That last clause is **unit-tier only**: the integration tier exists precisely to put a real Postgres behind `canAccessClient`.
+- `pnpm test` is the **unit project**, not the whole suite. The integration tier currently holds **no files** — `pnpm test:integration` and `pnpm test:all` pass on `--passWithNoTests`, which is green meaning nothing; once files exist they skip silently without `TEST_SUPABASE_URL` (the `setupFiles` warning cannot fire on an empty tier, measured). E2E is a separate runner. Run `pnpm test:all` and `pnpm test:e2e` before pushing. Narrow with `pnpm test dashboard`, never `pnpm test -- dashboard` — the latter silently runs everything.
+- Route handlers get a `<name>-route.test.ts` covering 401 / 403 / 400 and the no-data-leaked-before-auth path.
 
 ### 14. Read `context/` in order before implementing
 `project-overview` → `architecture-context` → `ui-context` → `code-standards` → `development-workflow` → `progress-tracker`; plus `pm-conventions.md` for commit/PR shape and `feature-specs/NN-*.md` for the unit you are building. Then `RULES.md`. Update the file your change invalidates, and `progress-tracker.md`, before continuing.
