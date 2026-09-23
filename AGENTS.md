@@ -118,7 +118,7 @@ only through `POST /api/revalidate/dashboard` (`revalidateTag(tag, profile)`), n
 
 ```bash
 pnpm test && pnpm typecheck && pnpm lint && pnpm build   # the gate
-pnpm test:all                                            # + integration (skips without TEST_SUPABASE_URL)
+pnpm test:all                                            # + integration (tier is EMPTY today — collects 0 and passes)
 pnpm test:e2e                                            # public Playwright specs
 ```
 

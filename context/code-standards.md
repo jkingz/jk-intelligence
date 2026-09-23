@@ -223,13 +223,16 @@ scripts/        — migrations runner, seed, demo user (the only way data lands 
 - No DB calls in `app/api/` — delegate to `lib/db` / `lib/dashboard`.
 - No sync logic in route handlers — delegate to `lib/queue`.
 - Tests live in `tests/<feature>/<tier>/`; nothing is colocated beside the module it covers. Import
-  the subject through `@/` — a relative `./` specifier cannot survive the move.
+  the subject under test through `@/` — a relative `./` still resolves after the move, just possibly
+  to a neighbouring file of the same name. `tests/helpers/` is the exception.
 
 ## Testing
 
 Vitest, Node environment, split into `unit` and `integration` projects. `pnpm test` runs the unit
-project (19 files / 122 tests); `pnpm test lib/db` narrows by path — `pnpm test -- lib/db` does not,
-it silently runs the whole tier. `pnpm test:all` adds integration, `pnpm test:e2e` is Playwright.
+project (19 files / 122 tests); `pnpm test tenant-isolation` narrows by path — `pnpm test --
+tenant-isolation` does not, it silently runs the whole tier. A filter that matches nothing exits 1,
+so a moved file announces itself instead of passing empty. `pnpm test:all` adds integration,
+`pnpm test:e2e` is Playwright.
 
 - New behavior gets a test in the same change; a bugfix gets a test that fails without the fix.
 - Mock the **module boundary** with `vi.mock("@/lib/db/repository", …)`, never an internal function
