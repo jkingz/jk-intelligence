@@ -300,11 +300,25 @@ Specs in the first change:
 
 | file | tier | asserts |
 |---|---|---|
-| `tests/landing/e2e/marketing.spec.ts` | public | landing renders; `/privacy` and `/terms` reachable from the footer |
-| `tests/identity/e2e/login.spec.ts` | public | `/auth/login` shows the form; submitting bad credentials surfaces an error and does not navigate |
-| `tests/dashboard/e2e/guard.spec.ts` | public | `/dashboard` unauthenticated lands on `/auth/login` |
+| `tests/landing/e2e/marketing.spec.ts` | public | landing renders; `/privacy` and `/terms` each reachable from the footer (the two clicks are separate navigations — the legal pages use `LegalPageShell`, which does not repeat the landing footer) |
+| `tests/identity/e2e/login.spec.ts` | public | `/auth/login` serves the form with both fields; submitting it empty is blocked client-side and does not navigate |
+| `tests/dashboard/e2e/guard.spec.ts` | public | `/dashboard` and `/profile` unauthenticated land on `/auth/login` with the measured `?next=` value |
 | `tests/dashboard/e2e/overview.spec.ts` | `@auth` | demo login reaches the dashboard and a metric renders |
 | `tests/export/e2e/csv.spec.ts` | `@auth` | CSV download produces a non-empty file with the expected header row |
+
+**Correction to the original `login.spec.ts` row, which said "submitting bad credentials surfaces an
+error".** That assertion cannot run in CI: the submit goes to `NEXT_PUBLIC_SUPABASE_URL`, which under
+`ci.yml` is `https://ci-placeholder.supabase.co` — the request dies on DNS, so no auth error message
+ever renders, and the test would be asserting a network failure while looking like a product one. The
+bad-credential round-trip belongs to the `@auth` tier, which only runs against a real project; what the
+public tier can prove is the form's structure and its client-side `required` validation, which needs no
+server at all.
+
+Two things learned by running it rather than reasoning about it. The page has **two** buttons matching
+`Sign in` — the submit and a separate "Sign in as demo" — so the public spec must scope the click to
+the form and pass `exact: true`, or Playwright's strict mode fails the run on an ambiguity that is
+invisible in the markup. And the plan's predicted five public specs are six, because the footer check
+is two navigations rather than one chain.
 
 **Resolved: the public tier does work under placeholders.** Measured on 2026-09-23 by building and
 serving with only the two values `ci.yml` sets:
