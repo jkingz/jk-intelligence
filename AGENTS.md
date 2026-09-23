@@ -122,8 +122,9 @@ pnpm test:all                                            # + integration (skips 
 pnpm test:e2e                                            # public Playwright specs
 ```
 
-`.github/workflows/ci.yml` runs those four on every push to `main`/`dev` and on pull requests, with
-non-secret Supabase env placeholders so the build can prerender. Tests live in `tests/<feature>/<tier>/`
+`.github/workflows/ci.yml` runs those four plus the public e2e tier on every push to `main`/`dev`
+and on pull requests, with non-secret Supabase env placeholders so the build can prerender and the
+guard/landing specs can serve without a database. Tests live in `tests/<feature>/<tier>/`
 (`unit`, `integration`, `e2e`), never beside the module; mock at module boundaries, never inside
 business logic.
 
