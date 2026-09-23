@@ -7,8 +7,9 @@ Hardening the built surface: read paths and tenant isolation are done; the **syn
 next unit** and is blocked on a worker-hosting decision (see Open Questions 2).
 
 ## Current Goal
-Nothing in flight. Last change put the dashboard's active section in the URL (`?tab=`) at zero
-network cost — see "Dashboard section deep links" under Recent Work.
+Nothing in flight. Last change fixed the dashboard at phone widths — page-level horizontal overflow
+and a header picker that painted over the actions; see "Dashboard phone-width layout" under Recent
+Work.
 
 > Entries above this line are a log, not a status. `## Current Phase`, `## In Progress`,
 > `## Open Questions` and the *implemented surface* columns in `AGENTS.md` /
@@ -152,6 +153,27 @@ network cost — see "Dashboard section deep links" under Recent Work.
 
 ## Recent Work
 
+- Dashboard phone-width layout (`320–414px`) — two independent defects, both fixed, tests:
+  `tests/dashboard/e2e/mobile-layout.spec.ts`.
+  - **The page reserved 73–97px of empty horizontal scroll.** `documentElement.scrollWidth` exceeded
+    `clientWidth` while nothing painted out there, so a horizontal scroll slid the whole column left
+    and left a dead band at the right. Cause: `sr-only` is `position: absolute`, and the `<caption>`
+    and `<th>` labels inside `query-table.tsx`'s `overflow-x-auto` box had **no positioned ancestor**,
+    so their containing block was the initial one — they escaped the clip and sized the document to
+    the table's 527px min-content. Fix: `relative` on that scroll box. Evidence that this was the
+    mechanism, not a guess: `contain: paint` on the clipper cleared it and `body { overflow-x: clip }`
+    did not (fixed/abspos escapes body clipping), and hiding the one `sr-only` span alone dropped
+    487 → 414.
+  - **The client picker painted over the header actions.** At 390 the picker's box reached x=303 while
+    Trigger Sync started at 214. The left group is `min-w-0`, but its brand child is `shrink-0`, so
+    the wordmark's `truncate` never engaged and the squeeze landed on the picker, which then overflowed
+    visibly. Fix: wordmark `hidden sm:block` (the logo mark and footer carry the brand below `sm`) and
+    `min-w-0` on the trigger so it truncates rather than painting over its neighbours.
+  - `keepMounted`/`<Activity mode="hidden">` was the obvious suspect and is **not** involved: the
+    hidden panels measure `display: none`, width 0. Measured 0 page overflow and a clear picker at
+    320/360/390/414/640/768/1024/1440; the table still scrolls inside its own box below 640.
+  - Verified: `pnpm test` (129), `pnpm typecheck`, `pnpm lint`, `pnpm build` (`/dashboard` still `○`),
+    and 9/9 dashboard e2e incl. the existing `?tab=` spec.
 - Dashboard section deep links (`?tab=`) — spec: `context/feature-specs/04-dashboard.md`.
   - `types/dashboard.ts` gains `DASHBOARD_TABS` / `DashboardTab` / `DEFAULT_DASHBOARD_TAB` /
     `isDashboardTab` (mirroring `DASHBOARD_RANGES`); the local `TAB_ORDER` copy in `dashboard.tsx`
