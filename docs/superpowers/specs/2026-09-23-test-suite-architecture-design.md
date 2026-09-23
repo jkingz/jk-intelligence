@@ -1,0 +1,391 @@
+# Test suite architecture: `tests/<feature>/{unit,integration,e2e}`
+
+Date: 2026-09-23 · Status: draft for review · Branch: `dev`
+
+Replaces the colocation mandate in `RULES.md` §13 and `context/code-standards.md:225`.
+Supersedes the unused `components/features/<slug>/tests/` slot in
+`docs/conventions/feature-components.md:24` and `.claude/skills/feature-component/SKILL.md:26`.
+
+## 0. The two calls I made, since the design review stopped short of them
+
+You approved sections 1–2 and then said write the spec, so the two open questions in sections 3 and 5
+got decided rather than asked. Both are one-line reversals if you disagree.
+
+1. **§6's merge rule.** The RLS integration slice will not be committed until it has run green once
+   against a real stack; the tier *structure* commits without it. I chose this because
+   `RULES.md` §2 forbids presenting a never-executed test as coverage. The alternative is committing
+   the slice in a skipped state and accepting that its assertions are guesses.
+2. **§8 supersedes `components/features/<slug>/tests/`.** I chose to delete that slot from the
+   convention doc and the `feature-component` skill. The alternative is keeping it, which means three
+   legitimate places for a test and the next feature-component run will pick one at random.
+
+## 1. Problem
+
+The repo has **19 test files / 122 tests** (verified `pnpm test` → `Test Files 19 passed`,
+`Tests 122 passed`, `681ms`), all colocated as `*.test.ts`. They are uniformly *unit* tier: every
+one mocks at a module boundary and touches no network, no database, no browser.
+
+There is no integration tier and no e2e tier, so the two invariants the docs call highest-value —
+tenant isolation enforced by Postgres RLS, and the rendered dashboard — are asserted only against
+mocks. A mocked gate cannot tell you the policy file is wrong.
+
+This reverses a recorded decision. `context/progress-tracker.md:217` removed an empty `tests/`
+directory precisely because "tests are colocated `**/*.test.ts`". The reversal is justified by what
+changed since: the suite now needs two tiers that colocation cannot express, because an integration
+test of `lib/db/repository.ts` has no natural `app/`-side neighbour and an e2e spec of the dashboard
+belongs to no module at all. Colocation was the right rule for a one-tier suite and is the wrong
+shape for a three-tier one.
+
+## 2. Non-goals
+
+- React component-render tests. Decided against: the unit tier stays Node-environment and no
+  `@testing-library/*` or `jsdom` dependency is added. UI behavior is covered by the e2e tier.
+  `context/code-standards.md:245` ("Adding a testing-library dependency is a decision to raise")
+  stays standing: this change does not make it.
+- Coverage thresholds or a coverage provider.
+- Integration/e2e for the queue worker. Nothing hosts the queue in production (`AGENTS.md`), so
+  there is no behavior to pin yet.
+- Putting the integration tier in CI. Requires a Postgres service container that does not exist
+  today; recorded as follow-up (§10).
+
+## 3. Taxonomy
+
+```
+tests/
+  <feature>/           # identity, tenant-isolation, dashboard, export, sync, landing, platform
+    unit/ | integration/ | e2e/     # only the tiers that exist for that feature
+  fixtures/            # shared data builders (empty until §6/§7 need them)
+  helpers/             # shared test infrastructure (same)
+```
+
+| feature | owns |
+|---|---|
+| `identity/` | `lib/agents/authAgent`, `lib/auth/{cron,routing}`, `lib/supabase/*`, `proxy.ts`, the `/auth/*` pages, `components/features/{user-profile,email-password-auth}/lib` |
+| `tenant-isolation/` | `canAccessClient` / `listAccessibleClients` and the RLS policies in `supabase/migrations/` behind them |
+| `dashboard/` | `/api/dashboard/boot`, both `/api/metrics/*` routes, `lib/dashboard/*`, `lib/cache/*` tag ownership, `/dashboard` |
+| `export/` | `/api/exports/[clientId]/{csv,pdf}`, `lib/exports/*`, the export menu |
+| `sync/` | `/api/cron/sync`, `/api/revalidate/dashboard`, `lib/queue/*` |
+| `landing/` | `/`, `/privacy`, `/terms`, `components/features/landing/*` |
+| `platform/` | cross-cutting primitives with no owning feature — today that is `lib/rate-limit.ts` alone |
+
+The folder is `identity/` rather than `auth/` because three
+`components/features/user-profile/lib/*.test.ts` files concern the signed-in account, not a
+credential exchange — a folder named `auth/` would split one invariant in two.
+
+`platform/` exists because `lib/rate-limit.ts` has 8 consumers across 3 features
+(`export-menu`, `edit-profile-form`, `account-menu`, `google-sign-in`, `apple-sign-in`,
+`sign-out-button`, `demo-access`, `email-auth-form`) plus `lib/exports/quota.ts`. It belongs to no
+feature, and filing it under one would be a lie.
+
+**Placement rule.** A test file goes in the feature that owns the *invariant the test protects*,
+not the directory the subject module happens to live in. `lib/auth/cron.ts` is the worked example:
+its only consumers are `/api/cron/sync` and `/api/revalidate/dashboard`, so a consumer reading says
+`sync/`, but the invariant that fails is authentication, so it belongs in `identity/` — alongside the
+`routing.test.ts` and `authAgent.test.ts` files that guard the same boundary. `platform/` is the only
+escape hatch, for subjects no single feature owns.
+
+**Naming.** `<sut>.test.ts` under `unit/` and `integration/`; `<flow>.spec.ts` under `e2e/`. Where a
+bare `route.test.ts` would collide with a future sibling, prefix with the SUT (`boot-route.test.ts`).
+
+### 3.1 Migration map (all 19 files)
+
+| # | from | to |
+|---|---|---|
+| 1 | `app/api/dashboard/boot/route.test.ts` | `tests/dashboard/unit/boot-route.test.ts` |
+| 2 | `app/api/metrics/[clientId]/overview/route.test.ts` | `tests/dashboard/unit/overview-route.test.ts` |
+| 3 | `app/api/metrics/[clientId]/keywords/route.test.ts` | `tests/dashboard/unit/keywords-route.test.ts` |
+| 4 | `lib/dashboard/overview.test.ts` | `tests/dashboard/unit/overview.test.ts` |
+| 5 | `lib/dashboard/keywords.test.ts` | `tests/dashboard/unit/keywords.test.ts` |
+| 6 | `app/api/exports/[clientId]/route.test.ts` | `tests/export/unit/export-route.test.ts` |
+| 7 | `lib/exports/exports.test.ts` | `tests/export/unit/exports.test.ts` |
+| 8 | `lib/exports/quota.test.ts` | `tests/export/unit/quota.test.ts` |
+| 9 | `lib/queue/syncQueue.test.ts` | `tests/sync/unit/syncQueue.test.ts` |
+| 10 | `lib/queue/flow.test.ts` | `tests/sync/unit/flow.test.ts` |
+| 11 | `app/api/revalidate/dashboard/route.test.ts` | `tests/sync/unit/revalidate-route.test.ts` |
+| 12 | `lib/db/repository.test.ts` | `tests/tenant-isolation/unit/repository.test.ts` |
+| 13 | `lib/agents/authAgent.test.ts` | `tests/identity/unit/authAgent.test.ts` |
+| 14 | `lib/auth/cron.test.ts` | `tests/identity/unit/cron.test.ts` |
+| 15 | `lib/auth/routing.test.ts` | `tests/identity/unit/routing.test.ts` |
+| 16 | `components/features/user-profile/lib/profile.test.ts` | `tests/identity/unit/profile.test.ts` |
+| 17 | `components/features/user-profile/lib/update-profile-action.test.ts` | `tests/identity/unit/update-profile-action.test.ts` |
+| 18 | `components/features/user-profile/lib/sign-out-action.test.ts` | `tests/identity/unit/sign-out-action.test.ts` |
+| 19 | `lib/rate-limit.test.ts` | `tests/platform/unit/rate-limit.test.ts` |
+
+Post-move per-tier counts: `identity/6 · tenant-isolation/1 · dashboard/5 · export/3 · sync/3 ·
+platform/1 = 19`.
+
+**What the move actually edits.** The `git mv` is the cheap half. **17 of the 19** import their
+subject relatively (`import { GET } from "./route"`, `from "./rate-limit"`, `from "./csv/route"`) and
+every one of those specifiers must become `@/app/api/dashboard/boot/route`-style, because the file is
+no longer beside what it tests. Only `lib/exports/quota.test.ts` and
+`components/features/user-profile/lib/update-profile-action.test.ts` move untouched.
+
+The good news, verified: **no `vi.mock()` call in the repo uses a relative specifier** — they all
+already name `@/lib/db/repository`, `@/components/features/user-profile/lib/profile` and so on, so
+the boundary mocks that make these tests work survive the move unchanged, and the edit is confined to
+`import` lines.
+
+Two specifics to get right. `app/api/exports/[clientId]/route.test.ts` imports `./csv/route` and
+`./pdf/route`, so its new specifiers embed a bracketed dynamic segment
+(`@/app/api/exports/[clientId]/csv/route`) — brackets are legal in a path but read as glob syntax to
+some resolvers, so `pnpm typecheck` is the arbiter there. And the 5 `app/api/**` files sit under
+Next's generated-types world; moving the file out of the route folder does not touch the route itself,
+so `RouteContext<"/path">` generics in the handler are unaffected — worth stating because it is the
+obvious thing to worry about and it is not a risk.
+
+`tsconfig.json` needs no change — `include: ["**/*.ts"]` already covers `tests/`, and `@/*` maps to
+the repo root, so `tests/**` resolves app imports unchanged. `pnpm lint` still covers them (only
+`.next/** out/** build/** next-env.d.ts .agents/**` are ignored).
+
+## 4. Runner wiring
+
+Vitest 5.0.1 declares projects as inline configurations on the root config
+(`node_modules/vitest/dist/chunks/plugin.d.CN87HSxv.d.ts:3642`; `defineProject` is exported from
+`vitest/config`). One root `vitest.config.ts` keeps today's `resolve.alias`, the `server-only`
+empty-module shim and `conditions: ["react-server"]`, and declares two projects inheriting them:
+
+```ts
+test: {
+  clearMocks: true,
+  projects: [
+    { extends: true, test: { name: "unit",        include: ["tests/*/unit/**/*.test.ts"] } },
+    { extends: true, test: { name: "integration", include: ["tests/*/integration/**/*.test.ts"],
+                             setupFiles: ["tests/helpers/load-test-env.ts"] } },
+  ],
+}
+```
+
+Two consequences worth naming. First, `include` is narrowed to `*.test.ts`, which is what stops
+Vitest's default `**/*.spec.ts` glob from swallowing the Playwright specs in §7. Second, a project
+that redefines `alias`/`resolve` gets its own Vite server instead of sharing the root one
+(`plugin.d.ts:3644-3657`) — so projects must not redefine them, or the `server-only` shim silently
+stops applying.
+
+The root config's `exclude` list (`.agents/**`, `.claude/**`, `.playwright/**`) becomes dead weight
+once `include` is anchored to `tests/*/…`; drop it in the same edit rather than keeping a list that no
+longer describes what is being skipped.
+
+**First-run check:** if `extends: true` does not propagate `resolve.alias`, all 19 files fail at
+import with `Cannot find package '@/…'`. That is the signal, and it is the first thing the plan runs.
+
+### 4.1 Commands
+
+| command | runs | gate |
+|---|---|---|
+| `pnpm test` | `vitest run --project unit` | the 122 existing tests, ~0.7s — unchanged meaning in `RULES.md` §13 and CI |
+| `pnpm test:integration` | `vitest run --project integration` | local, opt-in (§6) |
+| `pnpm test:all` | `vitest run` | **both Vitest projects, not Playwright** — the name is deliberate, so do not read it as "everything" |
+| `pnpm test:e2e` | `playwright test --project public` | public pages, CI (§7) |
+| `pnpm test:e2e:auth` | `playwright test --project auth` | local only |
+
+Path narrowing survives: `pnpm test -- dashboard`.
+
+**The risk this creates, stated plainly:** `pnpm test` no longer means "the whole suite". A
+contributor reading §13 literally can watch 122 green tests and believe the repo is verified while
+every integration file skips for want of a `TEST_SUPABASE_URL`. Mitigations, all three required:
+(a) the rewritten §13 names all five commands in §4.1 and what each leaves unchecked; (b)
+`tests/helpers/load-test-env.ts` logs one line when it skips, naming the variable it wanted; (c)
+`pnpm test:all` exists and the doc says to run it before pushing.
+
+## 5. Unit tier
+
+Content rules are the current ones, re-scoped: mock at the module boundary
+(`@/lib/db/repository`, `@/components/features/.../lib/profile`), never inside business logic; no
+real network or database call. The sentence "never a real network/DB call" applies **to this tier
+only** — it is exactly what §6 exists to violate, and `RULES.md` §13 must say so or the two rules
+contradict each other.
+
+New behavior still gets its test in the same change, and a bugfix still gets a test that fails
+without the fix; only the address changes.
+
+## 6. Integration tier
+
+**Why the seam is where it is.** `lib/supabase/server.ts` performs `const cookieStore = await
+cookies()`, so `canAccessClient()` cannot be invoked from a plain Node test at all — `next/headers`
+has no request scope there. The tier therefore fakes exactly one thing and leaves everything below
+it real:
+
+```
+fake   next/headers.cookies()      -> a store seeded with a token from signInWithPassword()
+real   @supabase/ssr  ->  PostgREST HTTP  ->  Postgres RLS  ->  private.current_user_role()
+```
+
+`lib/db/repository.ts` runs unmodified. That is the whole point: the test exercises the gate the app
+uses, not a reimplementation of it. Faking `cookies()` is a boundary mock in the §5 sense — external
+framework I/O, not business logic.
+
+**Skip mechanism.** `describe.skipIf(!hasTestDb)` at the top of each integration file;
+`skipIf` exists on the suite chain (`config.d.CU_b-wJj.d.ts:3138`). `hasTestDb` is
+`Boolean(process.env.TEST_SUPABASE_URL)`, exported from `tests/helpers/db.ts`.
+
+**Env loading.** `NODE_OPTIONS="--env-file=…"` is rejected by Node 24 (observed: `node: --env-file=
+is not allowed in NODE_OPTIONS`), so the documented approach cannot work. Instead
+`tests/helpers/load-test-env.ts`, registered as the integration project's `setupFiles`, calls
+`process.loadEnvFile("<repo>/.env.test")` inside a `try/catch` for a missing file — verified working
+on this Node (`process.loadEnvFile: ok`). `.env.test` is already untracked by the existing
+`.env*` gitignore pattern, so no `.gitignore` change is needed for it and no secret can be
+committed by accident. The live project's `.env` is never read by this tier; pointing tests at it is
+the failure mode the separate variable exists to prevent.
+
+**`loadEnvFile` does not override what is already set** (measured: with `QODER_COLLIDE=from-shell` in
+the environment and `from-file` in the file, the process kept `from-shell`). That settles two things.
+Every variable this tier reads gets a `TEST_` prefix — reusing `SUPABASE_SERVICE_ROLE_KEY` would be a
+silent no-op for anyone whose shell already exported the live one, which is precisely the developer
+with `.env` sourced. And when a value looks ignored, the shell is the suspect, not the file.
+
+**Required variables** (names only; values are secrets and stay out of every committed file, per
+`RULES.md` §6): `TEST_SUPABASE_URL`, `TEST_SUPABASE_PUBLISHABLE_KEY`,
+`TEST_SUPABASE_SERVICE_ROLE_KEY`, `TEST_DEMO_PASSWORD`.
+
+**Fixtures.** `tests/fixtures/identity-users.ts` provisions, idempotently and via service-role
+`auth.admin.createUser` — the mechanism already proven in `scripts/create-demo-user.mjs:57` — three
+auth users on two clients: `client@a` (role `client`, client A), `client@b` (role `client`,
+client B), `staff@a` (role `staff`, client A). Rows come from `scripts/seed.mjs` run against the
+test URL, not a second hand-written dataset.
+
+**First slice: `tests/tenant-isolation/integration/rls-gate.test.ts`.** Four assertions, each
+against the real `lib/db/repository.ts`:
+1. as `client@a`, `listAccessibleClients()` returns A and not B;
+2. as `client@a`, `canAccessClient(B)` is `false` and `canAccessClient(A)` is `true`;
+3. as `staff@a`, A is visible and B is not;
+4. an unauthenticated token sees neither.
+
+**Prerequisite, and it is not met today.** This needs a reachable Postgres running the Supabase
+platform roles — `supabase/migrations/20260917000000_seo_poc.sql` references `auth.users`,
+`auth.uid()` and grants to `authenticated` / `service_role` / `anon`, so a bare Postgres container
+cannot apply it without shimming `auth`. On this machine Docker is installed but **not running** and
+the `supabase` CLI is **not installed**.
+
+**Merge rule.** The RLS slice does not merge until it has been run green once against
+`supabase start`. Shipping it skipped-and-never-executed would be exactly the claim `RULES.md` §2
+forbids. The structure in this section (project, `skipIf`, `load-test-env`, the helper that fakes
+`cookies()`) does merge, because it is verified by the 19 unit files still passing and by an
+integration file reporting `skipped` for the right reason. If the stack cannot be brought up during
+implementation, §6 stops after the structure and the slice becomes the next change.
+
+## 7. e2e tier
+
+`@playwright/test` as a devDependency, Chromium only. `playwright.config.ts` at the root with
+`testDir: "./tests"`, `testMatch: "**/e2e/**/*.spec.ts"`, and two projects — `public`
+(`grepInvert: /@auth/`) and `auth` (`grep: /@auth/`). Tags rather than an env branch so the same
+binary serves both commands and CI cannot accidentally run the authed set.
+
+`webServer`: `pnpm start` on CI, reusing the `.next` build the pipeline already produces;
+`pnpm dev` with `reuseExistingServer: true` locally. Base URL comes from `NEXT_PUBLIC_APP_URL`, which
+in this checkout is `http://localhost:3000` — and because that variable is `NEXT_PUBLIC_*` it is
+already in the client bundle, so reading it is not a secret leak under `RULES.md` §6.
+
+Specs in the first change:
+
+| file | tier | asserts |
+|---|---|---|
+| `tests/landing/e2e/marketing.spec.ts` | public | landing renders; `/privacy` and `/terms` reachable from the footer |
+| `tests/identity/e2e/login.spec.ts` | public | `/auth/login` shows the form; submitting bad credentials surfaces an error and does not navigate |
+| `tests/dashboard/e2e/guard.spec.ts` | public | `/dashboard` unauthenticated lands on `/auth/login` |
+| `tests/dashboard/e2e/overview.spec.ts` | `@auth` | demo login reaches the dashboard and a metric renders |
+| `tests/export/e2e/csv.spec.ts` | `@auth` | CSV download produces a non-empty file with the expected header row |
+
+**Resolved: the public tier does work under placeholders.** Measured on 2026-09-23 by building and
+serving with only the two values `ci.yml` sets:
+
+| probe | result |
+|---|---|
+| `pnpm build` with placeholders | exit 0; `/`, `/dashboard`, `/privacy`, `/terms` prerendered as static `○`, `ƒ Proxy (Middleware)` emitted |
+| `GET /` | **200**, no redirect, body 40,483 bytes containing "JK Intelligence" and "Unified organic metrics" |
+| `GET /auth/login` | **200**, body 24,350 bytes |
+| `GET /privacy`, `/terms` | 200 / 200 |
+| `GET /dashboard` | **307 → `/auth/login?next=%2Fdashboard`** |
+| `GET /profile` | **307 → `/auth/login?next=%2Fprofile`** |
+| `GET /api/dashboard/boot` | **401** — the no-session path, and it never reaches a read |
+
+So all three public specs are CI-safe as written, and `guard.spec.ts` can assert the real 307 target
+rather than a guessed one. `app/page.tsx:10` renders `<LandingPage />` and nothing in
+`components/features/landing/*.tsx` reads a profile — `progress-tracker.md:52`'s "`/` now dynamically
+reads authenticated email" is a frozen historical entry that the current code contradicts. It is not
+edited (entries under "What happened" are dated logs, per that file's own note at `:15-16`); this
+table supersedes it.
+
+**How to reproduce, and why `.env` stays put.** `context/development-workflow.md` does not cover this,
+so: Next's load order is `process.env` → `.env.$(NODE_ENV).local` → `.env.local` → `.env.$(NODE_ENV)` →
+`.env`, **stopping once the variable is found**
+(`node_modules/next/dist/docs/01-app/02-guides/environment-variables.md:266-276`). Exporting the two
+placeholders in the shell therefore overrides the live `.env` values without moving or editing that
+file — and since `NEXT_PUBLIC_*` is inlined at build time from the build environment
+(`:158-164`), the resulting `.next` genuinely is the CI artifact, not a runtime imitation.
+
+Side effect to be aware of: `.next` in this checkout is now built with placeholder values. Any
+`pnpm start` before the next `pnpm build` serves the placeholder bundle.
+
+Authed specs reuse the existing demo account (`NEXT_PUBLIC_DEMO_EMAIL` /
+`NEXT_PUBLIC_DEMO_PASSWORD`, provisioned by `pnpm db:demo-user`). They log in through the real form,
+not by injecting a cookie, because the login flow is itself the thing without coverage.
+
+`.gitignore` gains `/playwright-report/` and `/test-results/`. `.playwright-cli/` is already ignored
+and stays as the ad-hoc exploration tool.
+
+**CI:** one step after Build in the existing job — `pnpm exec playwright install --with-deps
+chromium` then `pnpm test:e2e`. The `checks` job already builds, so `pnpm start` has an artifact.
+Cost is roughly the browser download plus one Chromium run; `pnpm test && typecheck && lint && build`
+keeps its current meaning and the four-command gate is unchanged.
+
+## 8. Documentation rewrite (same change)
+
+| file | change |
+|---|---|
+| `RULES.md:73-74` | replace the colocation mandate with the §3 tree and the §4.1 command table; scope "never a real network/DB call" to the unit tier; keep §13's four-command gate, add the `pnpm test:all`-before-pushing note |
+| `AGENTS.md:124` | "Tests colocate as `*.test.ts`" → the new sentence; `Verification` block lists the §4.1 commands |
+| `context/code-standards.md:225` | "there is no root `tests/` directory" is falsified — rewrite |
+| `context/code-standards.md:227-246` | tier semantics, the four commands, `:243`'s file paths, `:245` "no browser tests exist yet" → now false |
+| `context/development-workflow.md` | "Tests" row in the commands table; verification item 1 |
+| `docs/conventions/feature-components.md:23-24` | drop the per-feature `tests/` slot from the tree diagram, point to `tests/<feature>/` |
+| `.claude/skills/feature-component/SKILL.md:25-26` | same two lines |
+| `context/progress-tracker.md` | entry recording the reversal of `:217`, its reason, and the new commands |
+
+**Hardlink hazard.** `.claude/skills/feature-component/SKILL.md` and
+`.agents/skills/feature-component/SKILL.md` are the same inode (both `104056145`, confirmed with
+`ls -i`). An in-place edit updates both; an editor that writes a new file and renames it will break
+the link and leave one copy stale — silently, and `AGENTS.md`'s "never edit a skill in one place
+without the other" is exactly the failure this invites. The change must verify the inode still
+matches afterwards, and re-create the hardlink with `ln -f` if it does not.
+
+## 9. Acceptance
+
+The change is done when each line prints what it claims:
+
+1. `pnpm test` → `Test Files 19 passed (19)`, `Tests 122 passed (122)` — same counts as before the
+   move, from `tests/*/unit/`.
+2. `pnpm test:integration` with no `.env.test` → the suite reports skipped and the helper names
+   `TEST_SUPABASE_URL`; exit status green.
+3. `pnpm test:integration` with the local stack up → the RLS slice passes 4/4. Skipped, not
+   claimed, if §6's prerequisite is unmet.
+4. `pnpm typecheck` → clean (proves every moved import resolves).
+5. `pnpm lint` → clean.
+6. `pnpm build` → clean, and all seven `/api/*` route handlers still emit
+   (`cron/sync`, `dashboard/boot`, `exports/[clientId]/{csv,pdf}`, `metrics/[clientId]/{keywords,overview}`,
+   `revalidate/dashboard`).
+7. `pnpm test:e2e` → public specs pass against `pnpm start` with placeholder env, and `guard.spec.ts`
+   asserts the measured 307 target `/auth/login?next=%2Fdashboard` (§7's table), not a guessed one.
+8. `pnpm test:e2e:auth` → exercised locally against a seeded demo user; the observation is
+   reported, not just the exit code.
+9. `git ls-files 'app/**/*.test.ts' 'lib/**/*.test.ts' 'components/**/*.test.ts'` → empty.
+10. `grep -rn 'from "\./' tests --include='*.test.ts'` → empty, proving all 17 rewrites landed
+    rather than assuming it.
+11. Both SKILL.md inodes still identical.
+
+## 10. Open questions
+
+1. **Integration in CI** needs either a Supabase-capable service container or the local CLI on the
+   runner. Neither exists here. Deferred; revisit when a second integration file makes the skip
+   pattern more costly than the job.
+2. **Does `pnpm test:all` become the push gate** once integration is CI-capable? §4.1's silent-skip
+   risk is the argument for it; §13's four-command gate is the thing it would change.
+3. **`identity/` scope creep.** Account profile sits under an `identity` folder that also holds
+   authentication. Fine at six files; if it grows past ~12 it splits into `identity/` + `profile/`.
+4. **`/profile` needs no database to verify its guard.** Measured: under placeholders it answers
+   `307 → /auth/login?next=%2Fprofile`. Only the signed-in half of `/profile` requires a real session;
+   the unauthenticated half can be a public e2e spec, so add it to `guard.spec.ts` rather than
+   hand-verifying it. (An earlier revision of this section attributed a "live auth probe" claim to
+   `AGENTS.md:121`. That citation was wrong — line 121 is a closing code fence and no such phrase
+   exists in the repo. The measurement above stands on its own.)
+5. **Worker hosting** still undecided (`context/progress-tracker.md`); until something consumes the
+   queue in production the `sync/` integration tier has no worker contract to test.
