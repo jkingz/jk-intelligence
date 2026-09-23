@@ -205,7 +205,13 @@ it reports a whole-tier green run that reads like a subset. Use `pnpm test <patt
 contributor reading §13 literally can watch 122 green tests and believe the repo is verified while
 every integration file skips for want of a `TEST_SUPABASE_URL`. Mitigations, all three required:
 (a) the rewritten §13 names all five commands in §4.1 and what each leaves unchecked; (b)
-`tests/helpers/load-test-env.ts` logs one line when it skips, naming the variable it wanted; (c)
+`tests/helpers/load-test-env.ts` logs one line when it skips, naming the variable it wanted — with a
+limit found by measuring rather than trusting: it is registered as a `setupFiles` entry, so it runs
+per test file and therefore **cannot fire while the tier is empty**. Verified by adding a probe file
+(the warning appeared, on stderr, alongside a passing collect) and removing it (the warning never
+printed, and `--passWithNoTests` turned the run green). `globalSetup` does not close this hole either;
+registering the same module there suppressed collection entirely. The only honest signal available for
+an empty tier is Vitest's own `No test files found, exiting with code 0`; (c)
 `pnpm test:all` exists and the doc says to run it before pushing.
 
 ## 5. Unit tier

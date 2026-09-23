@@ -770,7 +770,7 @@ git commit -m "docs: point the feature-component convention at tests/<feature>/"
 
 **Boundary — read before starting.** Spec §6's merge rule says the RLS gate slice does not land until it has run green against a real Supabase stack, and that stack is not available here (Docker installed but not running; `supabase` CLI not installed). This task therefore ships the plumbing and stops. Writing `rls-gate.test.ts` now would commit never-executed assertions, which `RULES.md` §2 forbids. Its absence belongs in the progress tracker, not in a silent gap.
 
-- [ ] **Step 1: `tests/helpers/load-test-env.ts`**
+- [x] **Step 1: `tests/helpers/load-test-env.ts`**
 
 ```ts
 import { existsSync } from "node:fs";
@@ -792,13 +792,18 @@ if (!process.env.TEST_SUPABASE_URL) {
 }
 ```
 
-- [ ] **Step 2: `tests/helpers/db.ts`**
+- [x] **Step 2: `tests/helpers/db.ts`**
 
 ```ts
 export const hasTestDb = Boolean(process.env.TEST_SUPABASE_URL);
 ```
 
-- [ ] **Step 3: Register it in the integration project**
+- [x] **Step 3: Register it in the integration project**
+
+Result: done **without the `passWithNoTests` line.** It is not a `TestProjectOptions`
+key — with it present `pnpm typecheck` failed `TS2769`, and the CLI flag on
+`test:integration` covers the one command that needs it. See Known-deviations 1, which this
+supersedes.
 
 ```ts
         test: {
@@ -809,14 +814,24 @@ export const hasTestDb = Boolean(process.env.TEST_SUPABASE_URL);
         },
 ```
 
-- [ ] **Step 4: `tests/fixtures/README.md`**
+- [x] **Step 4: `tests/fixtures/README.md`**
 
 Record, without values: the four variable names, that `.env.test` is untracked by the existing `.env*` pattern, and the three fixture users the follow-up needs (`client@a` role client on client A, `client@b` role client on client B, `staff@a` role staff on client A) provisioned by service-role `auth.admin.createUser` as `scripts/create-demo-user.mjs:57` already does.
 
-- [ ] **Step 5: Verify the plumbing behaves and says why**
+- [x] **Step 5: Verify the plumbing behaves and says why**
 
 Run: `pnpm test:integration`
 Expected: the warn line naming `TEST_SUPABASE_URL`, then a green exit. This is the mitigation spec §4.1 requires — a skipped tier that announces itself rather than looking like coverage.
+
+**That expectation was wrong, and the step does not deliver what it claims.** With the tier
+empty the warn line never prints: no worker spawns, so no `setupFiles` module is evaluated.
+Measured by adding a probe `tests/tenant-isolation/integration/rls-gate.test.ts` — the warning
+appeared on stderr next to a passing collect — and deleting it — silence, and `--passWithNoTests`
+turned the run green. `globalSetup` is not a fix: it also does not fire on an empty tier, and
+pointing it at the same module as `setupFiles` suppressed collection outright. So a green
+`pnpm test:integration` today is exactly the silent-green this mitigation exists to prevent.
+Spec §4.1 carries the corrected wording; do not re-add the probe, the warning is for the first
+real integration file, not for this task.
 
 Run: `pnpm test:all`
 Expected: unit `19 passed (19)` / `122 passed (122)`, integration green.

@@ -31,6 +31,7 @@ export default defineConfig({
         test: {
           name: "integration",
           include: ["tests/*/integration/**/*.test.ts"],
+          setupFiles: ["tests/helpers/load-test-env.ts"],
         },
       },
     ],
