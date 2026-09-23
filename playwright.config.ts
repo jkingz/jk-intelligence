@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import "./tests/helpers/load-e2e-env";
 
 const baseURL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 const isCI = Boolean(process.env.CI);

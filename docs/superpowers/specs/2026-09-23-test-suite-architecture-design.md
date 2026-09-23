@@ -320,6 +320,30 @@ the form and pass `exact: true`, or Playwright's strict mode fails the run on an
 invisible in the markup. And the plan's predicted five public specs are six, because the footer check
 is two navigations rather than one chain.
 
+**A third, and it invalidates the plan's env story.** The `@auth` helper reads
+`NEXT_PUBLIC_DEMO_EMAIL` / `NEXT_PUBLIC_DEMO_PASSWORD` from `process.env`, and the plan asserted they
+"arrive because Next loads `.env` for `next dev` and `webServer` inherits the shell". That is wrong in
+the direction that matters: `next dev` loads `.env` **into its own child process**, and the Playwright
+runner is a *different* process whose `process.env` the child cannot write back to. Both specs failed
+on the missing-variable guard until `tests/helpers/load-e2e-env.ts` was added and imported from
+`playwright.config.ts`. Two constraints fell out of that fix worth keeping:
+
+- It loads `.env.local` **before** `.env`, because `process.loadEnvFile` never overrides a variable
+  that is already set, so first-loaded wins — the inverse of Next's own precedence, arrived at by
+  reversing the file order.
+- It resolves paths from `process.cwd()`, **not** `import.meta.url`. Playwright transpiles the config
+  to CommonJS (this package has no `"type": "module"`), and a helper imported from it hits
+  `SyntaxError: Cannot use 'import.meta' outside a module`. The Vitest integration helper in §6 uses
+  `import.meta.url` and is fine, because Vite loads it as ESM — the two helpers look interchangeable
+  and are not.
+
+Also confirmed by running, not reasoning: `<section aria-label="Performance metrics">` **is** exposed as
+`role="region"` once it has an accessible name, so `getByRole("region", …)` matches directly and the
+plan's `.or(locator)` hedge was unnecessary and is not in the committed spec. The downloaded CSV's first
+row is `\uFEFF` + `date,source,keyword,clicks,impressions,ctr,position,conversions,rank,search_volume`,
+with CRLF line endings — a BOM `buildCsv` adds deliberately for Excel (`lib/exports/csv.ts:68`), so the
+spec asserts its presence instead of stripping it.
+
 **Resolved: the public tier does work under placeholders.** Measured on 2026-09-23 by building and
 serving with only the two values `ci.yml` sets:
 
