@@ -229,10 +229,12 @@ scripts/        — migrations runner, seed, demo user (the only way data lands 
 ## Testing
 
 Vitest, Node environment, split into `unit` and `integration` projects. `pnpm test` runs the unit
-project (19 files / 122 tests); `pnpm test tenant-isolation` narrows by path — `pnpm test --
-tenant-isolation` does not, it silently runs the whole tier. A filter that matches nothing exits 1,
-so a moved file announces itself instead of passing empty. `pnpm test:all` adds integration,
-`pnpm test:e2e` is Playwright.
+project only; `pnpm test tenant-isolation` narrows by path — `pnpm test -- tenant-isolation` does
+not, it silently runs the whole tier. A filter that matches nothing exits 1, so a moved file
+announces itself instead of passing empty. `pnpm test:all` adds integration (which today collects
+**zero** files and passes on `--passWithNoTests` — green that means nothing), `pnpm test:e2e` is
+the public Playwright tier and `pnpm test:e2e:auth` the credential-gated one. Quote counts from the
+run's own output rather than restating them here.
 
 - New behavior gets a test in the same change; a bugfix gets a test that fails without the fix.
 - Mock the **module boundary** with `vi.mock("@/lib/db/repository", …)`, never an internal function
