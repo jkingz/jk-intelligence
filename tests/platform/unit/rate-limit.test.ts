@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SlidingWindowLimiter } from "./rate-limit";
+import { SlidingWindowLimiter } from "@/lib/rate-limit";
 
 describe("SlidingWindowLimiter", () => {
   it("allows submissions up to the window cap", () => {

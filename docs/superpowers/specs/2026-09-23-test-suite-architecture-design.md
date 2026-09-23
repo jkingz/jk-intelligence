@@ -165,20 +165,34 @@ The root config's `exclude` list (`.agents/**`, `.claude/**`, `.playwright/**`) 
 once `include` is anchored to `tests/*/…`; drop it in the same edit rather than keeping a list that no
 longer describes what is being skipped.
 
-**First-run check:** if `extends: true` does not propagate `resolve.alias`, all 19 files fail at
-import with `Cannot find package '@/…'`. That is the signal, and it is the first thing the plan runs.
+**First-run check — resolved during implementation.** `extends: true` does propagate `resolve`: with
+the alias declared only at the root, all 19 files collect and pass (122 tests), which also proves the
+`server-only` shim and `conditions` carried through (files that need them would fail at import). No
+project needs to redefine `resolve`, so §4's warning above stands as written.
+
+**Correction: `passWithNoTests` is not a project option in Vitest 5.** Placing it inside
+`test: { name: "integration", … }` fails `pnpm typecheck` with `TS2769 … 'passWithNoTests' does not
+exist in type`. It is also unnecessary where this section implied it: `vitest run` (both projects)
+exits 0 when only one project is empty — measured with an empty `integration` tier and 19 unit files.
+Only `vitest run --project integration` alone exits 1 on "No test files found", so the flag is a CLI
+flag on that one script (§4.1) and nowhere else. Keeping it off `pnpm test` is the point: a unit file
+dropped by a bad glob must stay a hard failure, not a silent green.
 
 ### 4.1 Commands
 
 | command | runs | gate |
 |---|---|---|
 | `pnpm test` | `vitest run --project unit` | the 122 existing tests, ~0.7s — unchanged meaning in `RULES.md` §13 and CI |
-| `pnpm test:integration` | `vitest run --project integration` | local, opt-in (§6) |
+| `pnpm test:integration` | `vitest run --project integration --passWithNoTests` | local, opt-in (§6) |
 | `pnpm test:all` | `vitest run` | **both Vitest projects, not Playwright** — the name is deliberate, so do not read it as "everything" |
 | `pnpm test:e2e` | `playwright test --project public` | public pages, CI (§7) |
 | `pnpm test:e2e:auth` | `playwright test --project auth` | local only |
 
-Path narrowing survives: `pnpm test -- dashboard`.
+Path narrowing survives, but not through `--`. Measured against this repo's pnpm 10.18.3:
+`pnpm test dashboard` collects only the dashboard files, while `pnpm test -- dashboard` collects all
+19 — the `--` is swallowed and the filter never reaches Vitest. That second form is the dangerous one:
+it reports a whole-tier green run that reads like a subset. Use `pnpm test <pattern>` or
+`pnpm exec vitest run --project unit <pattern>`.
 
 **The risk this creates, stated plainly:** `pnpm test` no longer means "the whole suite". A
 contributor reading §13 literally can watch 122 green tests and believe the repo is verified while
