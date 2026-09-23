@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Dashboard, DashboardSkeleton } from "@/components/features/dashboard";
 import { ExportMenu } from "@/components/features/data-export";
 import { AccountMenu } from "@/components/features/user-profile/components/account-menu";
+import { withDashboardParams } from "@/lib/dashboard/url-state";
 import type { ProfileView } from "@/components/features/user-profile/lib/profile";
 import {
   DASHBOARD_RANGES,
@@ -150,9 +151,16 @@ export function DashboardView() {
     const clientId = targetClient.id;
     currentRef.current = { clientId, days: targetDays };
     const cached = payloadsRef.current.get(cacheKey(clientId, targetDays));
+    // Carries whatever `?tab=` the address already holds, so a selection write
+    // cannot erase the panel a deep link asked for.
+    const selectionUrl = () =>
+      `/dashboard${withDashboardParams(window.location.search, {
+        client: clientId,
+        days: targetDays,
+      })}`;
     if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
       setSelection({ client: targetClient, days: targetDays, payload: cached.payload });
-      window.history.replaceState({}, "", `/dashboard?client=${clientId}&days=${targetDays}`);
+      window.history.replaceState({}, "", selectionUrl());
       setError(null);
       // The boot payload lands here, so this — not `loadOverview` — is the path
       // that first sees a client; prefetching it keeps range switches instant.
@@ -165,7 +173,7 @@ export function DashboardView() {
         const payload = await getPayload(clientId, targetDays, controller.signal);
         if (controller.signal.aborted) return;
         setSelection({ client: targetClient, days: targetDays, payload });
-        window.history.replaceState({}, "", `/dashboard?client=${clientId}&days=${targetDays}`);
+        window.history.replaceState({}, "", selectionUrl());
         setError(null);
         prefetchClientRanges(clientId, targetDays);
       } catch {

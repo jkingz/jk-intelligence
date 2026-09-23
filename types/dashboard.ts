@@ -8,6 +8,16 @@ export function isDashboardRange(value: unknown): value is DashboardRange {
   return DASHBOARD_RANGES.includes(value as DashboardRange);
 }
 
+export const DASHBOARD_TABS = ["overview", "queries", "ai_visibility"] as const;
+
+export type DashboardTab = (typeof DASHBOARD_TABS)[number];
+
+export const DEFAULT_DASHBOARD_TAB: DashboardTab = DASHBOARD_TABS[0];
+
+export function isDashboardTab(value: unknown): value is DashboardTab {
+  return DASHBOARD_TABS.includes(value as DashboardTab);
+}
+
 export interface DashboardClient {
   id: string;
   name: string;
