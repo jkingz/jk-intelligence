@@ -62,6 +62,17 @@ The active dashboard section lives in the URL next to `client` and `days`, so a 
 - **Written with `window.history.replaceState`, never `router.replace`**: all three panels are already mounted (`keepMounted` + `<Activity>`), so a router navigation per click would spend an RSC request. A tab click therefore produces zero network traffic; the client/days switch keeps its pre-existing single `router.replace`.
 - Scope: `types/dashboard.ts`, `lib/dashboard/url-state.ts`, `components/features/dashboard/components/dashboard.tsx`, `app/dashboard/dashboard-view.tsx`; tests `tests/dashboard/unit/url-state.test.ts`, `tests/dashboard/e2e/tab-deep-link.spec.ts`.
 
+## Phone-Width Layout Increment (`320–414px`)
+The dashboard column must fill the viewport and the header must stay legible on a phone; both were
+broken for unrelated reasons.
+
+**Status: implemented** (129 unit tests, typecheck, lint, build pass; `/dashboard` still prerenders as `○`).
+
+- **No page-level horizontal scroll, ever.** `documentElement.scrollWidth` ran 73–97px past `clientWidth` with nothing painted out there, so any horizontal scroll moved the whole column left and left a dead band on the right. Cause: Tailwind's `sr-only` is `position: absolute`, and the `<caption>` / `<th>` labels inside the query table's `overflow-x-auto` box had no positioned ancestor — their containing block was the initial one, so they escaped the clip and sized the document to the table's 527px min-content. Fix: `relative` on that scroll box, which makes it the containing block *and* the clipper. The table still scrolls in its own gutter below 640px.
+- **The header yields, it does not overlap.** The left group is `min-w-0`, but its brand child was `shrink-0`, so the wordmark's `truncate` never engaged and the squeeze fell on the client picker, which painted over Trigger Sync / Export at 390px. Below `sm` the wordmark is `hidden sm:block` (the logo mark and the footer carry the brand) and the trigger carries `min-w-0` so it truncates instead of overflowing.
+- **Not the cause**: `keepMounted` + `<Activity mode="hidden">`. Hidden panels measure `display: none`, width 0, and contribute nothing to scroll width — verified before changing anything.
+- Scope: `components/features/dashboard/components/query-table.tsx`, `components/features/dashboard/components/dashboard-header.tsx`; tests `tests/dashboard/e2e/mobile-layout.spec.ts` (asserts zero page overflow on all three sections and picker-clears-actions at 320 and 390).
+
 ## Security
 - Auth, route protection, and RLS unchanged. The dashboard reads through the service-role client but the page scopes clients by the session's role/`client_id` before reading metrics, so a client user can never request another tenant's overview.
 - Protected UI primitives untouched.
