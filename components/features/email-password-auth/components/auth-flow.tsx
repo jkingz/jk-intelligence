@@ -16,9 +16,11 @@ interface AuthFlowProps {
   initialMode: AuthMode;
   next?: string;
   error?: boolean;
+  demoEmail?: string;
+  demoPassword?: string;
 }
 
-export function AuthFlow({ initialMode, next, error }: AuthFlowProps) {
+export function AuthFlow({ initialMode, next, error, demoEmail, demoPassword }: AuthFlowProps) {
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const nextQuery = next ? `?next=${encodeURIComponent(next)}` : "";
 
@@ -73,7 +75,9 @@ export function AuthFlow({ initialMode, next, error }: AuthFlowProps) {
         </motion.div>
       </AnimatePresence>
 
-      {mode === "sign-in" && <DemoAccess next={next} />}
+      {mode === "sign-in" && (
+        <DemoAccess email={demoEmail} password={demoPassword} next={next} />
+      )}
 
       {mode === "sign-in" ? (
         <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">

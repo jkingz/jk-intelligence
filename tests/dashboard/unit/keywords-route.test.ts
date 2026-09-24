@@ -80,6 +80,10 @@ describe("GET /api/metrics/[clientId]/keywords", () => {
 
     const response = await get(CLIENT, { from: "2026-09-01T00:00:00.000Z" });
     expect(response.status).toBe(200);
+    // Invariant: CDN s-maxage == CACHE_TTL_MS == unstable_cache revalidate (300s).
+    expect(response.headers.get("Cache-Control")).toBe(
+      "public, s-maxage=300, stale-while-revalidate=60",
+    );
 
     const body = await response.json();
     expect(body.data).toEqual([

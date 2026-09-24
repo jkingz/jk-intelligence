@@ -1,20 +1,21 @@
 // Provisions the public demo account used by the "Try the demo" block on the
 // login page. Idempotent: re-runs update the `users` link instead of failing.
 //
-// Reads demo creds from NEXT_PUBLIC_DEMO_EMAIL / NEXT_PUBLIC_DEMO_PASSWORD
-// (same values the login page shows), and links the account to the first
+// Reads demo creds from DEMO_EMAIL / DEMO_PASSWORD (private env, never
+// NEXT_PUBLIC_* — the login page receives them as server props),
+// and links the account to the first
 // active client unless DEMO_CLIENT_ID is set, or a "Northstar" client exists.
 import { createClient } from "@supabase/supabase-js";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const email = process.env.NEXT_PUBLIC_DEMO_EMAIL;
-const password = process.env.NEXT_PUBLIC_DEMO_PASSWORD;
+const email = process.env.DEMO_EMAIL;
+const password = process.env.DEMO_PASSWORD;
 
 if (!url || !serviceRole || !email || !password) {
   console.error(
     "Missing env. Need NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, " +
-      "NEXT_PUBLIC_DEMO_EMAIL, NEXT_PUBLIC_DEMO_PASSWORD in .env",
+      "DEMO_EMAIL, DEMO_PASSWORD in .env",
   );
   process.exit(1);
 }

@@ -77,6 +77,10 @@ Policies: `supabase/migrations/20260917000000_seo_poc.sql`,
 `20260920000000_add_staff_role.sql`, `20260920000001_rls_hardening.sql`. `api_credentials` has a
 `using (false)` select policy and is never read by the app today.
 
+These policies have been exercised against a live Postgres (local `supabase start` stack) by
+`tests/tenant-isolation/integration/rls-gate.test.ts` — client/staff/admin/anon visibility all proven
+at the database, not only through a faked PostgREST.
+
 ## HTTP surface (what actually exists)
 
 | Route | Method | Auth | Notes |
@@ -118,9 +122,15 @@ only through `POST /api/revalidate/dashboard` (`revalidateTag(tag, profile)`), n
 
 ```bash
 pnpm test && pnpm typecheck && pnpm lint && pnpm build   # the gate
-pnpm test:all                                            # + integration (tier is EMPTY today — collects 0 and passes)
+pnpm test:all                                            # + integration tier — needs the local stack: `pnpm exec supabase start` and a filled `.env.test`
 pnpm test:e2e                                            # public Playwright specs
 ```
+
+The integration tier (`tests/tenant-isolation/integration/rls-gate.test.ts`) is the only evidence
+that the RLS policies actually decide visibility; it skips (with a warning, not a fake pass) when
+`.env.test` has no `TEST_*` names. `supabase/config.toml` keeps `[db.migrations].enabled = false` —
+`pnpm db:migrate` is the sole applier and ledger (`public.schema_migrations`); the CLI's own
+boot-time apply collides with it.
 
 `.github/workflows/ci.yml` runs those four plus the public e2e tier on every push to `main`/`dev`
 and on pull requests, with non-secret Supabase env placeholders so the build can prerender and the
