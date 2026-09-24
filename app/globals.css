@@ -71,7 +71,10 @@
   --radius-3xl: 2rem;
 }
 
-:root {
+/* Declared on `:root` and on any `[data-theme="dark"]` element, so a subtree can
+   opt into dark without a toggle (auth pages) — same values, scoped locally. */
+:root,
+[data-theme="dark"] {
   /* dark mode defaults */
   --bg-base: #0d0d0d;
   --bg-surface: #141414;
