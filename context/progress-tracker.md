@@ -8,9 +8,9 @@ live Postgres** (integration tier, 2026-09-24); the **sync pipeline is the next 
 blocked on a worker-hosting decision (see Open Questions 2).
 
 ## Current Goal
-Nothing in flight. Last change was the cleanup pass (2026-09-24): cache bounds aligned to 300s,
-demo creds moved server-side, `.env.example` written, and the first live-RLS integration slice —
-see Recent Work.
+Nothing in flight. Last change muted the Google/Apple buttons until those providers are configured
+(2026-09-24); before that the cleanup pass: cache bounds aligned to 300s, demo creds moved
+server-side, `.env.example` written, and the first live-RLS integration slice — see Recent Work.
 
 > Entries above this line are a log, not a status. `## Current Phase`, `## In Progress`,
 > `## Open Questions` and the *implemented surface* columns in `AGENTS.md` /
@@ -154,6 +154,14 @@ see Recent Work.
 
 ## Recent Work
 
+- Social sign-in muted (2026-09-24) — Google and Apple are not configured in Supabase yet, so their
+  buttons must not be pressable. `AuthFlow` now renders both with `disabled` (new optional
+  `disabled` prop on `GoogleSignInButton` / `AppleSignInButton`, OR-ed with the existing `pending`
+  guard) plus a caption: "Google and Apple sign-in are coming soon. Use email to continue."
+  Re-enable by flipping `SOCIAL_AUTH_READY` in
+  `components/features/email-password-auth/components/auth-flow.tsx`; the OAuth handlers are
+  untouched. Verified: `/auth/login` serves 200 with `disabled` on both `<button>`s, and the
+  dev-server page was checked in a browser (greyed row, hint visible).
 - Cleanup pass (2026-09-24) — four items, all verified:
   - **Q9 resolved: three-way cache bound restored to 300s.** Both metrics routes now serve
     `Cache-Control: public, s-maxage=300, stale-while-revalidate=60`, matching `CACHE_TTL_MS` and

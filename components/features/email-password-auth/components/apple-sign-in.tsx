@@ -22,7 +22,13 @@ function AppleGlyph() {
   );
 }
 
-export function AppleSignInButton({ next }: { next?: string }) {
+export function AppleSignInButton({
+  next,
+  disabled,
+}: {
+  next?: string;
+  disabled?: boolean;
+}) {
   const [pending, setPending] = useState(false);
   const limiter = useRef(new SlidingWindowLimiter({ max: 3, windowMs: 30_000 })).current;
 
@@ -70,7 +76,7 @@ export function AppleSignInButton({ next }: { next?: string }) {
       variant="outline"
       className="h-10 w-full gap-2"
       onClick={handleSignIn}
-      disabled={pending}
+      disabled={pending || disabled}
     >
       {pending ? (
         <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />

@@ -12,6 +12,9 @@ import { DemoAccess } from "./demo-access";
 
 type AuthMode = "sign-in" | "sign-up";
 
+// Neither OAuth provider is configured in Supabase yet; flip to true once they are.
+const SOCIAL_AUTH_READY = false;
+
 interface AuthFlowProps {
   initialMode: AuthMode;
   next?: string;
@@ -69,9 +72,14 @@ export function AuthFlow({ initialMode, next, error, demoEmail, demoPassword }: 
             <span className="h-px flex-1 bg-border" />
           </div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <GoogleSignInButton next={next} />
-            <AppleSignInButton next={next} />
+            <GoogleSignInButton next={next} disabled={!SOCIAL_AUTH_READY} />
+            <AppleSignInButton next={next} disabled={!SOCIAL_AUTH_READY} />
           </div>
+          {!SOCIAL_AUTH_READY && (
+            <p className="text-center text-xs text-muted-foreground">
+              Google and Apple sign-in are coming soon. Use email to continue.
+            </p>
+          )}
         </motion.div>
       </AnimatePresence>
 
