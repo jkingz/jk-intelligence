@@ -2,8 +2,7 @@ import Link from "next/link";
 import {
   BarChart3,
   TrendingUp,
-  Sparkles,
-  RefreshCw,
+  FileDown,
   ShieldCheck,
   ArrowRight,
 } from "lucide-react";
@@ -17,29 +16,29 @@ const features = [
   {
     name: "Unified organic metrics",
     description:
-      "Google Search Console, GA4, and SEO platform data merged into one dashboard per client — traffic, conversions, clicks, impressions, CTR, and average position.",
+      "Search Console, GA4 and Semrush share one normalized metric shape behind a single client switcher — traffic, clicks, impressions, CTR and average position for one client, in one place.",
     icon: BarChart3,
     tone: "accent",
   },
   {
     name: "Keyword ranking trends",
     description:
-      "Time-series tracking of top 3 / top 10 / top 20 keywords with the biggest movers, so you can see which rankings gained and which slipped — over any date range.",
+      "Time-series rank history for tracked keywords with the biggest movers, so you can see which rankings gained and which slipped over 7, 30 or 90 days.",
     icon: TrendingUp,
     tone: "sky",
   },
   {
-    name: "AI performance briefs",
+    name: "CSV and PDF exports",
     description:
-      "A plain-English summary generated for every client: top wins, biggest declines, and recommended focus areas — cached daily to keep costs predictable.",
-    icon: Sparkles,
+      "The same numbers behind the dashboard, on demand. CSV is spreadsheet-safe (UTF-8 BOM, formula-injection guarded); the PDF embeds a Unicode font so non-Latin client names and keywords survive.",
+    icon: FileDown,
     tone: "lilac",
   },
   {
-    name: "Automated daily sync",
+    name: "Isolation enforced in the database",
     description:
-      "A daily job pulls every client's data with per-source retries and partial-failure safety. Dashboards read from cache, so they stay fast even when an API is down.",
-    icon: RefreshCw,
+      "Three roles, one tenant gate, and row-level security in Postgres deciding visibility — covered by integration tests that run against a live database, not a mock.",
+    icon: ShieldCheck,
     tone: "blue",
   },
 ];
@@ -54,21 +53,21 @@ const tintChips: Record<string, string> = {
 const steps = [
   {
     number: "01",
-    title: "Connect your client accounts",
+    title: "Every client is its own tenant",
     description:
-      "Add each client and store their Google Search Console, GA4, and SEO API credentials. Access is isolated per client at the database level.",
+      "A client is a row with its own source set and role assignments. The app never asks 'is this account mine?' in application code — Postgres answers that.",
   },
   {
     number: "02",
-    title: "Sync runs every day",
+    title: "A daily sweep, per client",
     description:
-      "At 2 AM the platform pulls fresh metrics for every active client. Failures are retried with backoff, logged, and flagged in the dashboard — never a broken page.",
+      "A 2 AM cron enqueues one sync job for every active client, and a completed run revalidates the dashboard cache. Fetching live from the source APIs is the piece being built next.",
   },
   {
     number: "03",
-    title: "Act on the insights",
+    title: "Read it, then hand it over",
     description:
-      "Clients and staff sign in to see current numbers, trends, and an AI-generated summary of what changed and where to focus next.",
+      "Clients and staff sign in to current numbers and rank history, then export the same figures as CSV or PDF — built from the same code path, so the report can't disagree with the screen.",
   },
 ];
 
@@ -143,9 +142,9 @@ export function LandingPage() {
                   Built for agencies that report
                 </h2>
                 <p className="mt-4 text-sm text-landing-muted">
-                  Role-based access keeps each client seeing only their own numbers. Data is
-                  isolated at the database layer, synced daily, and readable even when a source
-                  API is down.
+                  Role-based access keeps each client seeing only their own numbers, enforced by
+                  row-level security in Postgres. Dashboards read from a cache rather than a vendor
+                  API, so page speed never depends on someone else&apos;s uptime.
                 </p>
                 <Link
                   href="/auth/sign-up"

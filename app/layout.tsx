@@ -20,7 +20,8 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: "JK Intelligence — Agency Organic Growth Platform",
-  description: "Unified organic search performance, technical crawl diagnostics, and AI visibility.",
+  description:
+    "One dashboard per client for organic search performance — keyword rank history, traffic and CTR, with CSV and PDF reporting.",
 };
 
 export default function RootLayout({

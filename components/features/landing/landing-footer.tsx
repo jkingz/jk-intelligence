@@ -24,8 +24,8 @@ export function LandingFooter() {
               </span>
             </div>
             <p className="mt-3 max-w-xs text-sm text-landing-muted">
-              Unified organic performance reporting for agencies — synced daily, with plain-English
-              AI briefs per client.
+              Organic performance reporting for multi-client agencies — one dashboard per client,
+              CSV and PDF exports, and tenant isolation enforced in the database.
             </p>
           </div>
 
