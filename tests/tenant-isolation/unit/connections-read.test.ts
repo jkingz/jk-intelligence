@@ -90,5 +90,11 @@ describe("listConnections", () => {
       ]),
     );
     await expect(listConnections()).rejects.toThrow("Database operation failed");
+    // Without this the case cannot tell "RLS denied the caller" from "the fake
+    // ran out of canned results": a wrong-client read reaches the unset
+    // `boundary.admin`, and `databaseOperation`'s catch-all re-emits the same
+    // message. This assertion is per-case and does not generalise —
+    // `repository.test.ts`'s cron case asserts the opposite boundary on purpose.
+    expect(boundary.admin).not.toHaveBeenCalled();
   });
 });

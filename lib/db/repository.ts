@@ -331,8 +331,7 @@ export async function listConnections(): Promise<ClientConnections[]> {
     const db = await createServerSupabaseClient();
     const { data, error } = await db
       .from("api_credentials")
-      .select("client_id,source,created_at")
-      .order("source");
+      .select("client_id,source,created_at");
     if (error) throw new Error("Database operation failed");
     const rows = z.array(credentialRowSchema).parse(data ?? []).map((row) => ({
       clientId: row.client_id,
