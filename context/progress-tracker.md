@@ -8,9 +8,10 @@ live Postgres** (integration tier, 2026-09-24); the **sync pipeline is the next 
 blocked on a worker-hosting decision (see Open Questions 2).
 
 ## Current Goal
-Nothing in flight. Last change muted the Google/Apple buttons until those providers are configured
-(2026-09-24); before that the cleanup pass: cache bounds aligned to 300s, demo creds moved
-server-side, `.env.example` written, and the first live-RLS integration slice — see Recent Work.
+Nothing in flight. Last change made the landing page's claims match the build (2026-09-24 — copy and
+metadata only, see Recent Work); before that the Google/Apple buttons were muted until those providers
+are configured, and before that the cleanup pass: cache bounds aligned to 300s, demo creds moved
+server-side, `.env.example` written, and the first live-RLS integration slice.
 
 > Entries above this line are a log, not a status. `## Current Phase`, `## In Progress`,
 > `## Open Questions` and the *implemented surface* columns in `AGENTS.md` /
@@ -153,6 +154,39 @@ server-side, `.env.example` written, and the first live-RLS integration slice �
 - None (data export completed — see Recent Work).
 
 ## Recent Work
+
+- Landing copy made claim-safe (2026-09-24) — copy and metadata only; no layout, token or behavior
+  change. The public page asserted three things the build cannot do, which mattered because the URL
+  goes out as evidence of capability. Now every line is defensible against the code:
+  - Hero subhead: dropped "live dashboards … automated daily … plain-English AI summaries" for what
+    the read path actually is, and states plainly that live source sync is the next build and the
+    demo runs on a sample dataset. Added a caption under the four hero figures: "Sample figures from
+    the demo dataset — not a connected account."
+  - Feature cards: "AI performance briefs" (no LLM dependency exists — Open Question 7) and
+    "Automated daily sync" (`worker.ts` returns `mock_completed` — Open Question 1) replaced by two
+    real, unmentioned features: **CSV and PDF exports** and **database-enforced isolation**. "Unified
+    organic metrics" no longer implies a fetch, and "over any date range" → the actual 7/30/90.
+  - Steps: "Connect your client accounts" (no connect flow; `api_credentials` is never read) →
+    tenant-per-client; "Sync runs every day" (retries/backoff not built) → the honest version, cron
+    enqueues per client and a completed run revalidates, live fetch is next; step 3's AI summary →
+    export parity with the dashboard.
+  - Trust band: removed "synced daily, and readable even when a source API is down" (reads return 503
+    on failure — they do not fall back). Now claims only RLS + its integration tests + cached reads.
+  - `app/page.tsx` and `app/layout.tsx` metadata described "technical crawl diagnostics, and AI
+    visibility" — neither exists in any form; rewritten to the shipped surface.
+  - Footer tagline carried the same "synced daily … AI briefs" pair; replaced.
+  - **Still overstating:** `public/diagrams/landing-pipeline.svg` (hero backdrop, `opacity-[0.18]`,
+    `aria-hidden`) still depicts `AI insights → plain-English brief`. Legible? Marginal. Regenerating
+    it is an Archify pass, deliberately not done here.
+  - Verified: `pnpm test` 135 passed · `pnpm typecheck` · `pnpm lint` clean · `pnpm build` green with
+    `/` still `○` · prerendered `.next/server/app/index.html` greps **0** for "AI performance briefs",
+    "Automated daily sync", "plain-English", "technical crawl diagnostics", "synced daily" and **1**
+    each for the replacement strings · `pnpm test:e2e` (public) 6 passed. Not committed.
+- Also new: `docs/pitches/2026-09-24-agency-paid-ads-monitoring-pilot.md` — an external proposal
+  responding to a paid-ads monitoring posting by offering the reshape (§12 slices 0–3) as a pilot,
+  with the platform-approval critical path and the operator checklist stated up front. Not product
+  code; kept here so the slice order and the honest-gap list stay in one place.
+
 
 - Social sign-in muted (2026-09-24) — Google and Apple are not configured in Supabase yet, so their
   buttons must not be pressable. `AuthFlow` now renders both with `disabled` (new optional

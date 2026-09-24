@@ -50,8 +50,9 @@ export function LandingHero() {
               Every client&apos;s organic performance, in one dashboard.
             </h1>
             <p className="mt-5 max-w-2xl motion-safe:animate-landing-fade-in text-base text-landing-muted sm:text-lg">
-              JK Intelligence pulls Google Search Console, GA4, and SEO platforms into live dashboards for
-              every client — automated daily, with plain-English AI summaries of what changed.
+              One dashboard per client, with organic metrics and keyword rank history in the same
+              place — and CSV or PDF reports on demand. Live Search Console, GA4 and Semrush sync is
+              the next build; this demo runs on a sample dataset.
             </p>
 
             <div className="mt-8 motion-safe:animate-landing-fade-in flex justify-center">
@@ -93,6 +94,9 @@ export function LandingHero() {
               </div>
             ))}
           </StaggerReveal>
+          <p className="mt-3 text-center text-xs text-landing-faint">
+            Sample figures from the demo dataset — not a connected account.
+          </p>
         </Reveal>
       </div>
     </section>
