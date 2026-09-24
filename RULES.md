@@ -85,7 +85,7 @@ Rules 1–10 are the **portable core** — they hold in every repo this workspac
 ### 16. Supabase
 - Schema changes are new timestamped files in `supabase/migrations/`, applied with `pnpm db:migrate`; never edit an applied migration.
 - Every table gets RLS matching the role model. `metrics_snapshots` is append-only. Credentials never appear in a response or a log line.
-- Local runs need `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env`; server-side also `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_URL`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `CRON_SECRET`, `NEXT_PUBLIC_APP_URL`. There is no `.env.example` yet — copy names from `.env` (values are secrets; never commit them).
+- Local runs need `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env`; server-side also `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_URL`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `CRON_SECRET`, `NEXT_PUBLIC_APP_URL`, and the private `DEMO_EMAIL`/`DEMO_PASSWORD` (server-read, prop-fed — never `NEXT_PUBLIC_*`, the login page would ship the password in the bundle). `.env.example` carries every name with placeholders; `.env.test` carries the `TEST_*` integration-tier names. Copy names, never values.
 - CI needs only the two `NEXT_PUBLIC_*` values; `.github/workflows/ci.yml` sets non-secret placeholders so `pnpm build` can prerender.
 
 ### 17. UI conventions

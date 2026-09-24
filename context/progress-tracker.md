@@ -3,13 +3,14 @@
 Update this file after every meaningful implementation change.
 
 ## Current Phase
-Hardening the built surface: read paths and tenant isolation are done; the **sync pipeline is the
-next unit** and is blocked on a worker-hosting decision (see Open Questions 2).
+Hardening the built surface: read paths and tenant isolation are done **and now proven against a
+live Postgres** (integration tier, 2026-09-24); the **sync pipeline is the next unit** and is
+blocked on a worker-hosting decision (see Open Questions 2).
 
 ## Current Goal
-Nothing in flight. Last change fixed the dashboard at phone widths — page-level horizontal overflow
-and a header picker that painted over the actions; see "Dashboard phone-width layout" under Recent
-Work.
+Nothing in flight. Last change muted the Google/Apple buttons until those providers are configured
+(2026-09-24); before that the cleanup pass: cache bounds aligned to 300s, demo creds moved
+server-side, `.env.example` written, and the first live-RLS integration slice — see Recent Work.
 
 > Entries above this line are a log, not a status. `## Current Phase`, `## In Progress`,
 > `## Open Questions` and the *implemented surface* columns in `AGENTS.md` /
@@ -152,6 +153,46 @@ Work.
 - None (data export completed — see Recent Work).
 
 ## Recent Work
+
+- Social sign-in muted (2026-09-24) — Google and Apple are not configured in Supabase yet, so their
+  buttons must not be pressable. `AuthFlow` now renders both with `disabled` (new optional
+  `disabled` prop on `GoogleSignInButton` / `AppleSignInButton`, OR-ed with the existing `pending`
+  guard) plus a caption: "Google and Apple sign-in are coming soon. Use email to continue."
+  Re-enable by flipping `SOCIAL_AUTH_READY` in
+  `components/features/email-password-auth/components/auth-flow.tsx`; the OAuth handlers are
+  untouched. Verified: `/auth/login` serves 200 with `disabled` on both `<button>`s, and the
+  dev-server page was checked in a browser (greyed row, hint visible).
+- Cleanup pass (2026-09-24) — four items, all verified:
+  - **Q9 resolved: three-way cache bound restored to 300s.** Both metrics routes now serve
+    `Cache-Control: public, s-maxage=300, stale-while-revalidate=60`, matching `CACHE_TTL_MS` and
+    `unstable_cache revalidate: 300`. The `58599ac` revert to 60 had no recorded rationale; the
+    invariant plus its resolution are now documented in `architecture-context.md`, and the two
+    dashboard unit tests pin the header verbatim (red-proved against pre-edit source).
+  - **Q4 resolved: demo creds no longer ship in the client bundle.** `NEXT_PUBLIC_DEMO_EMAIL`/
+    `_PASSWORD` were renamed to private `DEMO_EMAIL`/`DEMO_PASSWORD` and are read only in the
+    login/sign-up **server** pages, prop-fed through `AuthFlow` into `DemoAccess`
+    (`email`/`password` props; the component renders nothing without both). The visible Password
+    line was dropped from the card. Chosen approach was the server-props treatment, not the
+    minting endpoint originally sketched. Guard test: `tests/identity/unit/demo-creds.test.ts`
+    (scans client modules for `NEXT_PUBLIC_DEMO`, checks prop typing and the server-page reads).
+    Verified: 0 occurrences of the password in `.next/static` or built client chunks; auth e2e
+    (11 tests, incl. demo login) green.
+  - **Q5 partial: `.env.example` written** — all 11 required names plus `DEMO_CLIENT_ID` and the
+    `TEST_*` quartet, with comments; `.gitignore` gained `!.env.example`. **Deliberate deferrals:**
+    `lib/api/guard.ts` folds into the sync-route work, server-side auth rate limiting folds into
+    the Upstash-quota work. Sentry/OTel skipped for now.
+  - **Integration tier has its first real slice.** `supabase@2.117.0` added as a devDependency;
+    local stack via Docker Desktop + `pnpm exec supabase start`. `supabase/config.toml` sets
+    `[db.migrations].enabled = false` because the repo's applier is `pnpm db:migrate`
+    (`public.schema_migrations` ledger) — the CLI's boot-time auto-apply collides with it
+    ("relation clients already exists"). `tests/fixtures/identity-users.ts` provisions three users
+    across two clients idempotently via service-role; `tests/tenant-isolation/integration/rls-gate.test.ts`
+    runs 5 assertions against live Postgres (client sees own only; staff sees assigned; admin sees
+    both; `canAccessClient` true/false; cookie-less → anon grant revoked → throws, fail-closed).
+    Green twice, including after `supabase db reset` (fixture idempotency proven).
+  - Gate at close: 135 unit tests · 5 integration · typecheck · lint · build · public e2e 6 ·
+    auth e2e 11 — all green. Run the live tier with `pnpm exec supabase start` + `.env.test`
+    (see `AGENTS.md` → Verification).
 
 - Dashboard phone-width layout (`320–414px`) — two independent defects, both fixed, tests:
   `tests/dashboard/e2e/mobile-layout.spec.ts`.
@@ -369,32 +410,36 @@ Work.
   1. **Sync pipeline is not implemented.** `lib/queue/worker.ts` returns `status: "mock_completed"`; `lib/agents/` holds only `authAgent`. `persistMetrics`, `markMetricsStale` and `writeSyncLog` in `lib/db/repository.ts` have zero non-test callers, and `api_credentials` is never read — all dashboard data comes from `scripts/seed.mjs`. ~~`AGENTS.md` documents the agents as if built.~~ **Docs fixed 2026-09-23:** unbuilt design now lives in `docs/target-state.md` and `AGENTS.md`/`architecture-context.md` describe only implemented code. The code itself is unchanged and still needs a real `syncAgent`.
   2. **No host for the BullMQ worker.** Vercel has only the cron, so jobs enqueue with no consumer. Needs a decision: always-on worker (Fly/Render), cron calls sync inline, or QStash.
   3. ~~**Tenant isolation is one layer.**~~ **Fixed 2026-09-23 (step 2).** The tenant gate (`listAccessibleClients`, new `canAccessClient`) now reads `clients` through `createServerSupabaseClient()`, so Postgres RLS decides visibility. Metric reads stay on `getAdminDb()` by design (see Recent Work) — reachable only with a `client_id` that already passed the gate.
-  4. **`NEXT_PUBLIC_DEMO_PASSWORD` ships in the client bundle** (`components/features/email-password-auth/components/demo-access.tsx`) — move to a server-only credential minted through an endpoint.
-  5. Missing: `lib/api/guard.ts` (routes hand-roll auth + responses in two styles), rate limiting on login/signup/reset, Sentry/OTel, `.env.example` (the 11 required names are currently documented only in `RULES.md` §16 and `AGENTS.md`), generated `types/database.ts` (currently handwritten), and auth limiter reuse of the Upstash quota helper.
+  4. ~~**`NEXT_PUBLIC_DEMO_PASSWORD` ships in the client bundle** — move to a server-only credential minted through an endpoint.~~ **Fixed 2026-09-24** via the server-props treatment instead of an endpoint: private `DEMO_EMAIL`/`DEMO_PASSWORD` read in the login/sign-up server pages and prop-fed to `DemoAccess`; guarded by `tests/identity/unit/demo-creds.test.ts`. See Recent Work.
+  5. Missing: `lib/api/guard.ts` (routes hand-roll auth + responses in two styles — **deferred 2026-09-24, fold into the sync-route work**), rate limiting on login/signup/reset (**deferred 2026-09-24, fold into the Upstash-quota work**), Sentry/OTel (skipped), ~~`.env.example`~~ (**written 2026-09-24**), generated `types/database.ts` (currently handwritten), and auth limiter reuse of the Upstash quota helper.
   6. **`is_stale` has no writer.** `markMetricsStale()` exists and nothing calls it, so the stale banner and the "Cached data" sync pill can never appear. Falls out of #1.
   7. **`aiCitations` is hardcoded `[]`** (`lib/dashboard/overview.ts:231`), so `AICitationGrid` always renders its empty state — UI for a data source that does not exist. There is no LLM dependency in the repo at all.
   8. ~~**README contradicts `package.json`.~~ **Closed.** README now says Node `>=24`, pnpm `>=10`,
      matching `engines`. Its Checks block was stale against the test tiers and was rewritten in the
      same pass that found it.
-  9. **The three-way cache bound no longer holds.** This file claims `s-maxage` was raised to 300 to
-     match `CACHE_TTL_MS` and `unstable_cache revalidate: 300`; `2a46881` did set it, and `58599ac`
-     reverted it to 60. Code today: CDN 60s, client 300s, server 300s. `architecture-context.md`
-     already records 60. Decide whether the revert was deliberate, then align the two or drop the
-     invariant — do not "fix" the header back without knowing why it was lowered.
-- RLS policies are still unproven against a live database. The step-2 tests fake PostgREST, so they lock in *which client the app uses*, not that `clients_select_authenticated` etc. behave as written. Needs one pass with two provisioned users in different clients: `select` on `metrics_snapshots` as `anon` (expect permission denied — `revoke` strips the grant) and as a foreign `authenticated` user (expect 0 rows).
-- **The `integration` tier is wired but holds no test.** `tests/<feature>/integration/` exists in
-  the config and the `TEST_*` env plumbing is in place (`tests/helpers/load-test-env.ts`,
-  `db.ts`, `tests/fixtures/README.md`), but the tier is empty, so `pnpm test:integration` passes on
-  `--passWithNoTests` — green that means nothing yet. The first slice is
-  `tests/tenant-isolation/integration/rls-gate.test.ts` with spec §6's four assertions, and it is
-  blocked on the box above (no running Supabase stack). A green `pnpm test` says nothing about the
-  other two tiers; treat the four-command gate plus `pnpm test:e2e` as the check.
-- Profile: no display-name column exists (`users` has only id/role/client_id) — name editing deferred until schema decision.
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` now set in `.env` (208 chars) — auth login flows can be exercised at runtime; needs mirroring in Vercel.
-- Mirror into Vercel so prod actually gates: `CRON_SECRET` (same 64-char value as `.env`), `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_DEMO_EMAIL`/`NEXT_PUBLIC_DEMO_PASSWORD`, and `UPSTASH_REDIS_REST_URL`/`_TOKEN`. A cron/queue/revalidate worker is live only where these env vars are set.
+  9. ~~**The three-way cache bound no longer holds.**~~ **Resolved 2026-09-24: aligned to 300.**
+     The `58599ac` revert to 60 carried no recorded rationale; both metrics routes now serve
+     `s-maxage=300, stale-while-revalidate=60` so CDN == `CACHE_TTL_MS` == `unstable_cache
+     revalidate`, the unit tests pin the header, and `architecture-context.md` records the
+     invariant and its resolution.
+- ~~RLS policies are still unproven against a live database.~~ **Proven 2026-09-24** by
+  `tests/tenant-isolation/integration/rls-gate.test.ts`: client/staff/admin/anon visibility all
+  exercised against a real local Postgres (Docker + `supabase start`), not a faked PostgREST. The
+  anon path throws (grant revoked → fail-closed 503) rather than returning `[]`.
+- **The `integration` tier is live.** `tests/<feature>/integration/` is wired in the Vitest
+  workspace; the first slice (tenant isolation, 5 tests) runs green against the local stack.
+  Needs `pnpm exec supabase start` and a `.env.test` with `TEST_SUPABASE_URL` /
+  `TEST_SUPABASE_PUBLISHABLE_KEY` / `TEST_SUPABASE_SERVICE_ROLE_KEY` /
+  `TEST_DEMO_PASSWORD` (see `AGENTS.md` → Verification, `tests/fixtures/README.md`). Without
+  those, the suite `skipIf`s — so CI stays effectively unit+e2e until a hosted test DB exists.
+- Profile display name: **decided 2026-09-24 — no `users` column needed.** Name editing already
+  persists to `user_metadata.name` via Supabase Auth, which the profile reads; a public-schema
+  mirror column would duplicate the auth store for no gain.
+- Supabase publishable key set in `.env` as `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` fallback still honored) — auth login flows run at runtime; the same name must exist in Vercel.
+- Mirror into Vercel so prod actually gates: `CRON_SECRET` (same 64-char value as `.env`), `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `UPSTASH_REDIS_REST_URL`/`_TOKEN`, and — new since 2026-09-24 — `DEMO_EMAIL`/`DEMO_PASSWORD` as **plain (non-`NEXT_PUBLIC_`) vars** so they stay server-side; without them the demo card simply renders nowhere. A cron/queue/revalidate worker is live only where these env vars are set.
 - Staff access is enforced via the `users` table `role` column (staff → own `client_id`), not JWT claims — matches how Supabase RLS derives role/client per the advisor; no per-request DB round-trip for admins (short-circuit before query).
 - Google OAuth must be enabled on the Supabase project; `users` rows for admins/clients must be provisioned (RLS reads role/client_id from `users` table).
-- Supabase CLI / local Supabase not present on this machine — schema changes and auth flows not exercised against a real project. Email/password flows unit-level verified only; needs live Supabase + redirect URL allowlist (`/auth/callback`, `/auth/reset-password`) + PKCE email templates (token_hash style) to exercise end to end.
+- ~~Supabase CLI / local Supabase not present on this machine~~ **Resolved 2026-09-24:** `supabase` is a devDependency and the local stack (Docker Desktop + `pnpm exec supabase start`) backs the integration tier; schema changes and the RLS policies are now exercised against real Postgres. Still open for the *hosted* project: redirect URL allowlist (`/auth/callback`, `/auth/reset-password`) + PKCE email templates (token_hash style) for end-to-end OAuth/email flows.
 
 ## Architecture Decisions
 - Route protection uses Next.js 16 Proxy (middleware renamed) with pure decision logic in `lib/auth/routing.ts` to keep the decision testable without framework imports

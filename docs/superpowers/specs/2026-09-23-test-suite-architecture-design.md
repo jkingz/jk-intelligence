@@ -327,7 +327,9 @@ invisible in the markup. And the plan's predicted five public specs are six, bec
 is two navigations rather than one chain.
 
 **A third, and it invalidates the plan's env story.** The `@auth` helper reads
-`NEXT_PUBLIC_DEMO_EMAIL` / `NEXT_PUBLIC_DEMO_PASSWORD` from `process.env`, and the plan asserted they
+`DEMO_EMAIL` / `DEMO_PASSWORD` from `process.env` (renamed from the `NEXT_PUBLIC_DEMO_*` pair on
+2026-09-24 — Q4 moved the creds out of the client bundle; `tests/helpers/log-in.ts` reads them in
+Node, so the prefix never mattered there), and the plan asserted they
 "arrive because Next loads `.env` for `next dev` and `webServer` inherits the shell". That is wrong in
 the direction that matters: `next dev` loads `.env` **into its own child process**, and the Playwright
 runner is a *different* process whose `process.env` the child cannot write back to. Both specs failed
@@ -381,8 +383,8 @@ file — and since `NEXT_PUBLIC_*` is inlined at build time from the build envir
 Side effect to be aware of: `.next` in this checkout is now built with placeholder values. Any
 `pnpm start` before the next `pnpm build` serves the placeholder bundle.
 
-Authed specs reuse the existing demo account (`NEXT_PUBLIC_DEMO_EMAIL` /
-`NEXT_PUBLIC_DEMO_PASSWORD`, provisioned by `pnpm db:demo-user`). They log in through the real form,
+Authed specs reuse the existing demo account (`DEMO_EMAIL` /
+`DEMO_PASSWORD`, provisioned by `pnpm db:demo-user`). They log in through the real form,
 not by injecting a cookie, because the login flow is itself the thing without coverage.
 
 `.gitignore` gains `/playwright-report/` and `/test-results/`. `.playwright-cli/` is already ignored

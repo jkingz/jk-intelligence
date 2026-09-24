@@ -32,7 +32,7 @@ pnpm install
 pnpm dev    # http://localhost:3000
 ```
 
-Local auth needs two names in `.env`: `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` still works). Server-side paths also want `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_URL`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `CRON_SECRET`, `NEXT_PUBLIC_APP_URL`. No `.env.example` yet — copy the names, never the values. Register the Supabase providers and add `/auth/callback` to the redirect allowlist, then `pnpm db:migrate && pnpm db:seed` for demo data.
+Local auth needs two names in `.env`: `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` still works). Server-side paths also want `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_URL`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `CRON_SECRET`, `NEXT_PUBLIC_APP_URL`, and the private `DEMO_EMAIL`/`DEMO_PASSWORD`. Copy `.env.example` and fill it in — never copy values between machines. Register the Supabase providers and add `/auth/callback` to the redirect allowlist, then `pnpm db:migrate && pnpm db:seed` for demo data.
 
 ## Checks
 

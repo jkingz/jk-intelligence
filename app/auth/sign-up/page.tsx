@@ -17,11 +17,18 @@ interface SignUpPageProps {
 export default async function SignUpPage({ searchParams }: SignUpPageProps) {
   const params = await searchParams;
   const next = safeNext(params.next);
+  const demoEmail = process.env.DEMO_EMAIL;
+  const demoPassword = process.env.DEMO_PASSWORD;
 
   return (
     <AuthPageShell chrome={false}>
       <AuthCard description="Create your account.">
-        <AuthFlow initialMode="sign-up" next={next} />
+        <AuthFlow
+          initialMode="sign-up"
+          next={next}
+          demoEmail={demoEmail}
+          demoPassword={demoPassword}
+        />
       </AuthCard>
     </AuthPageShell>
   );

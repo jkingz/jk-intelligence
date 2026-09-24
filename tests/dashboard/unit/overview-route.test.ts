@@ -91,6 +91,10 @@ describe("GET /api/metrics/[clientId]/overview", () => {
       history: [{ keyword: "coffee", rank: 2 }],
     });
     expect(boundary.overview).toHaveBeenCalledWith(client, 30);
+    // Invariant: CDN s-maxage == CACHE_TTL_MS == unstable_cache revalidate (300s).
+    expect(response.headers.get("Cache-Control")).toBe(
+      "public, s-maxage=300, stale-while-revalidate=60",
+    );
   });
 
   it("degrades to 503 with no-store when the read fails", async () => {

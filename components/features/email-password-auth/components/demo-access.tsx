@@ -8,16 +8,30 @@ import { SlidingWindowLimiter } from "@/lib/rate-limit";
 import { finishStatusToast, startStatusToast } from "@/lib/toast-status";
 import { submitEmailAuth } from "../lib/email-password";
 
-const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_EMAIL;
-const DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD;
+interface DemoAccessProps {
+  email?: string;
+  password?: string;
+  next?: string;
+}
 
-export function DemoAccess({ next }: { next?: string }) {
+// Server-props only (Q4): the auth pages read DEMO_EMAIL/DEMO_PASSWORD so the
+// creds never reach the client bundle; absent env, the block hides itself.
+export function DemoAccess({ email, password, next }: DemoAccessProps) {
+  if (!email || !password) return null;
+  return <DemoAccessCard email={email} password={password} next={next} />;
+}
+
+function DemoAccessCard({
+  email,
+  password,
+  next,
+}: {
+  email: string;
+  password: string;
+  next?: string;
+}) {
   const [pending, setPending] = useState(false);
   const limiter = useRef(new SlidingWindowLimiter({ max: 5, windowMs: 60_000 })).current;
-
-  if (!DEMO_EMAIL || !DEMO_PASSWORD) return null;
-  const email = DEMO_EMAIL;
-  const password = DEMO_PASSWORD;
 
   async function signInAsDemo() {
     if (pending) return;
@@ -77,10 +91,6 @@ export function DemoAccess({ next }: { next?: string }) {
         <div className="flex justify-between gap-2">
           <dt>Email</dt>
           <dd className="truncate text-foreground">{email}</dd>
-        </div>
-        <div className="flex justify-between gap-2">
-          <dt>Password</dt>
-          <dd className="truncate text-foreground">{password}</dd>
         </div>
       </dl>
       <Button

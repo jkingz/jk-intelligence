@@ -220,8 +220,9 @@ the migration → route tests → the page.
 
 ## 8. Bootstrap: how an admin exists
 
-`scripts/create-demo-user.mjs` reads its email from `NEXT_PUBLIC_DEMO_EMAIL` today
-(`:11`), so `--admin` switches the source to `NEXT_PUBLIC_ADMIN_EMAIL` rather than inventing a
+`scripts/create-demo-user.mjs` reads its email from `DEMO_EMAIL` today
+(`:11`, private env since the 2026-09-24 Q4 fix), so `--admin` switches the source to `ADMIN_EMAIL`
+rather than inventing a
 positional argument. That keeps one env pair serving both purposes: the operator's bootstrap and §7's
 `@auth` fixture. `role` stays only in the `users` row, where `AGENTS.md` says it must live — not in a
 migration every environment replays, and not derived from an env var at session time.
