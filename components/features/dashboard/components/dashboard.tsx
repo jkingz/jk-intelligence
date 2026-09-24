@@ -85,7 +85,7 @@ function AnimatedPanel({
 
 function EmptyShell({ message }: { message: string }) {
   return (
-    <div className="flex min-h-svh w-full min-w-0 flex-1 flex-col font-sans antialiased bg-background text-foreground">
+    <div className="flex w-full min-w-0 flex-1 flex-col font-sans antialiased bg-background text-foreground">
       <main className="max-w-7xl w-full min-w-0 mx-auto px-4 sm:px-6 py-6 sm:py-8 flex-1">
         <Card>
           <CardContent className="py-12 text-center text-sm text-text-muted">{message}</CardContent>
@@ -210,7 +210,7 @@ export default function Dashboard({
     (pendingView.clientId !== selectedClient.id || pendingView.days !== days);
 
   return (
-    <div className="min-h-screen w-full min-w-0 flex flex-col font-sans antialiased bg-background text-foreground">
+    <div className="w-full min-w-0 flex flex-col flex-1 font-sans antialiased bg-background text-foreground">
       <DashboardHeader
         accountMenu={accountMenu}
         exportMenu={exportMenu}
