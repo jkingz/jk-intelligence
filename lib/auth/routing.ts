@@ -19,7 +19,7 @@ export type ProxyAction =
   | { type: "redirect-login"; next: string | undefined }
   | { type: "redirect-home" };
 
-const PROTECTED_PREFIXES = ["/dashboard", "/profile"];
+const PROTECTED_PREFIXES = ["/dashboard", "/connections", "/profile"];
 
 function isProtected(path: string): boolean {
   return PROTECTED_PREFIXES.some(

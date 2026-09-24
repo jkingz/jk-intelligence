@@ -18,7 +18,8 @@
 
 - `app/api` — route handlers: auth check, input validation, ownership gate, read/delegate.
 - `lib/agents` — `authAgent` only (identity + role). sync/transform/cache/insights agents are unbuilt spec.
-- `lib/auth` — `cron.ts` (timing-safe bearer check for cron/revalidate) and `routing.ts` (the `proxy.ts` decision table for `/dashboard` + `/profile`, and open-redirect-safe `next`). Both tested.
+- `lib/auth` — `cron.ts` (timing-safe bearer check for cron/revalidate) and `routing.ts` (the `proxy.ts` decision table for `/dashboard` + `/connections` + `/profile`, and open-redirect-safe `next`). Both tested.
+- `lib/navigation` — `destinations.ts`: the rail's `APP_DESTINATIONS` list and `activeDestination()`. Icons are string keys so the module stays importable from a node-tier test; the key → Lucide mapping lives with the rail component. Every href it lists is in `PROTECTED_PREFIXES`, asserted by `tests/platform/unit/destinations.test.ts`.
 - `lib/queue` — BullMQ queue definition (`seo-sync`) + worker entrypoint. Retry policy and circuit breaker are target-state, not code.
 - `lib/cache` — `invalidate.ts` owns the dashboard tag; `notify.ts` lets the worker ask the app to revalidate.
 - `lib/supabase` — client construction (per-request user client + service-role client).

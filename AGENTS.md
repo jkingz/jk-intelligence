@@ -146,7 +146,7 @@ business logic.
 | `export` | `/api/exports/[clientId]/{csv,pdf}`, `lib/exports/*`, the export menu |
 | `sync` | `/api/cron/sync`, `/api/revalidate/dashboard`, `lib/queue/*` |
 | `landing` | `/`, `/privacy`, `/terms`, `components/features/landing/*` |
-| `platform` | cross-cutting primitives with no owning feature — today that is `lib/rate-limit.ts` alone |
+| `platform` | cross-cutting primitives with no owning feature — `lib/rate-limit.ts`, `lib/navigation/destinations.ts` |
 
 A test goes in the feature that owns the *invariant the test protects*, not the file it imports.
 `lib/rate-limit.ts` has consumers in three features, so it belongs to none of them.
