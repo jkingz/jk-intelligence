@@ -183,7 +183,8 @@ colours, and note `--accent-primary-dim` is a red tint — it is the brand accen
 
 ## Layout Patterns
 
-- **Dashboard:** full-viewport, top navbar, left sidebar (collapsible), main content area.
+- **Dashboard:** full-viewport, top navbar, left sidebar, main content area. Authoritative shell
+  spec: `context/feature-specs/08-app-shell.md`.
 - **Sidebar:** `bg-surface border-r border-default`, client nav + metric categories.
 - **Admin panel:** *(not built — no `/admin` route and no admin-only API; target-state layout kept
   here so the eventual shell matches the dashboard.)*

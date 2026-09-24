@@ -185,7 +185,7 @@ const [gsc, ga4, semrush] = await Promise.allSettled([
   return 503; a thrown error in a handler becomes an HTML error page that the client `fetch` cannot
   parse.
 - The dashboard has no cached-data fallback yet: a failed boot shows `"Failed to load dashboard
-  data"` (`app/dashboard/dashboard-view.tsx`). Do not claim offline resilience until it exists.
+  data"` (`app/(app)/dashboard/dashboard-view.tsx`). Do not claim offline resilience until it exists.
 - Sync failures (when built) write `sync_logs` → mark `is_stale` → alert admin. Agents never throw
   to a client.
 - API errors logged with: clientId, source, timestamp, sanitized message. **No credentials, no

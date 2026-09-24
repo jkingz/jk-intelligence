@@ -15,7 +15,7 @@ We're adding the user profile feature: view account identity and sign out.
 - New folder per convention: `components/features/user-profile/`
   - `components/profile-card.tsx` (server-rendered info), `components/sign-out-button.tsx` ("use client")
   - barrel `index.ts` exports `ProfileCard`, `SignOutButton`, `getProfileView()`
-- New `app/profile/page.tsx` — thin: `getProfileView()` → render; unauthenticated handled by proxy
+- New `app/(app)/profile/page.tsx` — thin: `getProfileView()` → render; unauthenticated handled by proxy
 - Reuse Card/Button/Input tokens; dark theme; layout patterns from `ui-context.md`
 
 ## Implementation
