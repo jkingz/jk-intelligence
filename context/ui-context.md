@@ -183,9 +183,14 @@ colours, and note `--accent-primary-dim` is a red tint — it is the brand accen
 
 ## Layout Patterns
 
-- **Dashboard:** full-viewport, top navbar, left sidebar, main content area. Authoritative shell
+- **Dashboard:** full-viewport, left destination rail (persistent at `lg+`, a horizontal
+  strip below), page header inside the content column, main content area. Authoritative shell
   spec: `context/feature-specs/08-app-shell.md`.
-- **Sidebar:** `bg-surface border-r border-default`, client nav + metric categories.
+- **Sidebar (`AppNav`):** `bg-surface border-r border-default` at `lg+`, `w-60`, sticky at
+  full viewport height. Destinations come from `lib/navigation/destinations.ts`; the shell
+  reads no session so `/dashboard` stays prerendered. Below `lg` the same list renders as a
+  `relative overflow-x-auto` strip — the `relative` is what keeps `sr-only` descendants from
+  sizing the document. Not collapsible.
 - **Admin panel:** *(not built — no `/admin` route and no admin-only API; target-state layout kept
   here so the eventual shell matches the dashboard.)*
 - **Modals:** centered overlay, `rounded-3xl`, `bg-elevated`, backdrop blur.

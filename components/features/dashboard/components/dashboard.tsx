@@ -83,15 +83,9 @@ function AnimatedPanel({
   );
 }
 
-function EmptyShell({ accountMenu, message }: { accountMenu?: React.ReactNode; message: string }) {
+function EmptyShell({ message }: { message: string }) {
   return (
-    <div className="min-h-screen w-full min-w-0 flex flex-col font-sans antialiased bg-background text-foreground">
-      <header className="border-b border-default bg-surface">
-        <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-          <span className="font-serif text-base sm:text-lg tracking-tight font-medium">JK Intelligence</span>
-          {accountMenu}
-        </div>
-      </header>
+    <div className="flex min-h-svh w-full min-w-0 flex-1 flex-col font-sans antialiased bg-background text-foreground">
       <main className="max-w-7xl w-full min-w-0 mx-auto px-4 sm:px-6 py-6 sm:py-8 flex-1">
         <Card>
           <CardContent className="py-12 text-center text-sm text-text-muted">{message}</CardContent>
@@ -150,19 +144,13 @@ export default function Dashboard({
 
   if (!selectedClient) {
     return (
-      <EmptyShell
-        accountMenu={accountMenu}
-        message="No reporting client is assigned to your account yet."
-      />
+      <EmptyShell message="No reporting client is assigned to your account yet." />
     );
   }
 
   if (!overview) {
     return (
-      <EmptyShell
-        accountMenu={accountMenu}
-        message={`No metrics have been synced for ${selectedClient.name} yet.`}
-      />
+      <EmptyShell message={`No metrics have been synced for ${selectedClient.name} yet.`} />
     );
   }
 
