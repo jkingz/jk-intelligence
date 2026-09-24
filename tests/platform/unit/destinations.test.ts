@@ -20,10 +20,16 @@ describe("activeDestination", () => {
     expect(activeDestination("/dashboardx")).toBeNull();
   });
 
-  it("prefers the longest match so a nested destination wins", () => {
-    // Guards the day `/profile/session` is added as its own destination: the
-    // more specific href must claim it, not `/profile`.
-    expect(activeDestination("/dashboard")).toBe("/dashboard");
+  it("keeps the registry flat so no href can shadow another", () => {
+    // activeDestination's longest-href tie-break is unreachable while no two
+    // hrefs nest. If a nested destination is added, this fails: that is the
+    // moment the tie-break needs its own case.
+    const hrefs = APP_DESTINATIONS.map((d) => d.href);
+    for (const outer of hrefs) {
+      for (const inner of hrefs) {
+        expect(inner.startsWith(`${outer}/`)).toBe(false);
+      }
+    }
   });
 });
 
