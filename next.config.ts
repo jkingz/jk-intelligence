@@ -50,9 +50,9 @@ const nextConfig: NextConfig = {
   // relying on the implicit default.
   compress: true,
   // The PDF report embeds the vendored Unicode TTFs in `lib/exports/fonts` and
-  // reads them from disk at render time. Trace static-analysis cannot see a
-  // dynamic `readFile`, so the fonts are declared explicitly for serverless
-  // deployment bundles.
+  // reads them from disk at render time. `lib/exports/pdf.ts` keeps those
+  // `readFile` paths literal so tracing scopes to the font folder; the explicit
+  // include guarantees the binaries ship in the serverless bundle anyway.
   outputFileTracingIncludes: {
     "/api/exports/**": ["./lib/exports/fonts/*.ttf"],
   },

@@ -8,10 +8,12 @@ live Postgres** (integration tier, 2026-09-24); the **sync pipeline is the next 
 blocked on a worker-hosting decision (see Open Questions 2).
 
 ## Current Goal
-Nothing in flight. Last change made the landing page's claims match the build (2026-09-24 — copy and
-metadata only, see Recent Work); before that the Google/Apple buttons were muted until those providers
-are configured, and before that the cleanup pass: cache bounds aligned to 300s, demo creds moved
-server-side, `.env.example` written, and the first live-RLS integration slice.
+Nothing in flight. Last change removed the build's dynamic-`readFile` tracing warning and pinned the
+auth routes to the dark palette (2026-09-25 — see Recent Work); before that the landing page's claims
+were made to match the build (2026-09-24, copy and metadata only), and before that the Google/Apple
+buttons were muted until those providers are configured, and before that the cleanup pass: cache
+bounds aligned to 300s, demo creds moved server-side, `.env.example` written, and the first
+live-RLS integration slice.
 
 > Entries above this line are a log, not a status. `## Current Phase`, `## In Progress`,
 > `## Open Questions` and the *implemented surface* columns in `AGENTS.md` /
@@ -154,6 +156,32 @@ server-side, `.env.example` written, and the first live-RLS integration slice.
 - None (data export completed — see Recent Work).
 
 ## Recent Work
+
+- Build-warning + auth theme fix (2026-09-25) — two small, unrelated surface changes.
+  - `lib/exports/pdf.ts`: `readFile(FONT_PATHS.*)` made Next emit
+    `Dynamic filesystem access causes tracing of the whole project`, because the argument was a
+    variable it could not resolve. The two TTF paths are now literal and `process.cwd()`-anchored
+    at the call site (same runtime resolution as the old relative paths), and the
+    `outputFileTracingIncludes` comment in `next.config.ts` no longer claims static analysis is
+    blind here — the include stays as the deployment safety net. Verified: a clean `pnpm build`
+    prints no warning, and `.next/server/app/api/exports/[clientId]/pdf/route.js.nft.json` traces
+    113 files with both `NotoSans-*.ttf` present and zero `.ts/.tsx/.css` leakage; the live
+    `/api/exports/.../pdf` route still answers `200 application/pdf`.
+  - Auth pages are dark by default. `/auth/login`, `/auth/sign-up` and `/auth/forgot-password`
+    (and `/auth/reset-password`, same shell) carry no theme toggle, so a visitor whose stored
+    theme is `light` saw a light card floating between always-dark landing chrome. `AuthPageShell`
+    now sets `data-theme="dark"` on its wrapper, and the dark token block in `app/globals.css`
+    moved from `:root` to `:root, [data-theme="dark"]` so the declaration scopes to that subtree.
+    `text-foreground` is re-declared on the wrapper because `color` inherits as an already-resolved
+    value — without it `<footer>`/`<header>` text kept body's light `#171717` on a dark background.
+    Verified in a browser against `next start` with `prefers-color-scheme: light` and
+    `localStorage.theme = "light"`: `html[data-theme="light"]` + body `rgb(250,250,250)` while the
+    auth shell computes `rgb(13,13,13)` / text `rgb(250,250,250)` on all four routes, and
+    `/dashboard` (demo sign-in) still renders light — no regression for the toggle that does exist.
+    Guarded in-source by `tests/identity/unit/auth-dark-default.test.ts` (no DOM harness exists in
+    this repo, so the guard scans the shell and `globals.css` the way `demo-creds.test.ts` does).
+  - Gate: `pnpm test` 139 passed / 22 files, `pnpm typecheck`, `pnpm lint`, `pnpm build` (no
+    warnings), `pnpm test:e2e` 6 public specs passed. No server left on 3000/3100 by this session.
 
 - Landing copy made claim-safe (2026-09-24) — copy and metadata only; no layout, token or behavior
   change. The public page asserted three things the build cannot do, which mattered because the URL

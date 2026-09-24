@@ -9,16 +9,26 @@ export function AuthPageShell({
   children: ReactNode;
   chrome?: boolean;
 }) {
+  // No theme toggle exists on any auth route, so the subtree pins the dark tokens
+  // (see the `[data-theme="dark"]` block in globals.css) whatever <html> resolves to.
+  // `text-foreground` is re-declared here because `color` inherits as a resolved
+  // value: body's light text would otherwise leak into unstyled descendants.
   if (!chrome) {
     return (
-      <main className="flex min-h-svh w-full items-center justify-center bg-background px-4 py-10">
+      <main
+        data-theme="dark"
+        className="flex min-h-svh w-full items-center justify-center bg-background px-4 py-10 text-foreground"
+      >
         {children}
       </main>
     );
   }
 
   return (
-    <div className="flex min-h-svh flex-col items-center bg-background">
+    <div
+      data-theme="dark"
+      className="flex min-h-svh flex-col items-center bg-background text-foreground"
+    >
       <SiteHeader />
       <main className="flex w-full flex-1 items-center justify-center px-4 py-10">
         {children}

@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, rgb, type PDFFont } from "pdf-lib";
@@ -22,12 +23,6 @@ interface Fonts {
   bold: PDFFont;
 }
 
-/** Vendored Unicode TTFs (see `fonts/README.md`) — standard fonts are WinAnsi-only. */
-const FONT_PATHS = {
-  regular: "lib/exports/fonts/NotoSans-Regular.ttf",
-  bold: "lib/exports/fonts/NotoSans-Bold.ttf",
-};
-
 interface FontBytes {
   regular: Uint8Array;
   bold: Uint8Array;
@@ -35,11 +30,16 @@ interface FontBytes {
 
 let fontBytes: FontBytes | null = null;
 
+/**
+ * Vendored Unicode TTFs (see `fonts/README.md`) — standard fonts are WinAnsi-only.
+ * Literal, cwd-anchored paths: a dynamic `readFile` argument makes Next trace the
+ * whole project into the serverless bundle.
+ */
 async function loadFontBytes(): Promise<FontBytes> {
   if (!fontBytes) {
     const [regular, bold] = await Promise.all([
-      readFile(FONT_PATHS.regular),
-      readFile(FONT_PATHS.bold),
+      readFile(join(process.cwd(), "lib", "exports", "fonts", "NotoSans-Regular.ttf")),
+      readFile(join(process.cwd(), "lib", "exports", "fonts", "NotoSans-Bold.ttf")),
     ]);
     fontBytes = { regular, bold };
   }
