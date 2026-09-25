@@ -1658,7 +1658,7 @@ Add to the head status block that `api_credentials` is now read by the app, so t
 
 - [ ] **Step 3: `context/architecture-context.md`**
 
-Add `/connections` to the HTTP surface as its only server-rendered, cookie-scoped read, and record the no-cache rule where invariant 4-5 lives, so the next reader knows it was applied deliberately rather than forgotten. In Persistence Schema, change the `api_credentials` line from "never read" to the column list the app reads.
+Add `/connections` to the HTTP surface as its only server-rendered read of tenant rows (`/profile` is cookie-scoped too but reads only the caller's own `users` row), and record the no-cache rule where invariant 4-5 lives, so the next reader knows it was applied deliberately rather than forgotten. In Persistence Schema, change the `api_credentials` line from "never read" to the column list the app reads.
 
 - [ ] **Step 4: `context/progress-tracker.md`**
 

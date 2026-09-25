@@ -86,7 +86,7 @@ Cache-bound invariant (both metrics routes, 200 path only): `s-maxage` == client
 - `GET /api/exports/{clientId}/pdf` — `application/pdf` attachment, same filename scheme with `-report-`. 503 JSON when `renderPdfReport()` throws — never a 200 with an empty body.
 - `POST /api/revalidate/dashboard` — `revalidateTag(DASHBOARD_OVERVIEW_TAG)`, guarded by `Authorization: Bearer <CRON_SECRET>`. `revalidateTag` throws outside a request context, which is why the standalone worker POSTs here (`lib/cache/notify.ts`) instead of calling it.
 - `GET /api/cron/sync` — Vercel cron (`vercel.json`, `GET`, bearer `CRON_SECRET`): iterates `listActiveClients()` and queues one BullMQ job per client with `Promise.allSettled`; returns `{ queued, errors }`. Jobs are consumed by `lib/queue/worker.ts`, which currently returns `mock_completed` without touching the sources.
-- `GET /connections` — a **page**, not a route handler, and the app's only server-rendered data read: the page awaits `listConnections()` (clients, then `api_credentials`) as the signed-in user, so RLS decides the row set. Nothing cached; the segment declares `dynamic = "force-dynamic"` for the reason recorded under Invariants.
+- `GET /connections` — a **page**, not a route handler, and the app's only server-rendered read of *tenant* rows (`/profile` reads only the caller's own `users` row; every metric read goes through `/api/*`): the page awaits `listConnections()` (clients, then `api_credentials`) as the signed-in user, so RLS decides the row set. Nothing cached; the segment declares `dynamic = "force-dynamic"` for the reason recorded under Invariants.
 
 ## HTTP API — planned, not built
 
@@ -128,7 +128,7 @@ No `syncAgent`, `transformAgent`, `cacheAgent`, or `insightsAgent` exists; `lib/
 
 **How invariants 4-5 apply to `/connections` (applied deliberately, not forgotten).** `listConnections()`
 is never wrapped in `unstable_cache`, and `app/(app)/connections/page.tsx` declares
-`export const dynamic = "force-dynamic"` — the app's only server-rendered data read, so it opts out of
+`export const dynamic = "force-dynamic"` — the app's only server-rendered tenant read, so it opts out of
 the data cache entirely rather than keying a cookie-bound client on nothing. The `force-dynamic` line
 is load-bearing: the cookie read happens inside `databaseOperation()`, whose catch-all converts Next's
 prerender bailout into `Error("Database operation failed")`, so removing it fails `pnpm build`. The

@@ -165,7 +165,7 @@ business logic.
 | --- | --- |
 | `identity` | `lib/agents/authAgent`, `lib/auth/{cron,routing}`, `lib/supabase/*`, `proxy.ts`, the `/auth/*` pages, `components/features/{user-profile,email-password-auth}/lib` |
 | `tenant-isolation` | `canAccessClient` / `listAccessibleClients`, `listConnections` + `lib/connections/status`, and the RLS policies behind all three |
-| `dashboard` | `/api/dashboard/boot`, both `/api/metrics/*` routes, `lib/dashboard/*`, `lib/cache/*` tag ownership, `/dashboard` and the `app/(app)/` shell + rail it renders (`tests/dashboard/e2e/rail.spec.ts`) |
+| `dashboard` | `/api/dashboard/boot`, both `/api/metrics/*` routes, `lib/dashboard/*`, `lib/cache/*` tag ownership, `/dashboard` and the `app/(app)/` shell + rail it shares (`tests/dashboard/e2e/rail.spec.ts`) |
 | `export` | `/api/exports/[clientId]/{csv,pdf}`, `lib/exports/*`, the export menu |
 | `sync` | `/api/cron/sync`, `/api/revalidate/dashboard`, `lib/queue/*` |
 | `landing` | `/`, `/privacy`, `/terms`, `components/features/landing/*` |

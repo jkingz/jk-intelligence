@@ -13,7 +13,7 @@ Deployed at `jk-intelligence.vercel.app`. Screenshot: dark theme, one client ("A
 
 Not live yet, do not demo them as working:
 
-- **Sync.** No consumer runs the queue — `lib/queue/worker.ts` returns `mock_completed`, and Trigger Sync only animates its own state. All rows come from `pnpm db:seed`.
+- **Sync.** No consumer runs the queue — `lib/queue/worker.ts` returns `mock_completed`, and Trigger Sync only animates its own state. All metric rows come from `pnpm db:seed`; the `api_credentials` rows `/connections` renders come from `pnpm db:seed-connections` — both placeholders.
 - **Stale banner / sync pill.** Reads the stored `is_stale` column; nothing writes it, so it cannot fire outside seed data.
 - **AI citations.** `aiCitations` is a hardcoded `[]`, so the card and grid always render their empty state. No LLM dependency exists.
 

@@ -29,8 +29,9 @@ and navigation instead of each re-declaring a header.
 - Two nav landmarks share the name "Sections" (rail + strip). They are `lg:hidden` /
   `hidden lg:flex`, so exactly one is in the accessibility tree at any width; e2e takes
   `.first()` rather than asserting one exists.
-- Below `lg` the brand mark is not repeated in the strip; the footer and the login redirect
-  carry it.
+- Below `lg` the brand mark is not repeated in the strip: `/dashboard`'s footer carries it at every
+  width, the login card carries it after a guard redirect, and `/connections` and `/profile` show no
+  brand at all below `lg`.
 
 ## Verification
 `pnpm build` route table (`/dashboard` `○`), `tests/platform/unit/destinations.test.ts`,

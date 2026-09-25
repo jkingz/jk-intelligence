@@ -316,7 +316,7 @@ Purpose: View sync history and failure reasons.
 
 ## Build sequence (original POC plan)
 
-Kept as the dependency order for the unbuilt parts. Marked against the code as of 2026-09-23 — re-verify before trusting a line.
+Kept as the dependency order for the unbuilt parts. Marked against the code as of 2026-09-23, steps 1 and 3 re-marked 2026-09-25 — re-verify before trusting a line.
 
 1. ✅ DB schema + migrations — four files under `supabase/migrations/`.
 2. ✅ Supabase Auth + Google OAuth + email/password + RLS policies.

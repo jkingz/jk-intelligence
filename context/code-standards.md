@@ -146,8 +146,10 @@ cookie store; routes needing identity + role in one round trip use `getAuthSessi
 - metrics_snapshots is append-only — never update or delete historical rows. `keyword_rankings`
   cascades from it, so a delete silently destroys keyword history too.
 - current_metrics is the only mutable cache layer — one row per `(client_id, source)`.
-- `api_credentials` holds a `vault:<uuid>` **reference**, never key material, and RLS denies direct
-  select. Nothing in `.env`, logs, or responses may carry a provider key.
+- `api_credentials` holds a `vault:<uuid>` **reference**, never key material.
+  `api_credentials_select_tenant_or_admin` lets a tenant (or an admin) select its own rows, and no
+  code path selects `credential_reference`. Nothing in `.env`, logs, or responses may carry a
+  provider key.
 - Never expose the service-role key to client components or `NEXT_PUBLIC_*` vars. It is read only
   in `lib/db/admin.ts`, which is `server-only`.
 - RLS enabled on every table — policies must match the role model (admin/client/staff), with
