@@ -48,9 +48,9 @@ scripts". The interesting part is bigger than a missing folder:
 | Excluded | Why |
 | --- | --- |
 | Sync logs / run history | `sync_logs` has no production writer; the worker-hosting decision (steps 4–8) is still open. UI over a column nothing writes. |
-| `api_credentials` management | Nothing in the app reads the table, `credential_reference` is never produced by any code, and its select policy is `using (false)`. |
+| `api_credentials` management | *(corrected 2026-09-25: reversed by the app-shell/connections branch)* The app reads the table now — `/connections` selects `client_id,source,created_at` as the signed-in user, and `api_credentials_select_tenant_or_admin` grants that select to a tenant or an admin, so the old `using (false)` is gone. What still keeps management out of the panel: no code path selects `credential_reference`, and no insert/update/delete policy exists for any role but `service_role`. |
 | Invitations, join codes | Declined during scoping: no email transport, no token lifecycle, no new tables. |
-| Left navigation rail | Still deferred — non-admin destinations stay at five. |
+| Left navigation rail | *(corrected 2026-09-25: built, no longer deferred)* `app/(app)/layout.tsx` renders the rail from `lib/navigation/destinations.ts`, which lists three destinations — Dashboard, Connections, Profile. The admin panel's row would be the fourth, arriving with its role filter (`context/feature-specs/08-app-shell.md` → Non-goals). |
 | Hard `DELETE` on a client | `api_credentials.client_id … on delete cascade` and `users.client_id … on delete set null`: deleting a client silently destroys its credentials and un-homes its members. Deactivate instead. |
 
 ## 3. The write path: five definer functions, zero new table grants

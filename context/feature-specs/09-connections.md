@@ -41,7 +41,8 @@ cannot be connected yet and why.
   expiry, so "Linked" means linked, not working.
 
 ## Empty and error states
-- No visible client: one card, "No reporting client is assigned to your account yet."
+- No visible client: two cards, not one — the empty-client card, "No reporting client is assigned to your
+  account yet.", and the "Not available yet" card, which renders unconditionally.
 - Client with no credentials: every row "Not connected".
 - Database unreachable: the read throws "Database operation failed"; the page is a server
   component with no try/catch, so Next's error boundary renders it. Deliberate: inventing a

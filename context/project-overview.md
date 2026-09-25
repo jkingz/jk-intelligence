@@ -3,8 +3,11 @@
 > **This file is the product spec — what the product is meant to do, not what the code does.**
 > Built today: Supabase Auth (Google + email/password) with RLS-backed tenant isolation; a
 > multi-client dashboard (metric cards, trends, keyword rank chart, query table, date ranges) that
-> boots from one `GET /api/dashboard/boot`; CSV/PDF export behind a sliding-window quota.
-> Not built: real sync (worker returns `mock_completed`, data comes from `scripts/seed.mjs`), the
+> boots from one `GET /api/dashboard/boot`; CSV/PDF export behind a sliding-window quota; a read-only
+> `/connections` status page; and the `app/(app)/` shell whose destination rail lists Dashboard,
+> Connections and Profile.
+> Not built: real sync (worker returns `mock_completed`, dashboard data comes from `scripts/seed.mjs`
+> and the `api_credentials` rows `/connections` renders come from `scripts/seed-connections.mjs`), the
 > admin panel, and any LLM integration — there is no `@anthropic-ai/sdk`, `ANTHROPIC_API_KEY`, or
 > Claude call anywhere in the repo. The "AI" surfaces are presentation only:
 > `autonomous-brief.tsx` phrases numbers it is handed, and `lib/dashboard/overview.ts` hardcodes

@@ -9,7 +9,9 @@ export interface SourceConnection {
 
 export interface ClientConnections {
   client: DashboardClient;
-  /** Sources with a credential row, in SOURCES order. Absent means not connected. */
+  /** Sources with a credential row, in `SOURCES` order because `buildConnectionStates()`
+   *  derives the array by filtering that tuple (`lib/connections/status.ts`) — the read's
+   *  own arrival order carries no meaning and nothing sorts it. Absent means not connected. */
   sources: SourceConnection[];
 }
 

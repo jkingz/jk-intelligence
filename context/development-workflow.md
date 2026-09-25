@@ -79,6 +79,7 @@ Unbuilt design lives in `docs/target-state.md`; treat it as requirements, never 
 | Build | `pnpm build` |
 | Migrations | `pnpm db:migrate` |
 | Seed demo data | `pnpm db:seed` |
+| Seed connection placeholders | `pnpm db:seed-connections` — placeholder-only `api_credentials` rows (`vault:` reference, never a key), idempotent via `on conflict (client_id, source) do nothing`; needs the same `SUPABASE_DB_URL` redirection as `db:seed` |
 | Demo user | `pnpm db:demo-user` |
 | Queue worker | `pnpm worker` (manual only — no production host yet) |
 
