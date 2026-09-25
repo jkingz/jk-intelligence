@@ -38,6 +38,11 @@ await client.connect();
 
 try {
   if (reset) {
+    // Safe because the delete is keyed on `credential_reference`, not the table: it can
+    // only match rows carrying PLACEHOLDER_REF. The integration fixture's
+    // FAKE_VAULT_REFERENCE (tests/fixtures/identity-users.ts, the …00ff uuid) and a real
+    // Vault reference are different strings, so neither is ever in range. The two
+    // literals stay deliberately independent across the app/test boundary.
     const { rowCount } = await client.query(
       "delete from public.api_credentials where credential_reference = $1",
       [PLACEHOLDER_REF],

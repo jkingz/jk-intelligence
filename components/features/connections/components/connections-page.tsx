@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  STATUS_UPCOMING,
   SUPPORTED_SOURCES,
   UPCOMING_PROVIDERS,
   connectionStatusLabel,
@@ -64,7 +65,7 @@ export function ConnectionsPage({ connections }: { connections: ClientConnection
                 key={provider.id}
                 label={provider.label}
                 detail={provider.reason}
-                status="Coming soon"
+                status={STATUS_UPCOMING}
                 showConnectButton={false}
               />
             ))}

@@ -53,8 +53,14 @@ export const UPCOMING_PROVIDERS: readonly UpcomingProvider[] = [
 
 const linkedDate = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
 
+/** The two non-date statuses, owned here because `connection-row.tsx` derives its
+ *  badge variant by comparing the rendered string against them. Renaming a literal
+ *  anywhere else would silently restyle every row. */
+export const STATUS_UNLINKED = "Not connected";
+export const STATUS_UPCOMING = "Coming soon";
+
 export function connectionStatusLabel(linkedAt: string | null): string {
   return linkedAt === null
-    ? "Not connected"
+    ? STATUS_UNLINKED
     : `Linked ${linkedDate.format(new Date(linkedAt))}`;
 }

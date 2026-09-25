@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { STATUS_UNLINKED, STATUS_UPCOMING } from "../lib/catalog";
 
 export function ConnectionRow({
   label,
@@ -12,7 +13,7 @@ export function ConnectionRow({
   status: string;
   showConnectButton?: boolean;
 }) {
-  const linked = status !== "Not connected" && status !== "Coming soon";
+  const linked = status !== STATUS_UNLINKED && status !== STATUS_UPCOMING;
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex min-w-0 flex-col">

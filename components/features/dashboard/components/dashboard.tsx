@@ -91,6 +91,17 @@ function EmptyShell({ message }: { message: string }) {
           <CardContent className="py-12 text-center text-sm text-text-muted">{message}</CardContent>
         </Card>
       </main>
+      {/* Brand-only footer: the rail shows the brand at lg+ only, so this is the one
+          brand on screen below lg in these states (08-app-shell.md, ui-context.md). The
+          loaded footer's three `overview.*` spans have no data here, so they stay out. */}
+      <footer className="border-t border-default bg-surface py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between text-xs text-text-muted gap-4">
+          <div className="flex items-center gap-2">
+            <span className="font-serif font-medium text-text-primary">JK Intelligence</span>
+            <span>— Agency SEO & AI Visibility System</span>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
