@@ -3,17 +3,17 @@
 Update this file after every meaningful implementation change.
 
 ## Current Phase
-Hardening the built surface: read paths and tenant isolation are done **and now proven against a
-live Postgres** (integration tier, 2026-09-24); the **sync pipeline is the next unit** and is
-blocked on a worker-hosting decision (see Open Questions 2).
+Hardening the built surface: read paths and tenant isolation are done **and proven against a live
+Postgres for both gated tables** (integration tier, 9 tests, 2026-09-25); `api_credentials` is now
+*read* (status only, at `/connections`); the **sync pipeline is the next unit** and is blocked on a
+worker-hosting decision (see Open Questions 2).
 
 ## Current Goal
-Nothing in flight. Last change removed the build's dynamic-`readFile` tracing warning and pinned the
-auth routes to the dark palette (2026-09-25 — see Recent Work); before that the landing page's claims
-were made to match the build (2026-09-24, copy and metadata only), and before that the Google/Apple
-buttons were muted until those providers are configured, and before that the cleanup pass: cache
-bounds aligned to 300s, demo creds moved server-side, `.env.example` written, and the first
-live-RLS integration slice.
+Nothing in flight. Last change gave every authenticated page one shell (`app/(app)/` + a destination
+rail) and added the read-only `/connections` status page (2026-09-25 — see Completed); before that
+the build's dynamic-`readFile` tracing warning went away and the auth routes were pinned to the dark
+palette (2026-09-25 — see Recent Work), and before that the landing page's claims were made to match
+the build and the first live-RLS integration slice landed (2026-09-24).
 
 > Entries above this line are a log, not a status. `## Current Phase`, `## In Progress`,
 > `## Open Questions` and the *implemented surface* columns in `AGENTS.md` /
@@ -152,8 +152,19 @@ live-RLS integration slice.
 
 - Light-theme contrast fix (Lighthouse): the light palette failed WCAG AA — `text-faint` 2.70, `state-warning` 2.45, `state-success` 3.17, `state-error` 3.91, fire-red accent on its dim chip 3.67 (all vs `#fafafa`). Rewrote the `[data-theme="light"]` block in `globals.css` while keeping the charcoal + fire-red identity: text `#171717`/`#3d3d3d`/`#5c5c5c`/`#616161`, accent deepened to `#b91c1c` (hover `#991b1b`, dim 10%, now 6.20 plain / 4.92 on chip / 6.47 white-on-accent), success `#35701a`, error `#b3261e`, warning `#7d5800`, neutral `#5c5c5c`; borders `#dcdcdc`/`#c8c8c8`. All text roles now ≥4.5:1 on base, surface, and subtle. `ui-context.md` light table updated. Known gap: dark `--color-primary-foreground: #ffffff` on `#ff3b30` is 3.55:1 (primary buttons) — not addressed. Verified: lint clean.
 
+- App shell + read-only `/connections` (2026-09-25) — specs: `context/feature-specs/08-app-shell.md`, `context/feature-specs/09-connections.md`. Every existing API route and the whole dashboard read path are untouched.
+  - **Route group.** `app/dashboard` and `app/profile` moved to `app/(app)/dashboard` and `app/(app)/profile`; a route group adds no URL segment, so both paths are unchanged. `app/(app)/layout.tsx` renders `AppShell` (`components/features/app-shell`), a **server** component reading no session, no cookies, no data — a session read there would make `/dashboard` dynamic again, which is the 4–5s switch the client-side boot fetch exists to prevent.
+  - **Destination registry.** `lib/navigation/destinations.ts` is the only rail list. `tests/platform/unit/destinations.test.ts` asserts every href it renders appears in `PROTECTED_PREFIXES` (`lib/auth/routing.ts`, extended in `tests/identity/unit/routing.test.ts`), so a destination cannot be advertised before it is guarded. No role filter — with no `/admin` route there is nothing to hide, and the admin panel adds its row and the filter together.
+  - **The rail.** Sticky `w-60` column at `lg+`, `relative overflow-x-auto` strip below (`relative` is what stops `sr-only` descendants sizing the document). It owns the brand mark at `lg+`, so `DashboardHeader` lost its wordmark and logo. `tests/dashboard/e2e/rail.spec.ts` (`@auth`) covers active-row marking and 0 page overflow at 320/390/414.
+  - **Policy swap.** `supabase/migrations/20260925000000_connections_read.sql` drops `api_credentials_no_direct_access`, creates `api_credentials_select_tenant_or_admin` — the same `private.current_user_role()` / `current_user_client_id()` predicate as `clients` — and grants select. Applied to the **local** stack only; see Open Questions.
+  - **The read.** `listConnections()` (`lib/db/repository.ts:327-343`) chains the cookie-bound client over `clients` then `api_credentials`, selecting `client_id,source,created_at`: no `unstable_cache`, no `.order()`, no paging, no ownership rule of its own. `lib/connections/status.ts` (`buildConnectionStates()`, 26 lines) is the pure join of visible clients to visible rows.
+  - **The page.** `app/(app)/connections/page.tsx` awaits that read — the app's only server-rendered data read — and declares `dynamic = "force-dynamic"`, load-bearing rather than decorative: the cookie read happens inside `databaseOperation()`, whose catch-all turns Next's prerender bailout into `Error("Database operation failed")`. Connect controls render `disabled` with their reason in `title`; the two display-only providers get no control at all. `tests/identity/e2e/connections-guard.spec.ts` covers the anonymous redirect.
+  - **Seed.** `scripts/seed-connections.mjs` (`pnpm db:seed-connections`) writes placeholder `api_credentials` rows for the three demo clients.
+  - Verified: `pnpm test` → `Test Files 26 passed (26)` / `Tests 159 passed (159)` · `pnpm typecheck` → route types generated, `tsc --noEmit` silent · `pnpm lint` → no output · `pnpm build` → `○ /dashboard`, `ƒ /connections`, no warnings · `pnpm test:all` → `Test Files 28 passed (28)` / `Tests 168 passed (168)` · `pnpm test:e2e` → `7 passed` · `pnpm test:e2e:auth` → `16 passed`. The integration tier is now two files and both ran bare against the local stack (`pnpm test:integration` → `Test Files  2 passed (2)` / `Tests  9 passed (9)`): `tests/tenant-isolation/integration/rls-gate.test.ts` (`clients`, 5) and `tests/tenant-isolation/integration/credentials-visibility.test.ts` (`api_credentials`, 4).
+  - **What the demo cards prove, and don't.** Local data now covers 3 demo clients, 4 placeholder `api_credentials` rows and 2 fixture rows, but **no local `users` row is linked to the three demo clients** (`scripts/create-demo-user.mjs:39-42` binds one client-role user to one client), so `/connections` shows the demo cards only for an **admin** session; a client-role user sees only its own `rls-test` tenant.
+
 ## In Progress
-- None (data export completed — see Recent Work).
+- None (the app shell + `/connections` closed 2026-09-25 — see Completed).
 
 ## Recent Work
 
@@ -469,7 +480,7 @@ live-RLS integration slice.
 ## Open Questions
 
 - Audit findings still open (from the 2026-09-23 architecture review, in fix order):
-  1. **Sync pipeline is not implemented.** `lib/queue/worker.ts` returns `status: "mock_completed"`; `lib/agents/` holds only `authAgent`. `persistMetrics`, `markMetricsStale` and `writeSyncLog` in `lib/db/repository.ts` have zero non-test callers, and `api_credentials` is never read — all dashboard data comes from `scripts/seed.mjs`. ~~`AGENTS.md` documents the agents as if built.~~ **Docs fixed 2026-09-23:** unbuilt design now lives in `docs/target-state.md` and `AGENTS.md`/`architecture-context.md` describe only implemented code. The code itself is unchanged and still needs a real `syncAgent`.
+  1. **Sync pipeline is not implemented.** `lib/queue/worker.ts` returns `status: "mock_completed"`; `lib/agents/` holds only `authAgent`. `persistMetrics`, `markMetricsStale` and `writeSyncLog` in `lib/db/repository.ts` have zero non-test callers, and ~~`api_credentials` is never read~~ — **read since 2026-09-25, status only**: `listConnections()` feeds `/connections`. All dashboard data still comes from `scripts/seed.mjs`. ~~`AGENTS.md` documents the agents as if built.~~ **Docs fixed 2026-09-23:** unbuilt design now lives in `docs/target-state.md` and `AGENTS.md`/`architecture-context.md` describe only implemented code. The code itself is unchanged and still needs a real `syncAgent`. **Appended 2026-09-25:** `/connections` renders credential *status*; it fetches nothing, and item 2's worker-hosting decision still gates every fetch. The Connect button is deliberately inert until that closes — a credential stored today would be a live token with no reader.
   2. **No host for the BullMQ worker.** Vercel has only the cron, so jobs enqueue with no consumer. Needs a decision: always-on worker (Fly/Render), cron calls sync inline, or QStash.
   3. ~~**Tenant isolation is one layer.**~~ **Fixed 2026-09-23 (step 2).** The tenant gate (`listAccessibleClients`, new `canAccessClient`) now reads `clients` through `createServerSupabaseClient()`, so Postgres RLS decides visibility. Metric reads stay on `getAdminDb()` by design (see Recent Work) — reachable only with a `client_id` that already passed the gate.
   4. ~~**`NEXT_PUBLIC_DEMO_PASSWORD` ships in the client bundle** — move to a server-only credential minted through an endpoint.~~ **Fixed 2026-09-24** via the server-props treatment instead of an endpoint: private `DEMO_EMAIL`/`DEMO_PASSWORD` read in the login/sign-up server pages and prop-fed to `DemoAccess`; guarded by `tests/identity/unit/demo-creds.test.ts`. See Recent Work.
@@ -489,11 +500,21 @@ live-RLS integration slice.
   exercised against a real local Postgres (Docker + `supabase start`), not a faked PostgREST. The
   anon path throws (grant revoked → fail-closed 503) rather than returning `[]`.
 - **The `integration` tier is live.** `tests/<feature>/integration/` is wired in the Vitest
-  workspace; the first slice (tenant isolation, 5 tests) runs green against the local stack.
+  workspace; tenant isolation is now **9 tests across 2 files** — `rls-gate.test.ts` (5, `clients`)
+  and `credentials-visibility.test.ts` (4, `api_credentials`) — green against the local stack.
   Needs `pnpm exec supabase start` and a `.env.test` with `TEST_SUPABASE_URL` /
   `TEST_SUPABASE_PUBLISHABLE_KEY` / `TEST_SUPABASE_SERVICE_ROLE_KEY` /
-  `TEST_DEMO_PASSWORD` (see `AGENTS.md` → Verification, `tests/fixtures/README.md`). Without
-  those, the suite `skipIf`s — so CI stays effectively unit+e2e until a hosted test DB exists.
+  `TEST_DEMO_PASSWORD` (see `AGENTS.md` → Verification, `tests/fixtures/README.md`). Measured
+  2026-09-25: `.env.test` as it stands runs `9 passed` bare, no keys supplied inline. Note the skip
+  gate is `TEST_SUPABASE_URL` **alone** (`tests/helpers/db.ts`), so a URL that is live while the
+  keys are stale makes the tier *fail* rather than skip — read the counts, not the exit code. With
+  no `TEST_*` names at all it skips, so CI stays effectively unit+e2e until a hosted test DB exists.
+- **`20260925000000_connections_read.sql` is applied to the local stack only.** The hosted project
+  still has 3 migrations and the closed `api_credentials_no_direct_access` policy, so
+  `/connections` does not serve a signed-in user there. Applying it is a follow-up that needs the
+  human partner's go-ahead — no `db:*` script ran against hosted in this change. Neither e2e tier
+  notices: `tests/identity/e2e/connections-guard.spec.ts` asserts the anonymous redirect before any
+  read, and `tests/dashboard/e2e/rail.spec.ts` never navigates to the page.
 - Profile display name: **decided 2026-09-24 — no `users` column needed.** Name editing already
   persists to `user_metadata.name` via Supabase Auth, which the profile reads; a public-schema
   mirror column would duplicate the auth store for no gain.

@@ -40,6 +40,7 @@ proxy.ts (session refresh via updateSession)
     → lib/agents/authAgent      — identity + role
     → lib/db/repository         — RLS-backed tenant gate, then metric reads
   → components/features/*       — dashboard reads /api/dashboard/boot client-side
+  → app/(app)/connections/page.tsx — server render; awaits listConnections() directly, no API hop
 ```
 
 ## Agents (`lib/agents/`)
@@ -56,6 +57,8 @@ proxy.ts (session refresh via updateSession)
 - `canAccessClient(clientId)` and `listAccessibleClients()` in `lib/db/repository.ts` read the
   `clients` table through the per-request Supabase client (`createServerSupabaseClient()`:
   publishable key + session cookie), so Postgres decides visibility. Both fail closed.
+- `listConnections()` composes those two reads for `/connections` (`clients`, then
+  `api_credentials`) and adds no ownership rule of its own.
 - No route or helper may re-implement "is this the caller's client?" in TypeScript.
 - Metric/keyword reads deliberately use the service-role client (`getAdminDb()`, RLS bypassed)
   because they run inside `unstable_cache`; they are reachable only with a `client_id` that already
@@ -74,12 +77,19 @@ export async function canAccessClient(clientId: string): Promise<boolean> {
 ```
 
 Policies: `supabase/migrations/20260917000000_seo_poc.sql`,
-`20260920000000_add_staff_role.sql`, `20260920000001_rls_hardening.sql`. `api_credentials` has a
-`using (false)` select policy and is never read by the app today.
+`20260920000000_add_staff_role.sql`, `20260920000001_rls_hardening.sql`,
+`20260925000000_connections_read.sql`. `api_credentials` is readable through
+`api_credentials_select_tenant_or_admin`, which applies the same two `security definer` helpers as
+`clients`; the app reads `client_id`, `source` and `created_at` only, and never
+`credential_reference`. That last migration exists on the local stack only — the hosted project
+still carries `api_credentials_no_direct_access`, so `/connections` does not serve a signed-in user
+there until it is applied (`context/progress-tracker.md` → Open Questions).
 
 These policies have been exercised against a live Postgres (local `supabase start` stack) by
-`tests/tenant-isolation/integration/rls-gate.test.ts` — client/staff/admin/anon visibility all proven
-at the database, not only through a faked PostgREST.
+`tests/tenant-isolation/integration/rls-gate.test.ts` and
+`tests/tenant-isolation/integration/credentials-visibility.test.ts` — client/staff/admin/anon
+visibility for `clients` and for `api_credentials`, proven at the database and not only through a
+faked PostgREST.
 
 ## HTTP surface (what actually exists)
 
@@ -90,6 +100,7 @@ at the database, not only through a faked PostgREST.
 | `/api/metrics/[clientId]/keywords` | GET | session + gate | `?source=gsc\|ga4\|semrush`, rank history |
 | `/api/exports/[clientId]/csv` | GET | session + gate | streams via `lib/exports/server.ts` |
 | `/api/exports/[clientId]/pdf` | GET | session + gate | pdf-lib + vendored Noto Sans TTFs |
+| `/connections` (page) | GET | session + RLS | server page; reads `api_credentials` per tenant, no cache |
 | `/api/revalidate/dashboard` | POST | `CRON_SECRET` bearer | the only path that revalidates `DASHBOARD_OVERVIEW_TAG` |
 | `/api/cron/sync` | GET | `CRON_SECRET` bearer | enqueues one job per active client; Vercel cron `0 2 * * *` |
 
@@ -105,18 +116,28 @@ Planned and absent: `POST /api/sync/trigger`, `GET /api/metrics/{clientId}`,
   (always-on process, inline-in-cron, or QStash) is an open decision — see
   `context/progress-tracker.md`.
 - `persistMetrics`, `markMetricsStale` and `writeSyncLog` in `lib/db/repository.ts` exist but have
-  zero callers. All dashboard rows today come from `scripts/seed.mjs`.
+  zero callers. All dashboard rows today come from `scripts/seed.mjs`, and the placeholder
+  `api_credentials` rows `/connections` renders come from `scripts/seed-connections.mjs`.
 
 ## Pages and caching
 
-`app/` routes: `/` (landing), `/dashboard`, `/profile`, `/auth/{login,sign-up,forgot-password,
-reset-password}`, `/privacy`, `/terms`, plus `app/auth/callback/route.ts` (PKCE exchange).
-There is **no** admin panel page, no `sitemap.ts`/`robots.ts`, and no LLM/Claude dependency.
+`app/` routes: `/` (landing), `/auth/{login,sign-up,forgot-password,reset-password}`, `/privacy`,
+`/terms`, plus `app/auth/callback/route.ts` (PKCE exchange). `/dashboard`, `/profile` and
+`/connections` live in the `app/(app)/` route group — the group folder adds no URL segment — under
+one server-component shell (`app/(app)/layout.tsx` → `components/features/app-shell`) whose rail
+renders its links from `lib/navigation/destinations.ts`; the shell reads no session, so it cannot
+make a page dynamic. There is **no** admin panel page, no `sitemap.ts`/`robots.ts`, and no
+LLM/Claude dependency.
 
 `lib/cache/invalidate.ts` owns `DASHBOARD_OVERVIEW_TAG = "dashboard-overview"`; revalidation happens
 only through `POST /api/revalidate/dashboard` (`revalidateTag(tag, profile)`), never from the worker.
-`/dashboard` stays a prerendered static shell. `is_stale` is a stored column the UI only reads —
-`markMetricsStale()` exists but nothing calls it, so the stale banner can never fire yet.
+`/dashboard` stays a prerendered static shell (`○`). `/connections` is dynamic (`ƒ`) and declares
+`export const dynamic = "force-dynamic"`, which is load-bearing rather than decorative: the page
+awaits the cookie-bound read, and `databaseOperation()`'s catch-all converts Next's prerender bailout
+into `Error("Database operation failed")`, so without the declaration `pnpm build` fails. The
+underlying defect in the shared `lib/db` error wrapper stays open deliberately, for a later change.
+`is_stale` is a stored column the UI only reads — `markMetricsStale()` exists but nothing calls it,
+so the stale banner can never fire yet.
 
 ## Verification
 
@@ -126,9 +147,11 @@ pnpm test:all                                            # + integration tier �
 pnpm test:e2e                                            # public Playwright specs
 ```
 
-The integration tier (`tests/tenant-isolation/integration/rls-gate.test.ts`) is the only evidence
-that the RLS policies actually decide visibility; it skips (with a warning, not a fake pass) when
-`.env.test` has no `TEST_*` names. `supabase/config.toml` keeps `[db.migrations].enabled = false` —
+The integration tier — `tests/tenant-isolation/integration/rls-gate.test.ts` (`clients`) and
+`credentials-visibility.test.ts` (`api_credentials`) — is the only evidence that the RLS policies
+actually decide visibility; both `skipIf` on `TEST_SUPABASE_URL`, so the tier skips with a warning
+rather than faking a pass when `.env.test` has no `TEST_*` names.
+`supabase/config.toml` keeps `[db.migrations].enabled = false` —
 `pnpm db:migrate` is the sole applier and ledger (`public.schema_migrations`); the CLI's own
 boot-time apply collides with it.
 
@@ -141,12 +164,12 @@ business logic.
 | test folder | owns |
 | --- | --- |
 | `identity` | `lib/agents/authAgent`, `lib/auth/{cron,routing}`, `lib/supabase/*`, `proxy.ts`, the `/auth/*` pages, `components/features/{user-profile,email-password-auth}/lib` |
-| `tenant-isolation` | `canAccessClient` / `listAccessibleClients` and the RLS policies in `supabase/migrations/` behind them |
-| `dashboard` | `/api/dashboard/boot`, both `/api/metrics/*` routes, `lib/dashboard/*`, `lib/cache/*` tag ownership, `/dashboard` |
+| `tenant-isolation` | `canAccessClient` / `listAccessibleClients`, `listConnections` + `lib/connections/status`, and the RLS policies behind all three |
+| `dashboard` | `/api/dashboard/boot`, both `/api/metrics/*` routes, `lib/dashboard/*`, `lib/cache/*` tag ownership, `/dashboard` and the `app/(app)/` shell + rail it renders (`tests/dashboard/e2e/rail.spec.ts`) |
 | `export` | `/api/exports/[clientId]/{csv,pdf}`, `lib/exports/*`, the export menu |
 | `sync` | `/api/cron/sync`, `/api/revalidate/dashboard`, `lib/queue/*` |
 | `landing` | `/`, `/privacy`, `/terms`, `components/features/landing/*` |
-| `platform` | cross-cutting primitives with no owning feature — `lib/rate-limit.ts`, `lib/navigation/destinations.ts` |
+| `platform` | cross-cutting primitives with no owning feature — `lib/rate-limit.ts`, `lib/navigation/destinations.ts`, the connections catalog |
 
 A test goes in the feature that owns the *invariant the test protects*, not the file it imports.
 `lib/rate-limit.ts` has consumers in three features, so it belongs to none of them.

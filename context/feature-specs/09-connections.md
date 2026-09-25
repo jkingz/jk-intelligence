@@ -9,6 +9,12 @@ cannot be connected yet and why.
   role but `service_role`, and the Connect control is rendered `disabled` with its reason in
   the copy. Rationale: nothing consumes the sync queue (`worker.ts` -> `mock_completed`,
   Open Question 2), so a stored Google/Meta token would be a live credential with no reader.
+- Which rows carry that control, exactly — the page is not inconsistent here. The three
+  enum-backed sources (`gsc`, `ga4`, `semrush`) each render a `disabled` Connect with the reason
+  in its `title`, because each is storable in `api_credentials` today and only the *write path*
+  is missing. The two display-only providers (`google-ads`, `meta-ads`) render **no control at
+  all**: a greyed button on a source that has no key-paste flow is the fake affordance the
+  scoping decision ruled out.
 - No new sources. `google_ads` / `meta_ads` are display catalog entries only; adding a value
   to `api_credentials_source_check` or `SOURCES` touches `persist_metrics` and every metrics
   read, and belongs to the sync work.
@@ -45,5 +51,5 @@ cannot be connected yet and why.
 `tests/tenant-isolation/unit/connections-status.test.ts`,
 `tests/tenant-isolation/unit/connections-read.test.ts` (incl. "never the admin client",
 "never selects the reference"), `tests/platform/unit/connections-catalog.test.ts`,
-`tests/tenant-isolation/integration/credentials-visibility.test.ts` (live RLS, `skipIf` —
-written, and labelled as not yet executed).
+`tests/tenant-isolation/integration/credentials-visibility.test.ts` (live RLS, `skipIf` — executed
+against the local stack 2026-09-25: 4 tests green alongside `rls-gate.test.ts`'s 5).

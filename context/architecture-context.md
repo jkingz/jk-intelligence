@@ -24,12 +24,18 @@
 - `lib/cache` — `invalidate.ts` owns the dashboard tag; `notify.ts` lets the worker ask the app to revalidate.
 - `lib/supabase` — client construction (per-request user client + service-role client).
 - `lib/db` — persistence + the RLS-backed tenant gate. `admin.ts` isolates the service-role client.
+- `lib/connections` — `status.ts`: `buildConnectionStates()`, the pure join of RLS-visible clients to
+  RLS-visible `api_credentials` rows. It derives no ownership; an `clientId` outside the client list
+  contributes nothing.
 - `lib/dashboard` — read-model assembly (`overview.ts`, `keywords.ts`) shared by the boot and metrics routes, so both return identical shapes.
 - `lib/exports` — server-side CSV/PDF assembly, dataset builder, `quota.ts` (per-user export budget), `fonts/` for PDF unicode.
 - `lib/rate-limit.ts` — `SlidingWindowLimiter`; throttles auth actions client-side and backs the export quota server-side.
-- `components` — `components/ui/*` (shadcn, protected) + `components/features/*` (dashboard widgets, metric cards, stale banners, auth forms, export menu). No admin panel yet.
+- `components` — `components/ui/*` (shadcn, protected) + `components/features/*` (the `app-shell`
+  rail, dashboard widgets, metric cards, stale banners, auth forms, export menu, connection status
+  rows). No admin panel yet.
 - `types` — `database.ts` is handwritten; generated types are an open item.
-- `supabase/migrations` — `20260917000000_seo_poc.sql`, `20260920000000_add_staff_role.sql`, `20260920000001_rls_hardening.sql`.
+- `supabase/migrations` — `20260917000000_seo_poc.sql`, `20260920000000_add_staff_role.sql`,
+  `20260920000001_rls_hardening.sql`, `20260925000000_connections_read.sql`.
 
 ## Storage Model
 
@@ -46,7 +52,7 @@ Verified against `supabase/migrations/*` — not from the original spec.
 
 - `clients`: id uuid PK, name, **domain** (unique on `lower(domain)`), is_active, created_at.
 - `users`: id uuid PK → `auth.users` on delete cascade, role (`admin`|`client`|`staff`, default `client`), client_id FK (on delete set null), created_at. **No email column** — email lives in `auth.users`. Constraint `users_admin_has_no_tenant`: `admin` must have `client_id is null`.
-- `api_credentials`: client_id FK, source (`gsc`|`ga4`|`semrush`), credential_reference (must match `^vault:<uuid>$`), unique `(client_id, source)`. A pointer only — no key material in Postgres, and no code path reads it yet.
+- `api_credentials`: client_id FK, source (`gsc`|`ga4`|`semrush`), credential_reference (must match `^vault:<uuid>$`), unique `(client_id, source)`. A pointer only — no key material in Postgres. The app reads `client_id`, `source`, `created_at` (via `listConnections()` for `/connections`); `credential_reference` is selected by no code path.
 - `metrics_snapshots`: id uuid PK, client_id FK, source, run_id (1–512 chars), metrics jsonb (non-empty array), synced_at, created_at, unique `(client_id, source, run_id)` — immutable, append-only.
 - `keyword_rankings`: PK `(snapshot_id, metric_index)`, client_id FK, source, keyword, rank numeric ≥ 0, synced_at. FK to `metrics_snapshots` is `on delete cascade`, so deleting a snapshot deletes its keyword rows — hence invariant 7.
 - `current_metrics`: PK `(client_id, source)`, snapshot_id FK, run_id, metrics jsonb, synced_at, is_stale.
@@ -60,12 +66,12 @@ Verified against `supabase/migrations/*` — not from the original spec.
 - Sign-up creates only an Auth identity; application roles/client assignments remain separately provisioned. No schema or RLS changes.
 - Supabase JWT sub claim stores user identity; client_id FK links user to client.
 - Roles: `admin` (full access), `client` (own data only), `staff` (assigned clients).
-- Tenant gate: `canAccessClient(clientId)` and `listAccessibleClients()` (`lib/db/repository.ts`) read `clients` **as the signed-in user**, so Postgres RLS (`clients_select_authenticated`) decides visibility instead of a TypeScript copy of the rule.
+- Tenant gate: `canAccessClient(clientId)` and `listAccessibleClients()` (`lib/db/repository.ts`) read `clients` **as the signed-in user**, so Postgres RLS (`clients_select_authenticated`) decides visibility instead of a TypeScript copy of the rule. `listConnections()` chains the same cookie-bound client over `clients` then `api_credentials` (`api_credentials_select_tenant_or_admin`) and adds no rule of its own.
 - Metric reads (`metrics_snapshots`, `current_metrics`, `keyword_rankings`) still run on the service-role client so `unstable_cache` stays request-independent, but only for a `client_id` that already passed the RLS gate. `getAdminDb()` is reserved for cron/worker paths (queueing every active client, `persist_metrics`, sync logs).
 - Clients can never access another client's rows: the id set they can name is RLS-derived, and the same policies filter a direct PostgREST read.
 - `requireAdmin()` (`lib/agents/authAgent.ts`) is the role gate, but **no route calls it yet** — there are no admin-only endpoints. There is no `middleware.ts`; the root `proxy.ts` only refreshes the session cookie. When an admin route is added, it must use `requireAdmin()`, not a fresh role check.
 - Both secret-guarded routes (`cron/sync`, `revalidate/dashboard`) go through `verifyCronSecret()`: 503 when `CRON_SECRET` is unset, 401 on a bearer mismatch. Configurable-but-unset is treated as unavailable, never as "open".
-- API credentials: `api_credentials` stores a `vault:<uuid>` reference and RLS denies direct select, so no key material ever lands in Postgres, `.env`, or the browser. Resolving that reference and calling the sources is part of the unbuilt sync agent.
+- API credentials: `api_credentials` stores a `vault:<uuid>` reference, never key material, so nothing lands in `.env` or the browser. `20260925000000_connections_read.sql` replaced the closed `using (false)` policy with `api_credentials_select_tenant_or_admin` (the same admin-or-own-tenant predicate as `clients`), which is what lets `/connections` read a tenant's status rows. Resolving the reference and calling the sources is still part of the unbuilt sync agent.
 
 ## HTTP API — implemented
 
@@ -80,6 +86,7 @@ Cache-bound invariant (both metrics routes, 200 path only): `s-maxage` == client
 - `GET /api/exports/{clientId}/pdf` — `application/pdf` attachment, same filename scheme with `-report-`. 503 JSON when `renderPdfReport()` throws — never a 200 with an empty body.
 - `POST /api/revalidate/dashboard` — `revalidateTag(DASHBOARD_OVERVIEW_TAG)`, guarded by `Authorization: Bearer <CRON_SECRET>`. `revalidateTag` throws outside a request context, which is why the standalone worker POSTs here (`lib/cache/notify.ts`) instead of calling it.
 - `GET /api/cron/sync` — Vercel cron (`vercel.json`, `GET`, bearer `CRON_SECRET`): iterates `listActiveClients()` and queues one BullMQ job per client with `Promise.allSettled`; returns `{ queued, errors }`. Jobs are consumed by `lib/queue/worker.ts`, which currently returns `mock_completed` without touching the sources.
+- `GET /connections` — a **page**, not a route handler, and the app's only server-rendered data read: the page awaits `listConnections()` (clients, then `api_credentials`) as the signed-in user, so RLS decides the row set. Nothing cached; the segment declares `dynamic = "force-dynamic"` for the reason recorded under Invariants.
 
 ## HTTP API — planned, not built
 
@@ -118,3 +125,12 @@ No `syncAgent`, `transformAgent`, `cacheAgent`, or `insightsAgent` exists; `lib/
 10. API credentials never logged, never returned in API responses.
 11. The Next data-cache tag for the dashboard is owned by `lib/cache/invalidate.ts` (`DASHBOARD_OVERVIEW_TAG = "dashboard-overview"`) and only revalidated through `app/api/revalidate/dashboard` (secret-guarded) — never called from the worker process directly.
 12. `/dashboard` stays a prerendered static shell (`○`): all auth-dependent data arrives client-side, and the whole boot payload comes from **one** `GET /api/dashboard/boot` request. While that request is in flight `DashboardView` must render `DashboardSkeleton` — returning `null` there blanks the skeleton the shell already painted. Identity + role reads go through `getAuthSession()` (one `auth.getUser()` + one `users` read per request); do not pair `getUser()` with `getAuthUser()` in a handler, that repeats both round trips.
+
+**How invariants 4-5 apply to `/connections` (applied deliberately, not forgotten).** `listConnections()`
+is never wrapped in `unstable_cache`, and `app/(app)/connections/page.tsx` declares
+`export const dynamic = "force-dynamic"` — the app's only server-rendered data read, so it opts out of
+the data cache entirely rather than keying a cookie-bound client on nothing. The `force-dynamic` line
+is load-bearing: the cookie read happens inside `databaseOperation()`, whose catch-all converts Next's
+prerender bailout into `Error("Database operation failed")`, so removing it fails `pnpm build`. The
+shared `lib/db` wrapper defect behind that behaviour is a separate, later change and stays open on
+purpose — do not "clean up" either line here.

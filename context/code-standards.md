@@ -231,8 +231,9 @@ scripts/        — migrations runner, seed, demo user (the only way data lands 
 Vitest, Node environment, split into `unit` and `integration` projects. `pnpm test` runs the unit
 project only; `pnpm test tenant-isolation` narrows by path — `pnpm test -- tenant-isolation` does
 not, it silently runs the whole tier. A filter that matches nothing exits 1, so a moved file
-announces itself instead of passing empty. `pnpm test:all` adds integration (which today collects
-**zero** files and passes on `--passWithNoTests` — green that means nothing), `pnpm test:e2e` is
+announces itself instead of passing empty. `pnpm test:all` adds integration, which runs the tenant
+policies against a **real Postgres** (`pnpm exec supabase start` + `.env.test`; it `skipIf`s without
+`TEST_SUPABASE_URL`, so read the passed/skipped counts rather than the exit code), `pnpm test:e2e` is
 the public Playwright tier and `pnpm test:e2e:auth` the credential-gated one. Quote counts from the
 run's own output rather than restating them here.
 

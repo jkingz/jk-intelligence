@@ -194,7 +194,7 @@ colours, and note `--accent-primary-dim` is a red tint — it is the brand accen
 - **Admin panel:** *(not built — no `/admin` route and no admin-only API; target-state layout kept
   here so the eventual shell matches the dashboard.)*
 - **Modals:** centered overlay, `rounded-3xl`, `bg-elevated`, backdrop blur.
-- **Navbar:** `bg-surface border-b border-default`, client selector + sync status + trigger sync + export menu + theme toggle + account menu. No brand mark — the rail owns it at `lg+`, the page footer below `lg` (`context/feature-specs/08-app-shell.md`).
+- **Navbar:** `bg-surface border-b border-default`, client selector + sync status + trigger sync + export menu + theme toggle + account menu. No brand mark — the rail owns it at `lg+`; below `lg` only `/dashboard` repeats it (page footer), while `/connections` and `/profile` render none (`context/feature-specs/08-app-shell.md`).
 - **Data tables:** `bg-surface`, alternating `bg-subtle` rows, sticky header.
 
 ---
