@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import pg from "pg";
 
 // Seeds demo api_credentials rows so /connections has something to render.
