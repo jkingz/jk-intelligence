@@ -81,9 +81,11 @@ Policies: `supabase/migrations/20260917000000_seo_poc.sql`,
 `20260925000000_connections_read.sql`. `api_credentials` is readable through
 `api_credentials_select_tenant_or_admin`, which applies the same two `security definer` helpers as
 `clients`; the app reads `client_id`, `source` and `created_at` only, and never
-`credential_reference`. That last migration exists on the local stack only — the hosted project
-still carries `api_credentials_no_direct_access`, so `/connections` does not serve a signed-in user
-there until it is applied (`context/progress-tracker.md` → Open Questions).
+`credential_reference`. That last migration is applied to the local stack **and** to the hosted
+project (2026-09-30), so `/connections` serves a signed-in user on hosted; the only
+`api_credentials` rows there are the seeded placeholders. Being row-level, the policy leaves
+`credential_reference` column-selectable to any tenant that can see the row — recorded as an
+accepted limitation in `context/feature-specs/09-connections.md`.
 
 These policies have been exercised against a live Postgres (local `supabase start` stack) by
 `tests/tenant-isolation/integration/rls-gate.test.ts` and
