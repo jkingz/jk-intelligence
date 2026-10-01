@@ -16,7 +16,7 @@ jobs:
   checks:
     name: test / typecheck / lint / build
     runs-on: ubuntu-latest
-    # `app/profile` is server-rendered at build export, so the build needs a
+    # `app/(app)/profile` is server-rendered at build export, so the build needs a
     # Supabase client to construct. Placeholders keep CI green without wiring
     # secrets into a job that never calls the database.
     env:

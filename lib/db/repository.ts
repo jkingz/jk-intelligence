@@ -3,6 +3,7 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { z } from "zod";
 import { DASHBOARD_OVERVIEW_TAG } from "@/lib/cache/invalidate";
+import { buildConnectionStates } from "@/lib/connections/status";
 import { getAdminDb } from "@/lib/db/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
@@ -11,6 +12,7 @@ import {
   type MetricSnapshotInput,
 } from "@/lib/dashboard/overview";
 import { buildKeywordSeries, type KeywordRankingRow } from "@/lib/dashboard/keywords";
+import type { ClientConnections } from "@/types/connections";
 import type {
   DashboardClient,
   DashboardOverview,
@@ -64,6 +66,12 @@ const keywordRankingRowSchema = z.object({
   keyword: z.string().min(1),
   rank: z.coerce.number().nonnegative(),
   synced_at: timestampSchema,
+});
+
+const credentialRowSchema = z.object({
+  client_id: idSchema,
+  source: sourceSchema,
+  created_at: timestampSchema,
 });
 
 async function databaseOperation<T>(operation: () => Promise<T>): Promise<T> {
@@ -302,6 +310,35 @@ export async function canAccessClient(clientId: string): Promise<boolean> {
       .maybeSingle();
     if (error) throw new Error("Database operation failed");
     return data !== null;
+  });
+}
+
+/**
+ * Connection status per tenant. Both relations are read as the signed-in user,
+ * so `api_credentials_select_tenant_or_admin` and `clients_select_authenticated`
+ * decide the row set; the column list names the three readable columns, and a
+ * credential reference never reaches this process, let alone a response.
+ *
+ * Deliberately NOT wrapped in `unstable_cache`: the client is cookie-bound, and
+ * a cached function keyed on nothing while deriving its rows from the caller is
+ * the cross-user leak the tenant-gate change closed
+ * (context/architecture-context.md invariant 4-5).
+ */
+export async function listConnections(): Promise<ClientConnections[]> {
+  const clients = await listAccessibleClients();
+  if (clients.length === 0) return [];
+  return databaseOperation(async () => {
+    const db = await createServerSupabaseClient();
+    const { data, error } = await db
+      .from("api_credentials")
+      .select("client_id,source,created_at");
+    if (error) throw new Error("Database operation failed");
+    const rows = z.array(credentialRowSchema).parse(data ?? []).map((row) => ({
+      clientId: row.client_id,
+      source: row.source,
+      linkedAt: row.created_at,
+    }));
+    return buildConnectionStates(clients, rows);
   });
 }
 

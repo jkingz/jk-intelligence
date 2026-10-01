@@ -10,7 +10,12 @@ Verified status at move time:
 - `lib/queue/worker.ts` consumes `seo-sync` and returns `status: "mock_completed"` — it performs no
   external fetch and writes no rows.
 - `persistMetrics`, `markMetricsStale` and `writeSyncLog` in `lib/db/repository.ts` have zero
-  callers; `api_credentials` is never read. Dashboard data currently comes from `scripts/seed.mjs`.
+  callers; dashboard data currently comes from `scripts/seed.mjs`.
+- **Corrected 2026-09-25:** `api_credentials` **is** now read by the app. `listConnections()`
+  selects `client_id, source, created_at` through the tenant-scoped
+  `api_credentials_select_tenant_or_admin` policy and `/connections` renders it. What is still not
+  built is the rest of this file: nothing selects or resolves `credential_reference`, and no source
+  is ever fetched.
 - No deployment host runs the worker. Vercel provides only the cron (`vercel.json`: `0 2 * * *` →
   `GET /api/cron/sync`), so enqueued jobs have no consumer in production.
 
@@ -311,11 +316,13 @@ Purpose: View sync history and failure reasons.
 
 ## Build sequence (original POC plan)
 
-Kept as the dependency order for the unbuilt parts. Marked against the code as of 2026-09-23 — re-verify before trusting a line.
+Kept as the dependency order for the unbuilt parts. Marked against the code as of 2026-09-23, steps 1 and 3 re-marked 2026-09-25 — re-verify before trusting a line.
 
-1. ✅ DB schema + migrations — three files under `supabase/migrations/`.
+1. ✅ DB schema + migrations — four files under `supabase/migrations/`.
 2. ✅ Supabase Auth + Google OAuth + email/password + RLS policies.
-3. ⚠️ API credentials model — `api_credentials` holds a `vault:<uuid>` reference and RLS denies select; nothing resolves the reference.
+3. ⚠️ API credentials model — a tenant can now read its own `api_credentials` status rows
+   (`20260925000000_connections_read.sql`), surfaced at `/connections`. Still unread:
+   `credential_reference`, which nothing resolves because no sync worker is hosted (steps 4-8).
 4. ⬜ GSC sync agent (fetch → transform → store).
 5. ⬜ GA4 sync agent.
 6. ⬜ Semrush/Ahrefs sync agent.

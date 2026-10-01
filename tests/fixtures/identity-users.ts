@@ -84,6 +84,27 @@ async function ensureLink(
   if (error) throw new Error(`fixture link ${role}: ${error.message}`);
 }
 
+/**
+ * One `api_credentials` row per fixture client, so the visibility test has a
+ * positive case. The reference is a syntactically valid, obviously fake Vault
+ * uuid: nothing decrypts it, and the regex in api_credentials_reference_shape
+ * is the only thing it must satisfy.
+ */
+export const FAKE_VAULT_REFERENCE =
+  "vault:00000000-0000-4000-8000-0000000000ff";
+
+async function ensureCredential(db: SupabaseClient, clientId: string) {
+  const { error } = await db.from("api_credentials").upsert(
+    {
+      client_id: clientId,
+      source: "semrush",
+      credential_reference: FAKE_VAULT_REFERENCE,
+    },
+    { onConflict: "client_id,source" },
+  );
+  if (error) throw new Error(`fixture credential: ${error.message}`);
+}
+
 export interface TestClients {
   a: string;
   b: string;
@@ -105,6 +126,9 @@ export async function provisionFixtures(): Promise<TestClients> {
     "admin",
     null,
   );
+
+  await ensureCredential(db, a);
+  await ensureCredential(db, b);
 
   return { a, b };
 }

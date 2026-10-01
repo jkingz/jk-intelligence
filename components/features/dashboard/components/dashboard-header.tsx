@@ -48,17 +48,6 @@ export function DashboardHeader({
     <header className="border-b border-default bg-surface sticky top-0 z-30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 sm:gap-6 min-w-0">
-          <div className="flex items-center gap-2.5 shrink-0">
-            <div className="h-8 w-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-serif text-lg font-bold">
-              J
-            </div>
-            <span className="hidden truncate font-serif text-lg tracking-tight font-medium sm:block">
-              JK Intelligence
-            </span>
-          </div>
-
-          <div className="hidden sm:block h-4 w-px bg-border-subtle shrink-0" />
-
           <div className="flex items-center gap-2 min-w-0">
             <Building2 className="w-3.5 h-3.5 text-text-muted shrink-0 hidden sm:inline-block" />
             <Select

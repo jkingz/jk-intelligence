@@ -79,6 +79,7 @@ Unbuilt design lives in `docs/target-state.md`; treat it as requirements, never 
 | Build | `pnpm build` |
 | Migrations | `pnpm db:migrate` |
 | Seed demo data | `pnpm db:seed` |
+| Seed connection placeholders | `pnpm db:seed-connections` — placeholder-only `api_credentials` rows (`vault:` reference, never a key), idempotent via `on conflict (client_id, source) do nothing`; needs the same `SUPABASE_DB_URL` redirection as `db:seed` |
 | Demo user | `pnpm db:demo-user` |
 | Queue worker | `pnpm worker` (manual only — no production host yet) |
 
@@ -86,8 +87,9 @@ Unbuilt design lives in `docs/target-state.md`; treat it as requirements, never 
 
 ### Where logic goes
 `lib/agents` identity/role only · `lib/db` persistence + the RLS-backed tenant gate ·
-`lib/dashboard` read models shared by routes · `lib/queue` queue + worker · `lib/cache` tag ownership ·
-`lib/exports` CSV/PDF · `app/api` thin handlers.
+`lib/dashboard` read models shared by routes · `lib/connections` the connection-state join (derives
+no ownership) · `lib/navigation` the rail's destination list · `lib/queue` queue + worker ·
+`lib/cache` tag ownership · `lib/exports` CSV/PDF · `app/api` thin handlers.
 Protected: `components/ui/*` (shadcn) and `lib/supabase/*` (client construction).
 
 ### Next.js 16 fork
@@ -101,9 +103,10 @@ Never edit an applied migration — add a timestamped one. Every new table needs
 policy matching the role/tenant model in `context/architecture-context.md`, in the same change.
 
 ### Data today
-The dashboard's rows come from `scripts/seed.mjs`. `pnpm worker` consumes the queue and returns
-`mock_completed`; it writes nothing. Anything you observe about "sync" is therefore not evidence
-about sync.
+The dashboard's rows come from `scripts/seed.mjs`, and the `api_credentials` rows `/connections`
+renders from `scripts/seed-connections.mjs` — both are placeholders; nothing is fetched.
+`pnpm worker` consumes the queue and returns `mock_completed`; it writes nothing. Anything you
+observe about "sync" is therefore not evidence about sync.
 
 ### Agent development rules
 - Build each agent in isolation before wiring it into the queue; mock the external API responses.

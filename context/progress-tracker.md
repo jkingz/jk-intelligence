@@ -3,17 +3,17 @@
 Update this file after every meaningful implementation change.
 
 ## Current Phase
-Hardening the built surface: read paths and tenant isolation are done **and now proven against a
-live Postgres** (integration tier, 2026-09-24); the **sync pipeline is the next unit** and is
-blocked on a worker-hosting decision (see Open Questions 2).
+Hardening the built surface: read paths and tenant isolation are done **and proven against a live
+Postgres for both gated tables** (integration tier, 9 tests, 2026-09-25); `api_credentials` is now
+*read* (status only, at `/connections`); the **sync pipeline is the next unit** and is blocked on a
+worker-hosting decision (see Open Questions 2).
 
 ## Current Goal
-Nothing in flight. Last change removed the build's dynamic-`readFile` tracing warning and pinned the
-auth routes to the dark palette (2026-09-25 — see Recent Work); before that the landing page's claims
-were made to match the build (2026-09-24, copy and metadata only), and before that the Google/Apple
-buttons were muted until those providers are configured, and before that the cleanup pass: cache
-bounds aligned to 300s, demo creds moved server-side, `.env.example` written, and the first
-live-RLS integration slice.
+Nothing in flight. Last change gave every authenticated page one shell (`app/(app)/` + a destination
+rail) and added the read-only `/connections` status page (2026-09-25 — see Completed); before that
+the build's dynamic-`readFile` tracing warning went away and the auth routes were pinned to the dark
+palette (2026-09-25 — see Recent Work), and before that the landing page's claims were made to match
+the build and the first live-RLS integration slice landed (2026-09-24).
 
 > Entries above this line are a log, not a status. `## Current Phase`, `## In Progress`,
 > `## Open Questions` and the *implemented surface* columns in `AGENTS.md` /
@@ -94,7 +94,7 @@ live-RLS integration slice.
 
 - Seeded the live Supabase DB: `pnpm db:seed` wrote 3 clients, 810 snapshots (270 each `gsc`/`ga4`/`semrush`), 10,800 keyword rankings (20 keywords/client), and `current_metrics` for all 3 clients × 3 sources; Atlas marked `is_stale`. Also provisioned the current auth user (`dummydump01@gmail.com`) as `admin` in `public.users`, so `listAccessibleClients` returns all three demo clients on `/`.
 
-- Fixed "Database operation failed" on `/`: the repository read path needs `SUPABASE_SERVICE_ROLE_KEY` (via `getAdminDb()`), which was absent from `.env`; the throw was masked by `databaseOperation`. Added `SUPABASE_SERVICE_ROLE_KEY` and made `databaseOperation` log the underlying error server-side while still returning the generic client message. Verified the admin client returns clients + 90 `gsc` snapshots (20 metrics each, `searchVolume` present) + `current_metrics`.
+- Fixed "Database operation failed" on `/`: the repository read path needs `SUPABASE_SERVICE_ROLE_KEY` (via `getAdminDb()`), which was absent from `.env`; the throw was masked by `databaseOperation`. Added `SUPABASE_SERVICE_ROLE_KEY`. **Logging claim corrected 2026-09-25:** `databaseOperation` does not log the underlying error on the PostgREST paths — the wrapped reads throw their own `Error("Database operation failed")` at eleven sites in `lib/db/repository.ts` (`:104`, `:135`, `:150`, `:165`, `:180`, `:199`, `:222`, `:251`, `:278`, `:311`, `:335`) before the catch at `:81-84` can see a cause, so the server line is that literal and the root cause is lost. Repairing the wrapper is deliberately out of this branch: it changes the message eight test files assert. Verified the admin client returns clients + 90 `gsc` snapshots (20 metrics each, `searchVolume` present) + `current_metrics`.
 
 - Client switcher now shows client names: Base UI's `Select.Value` renders the raw value by default, so `DashboardHeader` passes `items={clients.map(({id,name}) => ({ value: id, label: name }))}` to `Select` (the same `{value,label}` mapping Base UI uses for the trigger label). Verified in a throwaway route that the trigger renders "Atlas Coffee", not the UUID.
 
@@ -112,7 +112,7 @@ live-RLS integration slice.
 
 - Keyword rankings read/history path + dashboard time series — spec: `context/feature-specs/05-keyword-rankings.md`
   - `types/dashboard.ts` gains `RankPoint`, `KeywordRankSeries`; pure `lib/dashboard/keywords.ts` `buildKeywordSeries` (groups rows, skips null-latest-rank keywords, sorts best-first + chronological, unit tested).
-  - `lib/db/repository.ts`: `keywordRankingRowSchema` (`rank` via `z.coerce.number()` — PostgREST numeric can arrive as string; confirmed raw `pg` returns string), `listKeywordRankings`, `getKeywordRankingHistory` (2× window), `getCachedKeywordHistory` (tagged with `DASHBOARD_OVERVIEW_TAG`). `databaseOperation` already logs the root cause server-side.
+  - `lib/db/repository.ts`: `keywordRankingRowSchema` (`rank` via `z.coerce.number()` — PostgREST numeric can arrive as string; confirmed raw `pg` returns string), `listKeywordRankings`, `getKeywordRankingHistory` (2× window), `getCachedKeywordHistory` (tagged with `DASHBOARD_OVERVIEW_TAG`). `databaseOperation` does **not** log the root cause on those paths (see the 2026-09-25 correction further up): the wrapped read throws its own generic error first, so the log line is the literal `"Database operation failed"` and the cause is swallowed.
   - New `app/api/metrics/[clientId]/keywords/route.ts`: GET, zod params (Next 16 `await ctx.params`), `enforceClientAccess` 401/403, `{ data, meta }`.
   - Dashboard: `query-table.tsx` takes `history` prop + Trend buttons; `keyword-rank-chart.tsx` (recharts, reversed Y so rank 1 is at top, `ResponsiveContainer initialDimension` to silence the width/height −1 warning, token colors, #rank + gained/lost header); `app/page.tsx` fetches overview + history in parallel; `Dashboard` plumbs `history`.
   - Live DB verified: `getKeywordRankingHistory` → 20 series/client, dense daily points, seeded data confirmed (1,800 rows, 20 keywords over the last 60d).
@@ -152,10 +152,53 @@ live-RLS integration slice.
 
 - Light-theme contrast fix (Lighthouse): the light palette failed WCAG AA — `text-faint` 2.70, `state-warning` 2.45, `state-success` 3.17, `state-error` 3.91, fire-red accent on its dim chip 3.67 (all vs `#fafafa`). Rewrote the `[data-theme="light"]` block in `globals.css` while keeping the charcoal + fire-red identity: text `#171717`/`#3d3d3d`/`#5c5c5c`/`#616161`, accent deepened to `#b91c1c` (hover `#991b1b`, dim 10%, now 6.20 plain / 4.92 on chip / 6.47 white-on-accent), success `#35701a`, error `#b3261e`, warning `#7d5800`, neutral `#5c5c5c`; borders `#dcdcdc`/`#c8c8c8`. All text roles now ≥4.5:1 on base, surface, and subtle. `ui-context.md` light table updated. Known gap: dark `--color-primary-foreground: #ffffff` on `#ff3b30` is 3.55:1 (primary buttons) — not addressed. Verified: lint clean.
 
+- App shell + read-only `/connections` (2026-09-25) — specs: `context/feature-specs/08-app-shell.md`, `context/feature-specs/09-connections.md`. Every existing API route and the whole dashboard read path are untouched.
+  - **Route group.** `app/dashboard` and `app/profile` moved to `app/(app)/dashboard` and `app/(app)/profile`; a route group adds no URL segment, so both paths are unchanged. `app/(app)/layout.tsx` renders `AppShell` (`components/features/app-shell`), a **server** component reading no session, no cookies, no data — a session read there would make `/dashboard` dynamic again, which is the 4–5s switch the client-side boot fetch exists to prevent.
+  - **Destination registry.** `lib/navigation/destinations.ts` is the only rail list. `tests/platform/unit/destinations.test.ts` asserts every href it renders appears in `PROTECTED_PREFIXES` (`lib/auth/routing.ts`, extended in `tests/identity/unit/routing.test.ts`), so a destination cannot be advertised before it is guarded. No role filter — with no `/admin` route there is nothing to hide, and the admin panel adds its row and the filter together.
+  - **The rail.** Sticky `w-60` column at `lg+`, `relative overflow-x-auto` strip below (`relative` is what stops `sr-only` descendants sizing the document). It owns the brand mark at `lg+`, so `DashboardHeader` lost its wordmark and logo. `tests/dashboard/e2e/rail.spec.ts` (`@auth`) covers active-row marking and 0 page overflow at 320/390/414.
+  - **Policy swap.** `supabase/migrations/20260925000000_connections_read.sql` drops `api_credentials_no_direct_access`, creates `api_credentials_select_tenant_or_admin` — the same `private.current_user_role()` / `current_user_client_id()` predicate as `clients` — and grants select. Applied to the **local** stack on 2026-09-25 and to the **hosted** project on 2026-09-30 (see Recent Work).
+  - **The read.** `listConnections()` (`lib/db/repository.ts:327-343`) chains the cookie-bound client over `clients` then `api_credentials`, selecting `client_id,source,created_at`: no `unstable_cache`, no `.order()`, no paging, no ownership rule of its own. `lib/connections/status.ts` (`buildConnectionStates()`) is the pure join of visible clients to visible rows.
+  - **The page.** `app/(app)/connections/page.tsx` awaits that read — the app's only server-rendered read of tenant rows — and declares `dynamic = "force-dynamic"`, load-bearing rather than decorative: the cookie read happens inside `databaseOperation()`, whose catch-all turns Next's prerender bailout into `Error("Database operation failed")`. Connect controls render `disabled` with their reason in `title`; the two display-only providers get no control at all. `tests/identity/e2e/connections-guard.spec.ts` covers the anonymous redirect.
+  - **Seed.** `scripts/seed-connections.mjs` (`pnpm db:seed-connections`) writes placeholder `api_credentials` rows for two of the three demo clients — `atlas.example` is deliberately left with none, because it is the all-"Not connected" card.
+  - Verified: `pnpm test` → `Test Files 26 passed (26)` / `Tests 159 passed (159)` · `pnpm typecheck` → route types generated, `tsc --noEmit` silent · `pnpm lint` → no output · `pnpm build` → `○ /dashboard`, `ƒ /connections`, no warnings · `pnpm test:all` → `Test Files 28 passed (28)` / `Tests 168 passed (168)` · `pnpm test:e2e` → `7 passed` · `pnpm test:e2e:auth` → `16 passed`. The integration tier is now two files and both ran bare against the local stack (`pnpm test:integration` → `Test Files  2 passed (2)` / `Tests  9 passed (9)`): `tests/tenant-isolation/integration/rls-gate.test.ts` (`clients`, 5) and `tests/tenant-isolation/integration/credentials-visibility.test.ts` (`api_credentials`, 4).
+  - **What the demo cards prove, and don't.** Local data now covers 3 demo clients, 4 placeholder `api_credentials` rows and 2 fixture rows, but **no local `users` row is linked to the three demo clients** (`scripts/create-demo-user.mjs:39-42` binds one client-role user to one client), so `/connections` shows the demo cards only for an **admin** session; a client-role user sees only its own `rls-test` tenant.
+
 ## In Progress
-- None (data export completed — see Recent Work).
+- None (the app shell + `/connections` closed 2026-09-25 — see Completed).
 
 ## Recent Work
+
+- `/connections` opened on hosted (2026-09-30) — a database-state change with **no code diff**. The
+  branch shipped the read path but left the policy swap local-only, so the page could not serve a
+  signed-in user against the project this checkout's `.env` points at (RULES.md §16).
+  - Pre-flight, SELECT-only: hosted `public.schema_migrations` held exactly the 3 older rows, so
+    `pnpm db:migrate` could apply nothing else; `private.current_user_role()` (→ `text`) and
+    `private.current_user_client_id()` (→ `uuid`) both exist there, `security definer` and
+    EXECUTE-granted to `authenticated`; `clients_select_authenticated` carries the identical
+    predicate, so the swap widens nothing. Two findings the tracker did not have: `authenticated`
+    held **no** table grant on `api_credentials` at all (only `postgres` and `service_role`), making
+    the migration's `grant select` line as load-bearing as the policy; and hosted held **zero**
+    `api_credentials` rows.
+  - Applied: `pnpm db:migrate` → `Applied 1 migration(s)`; `pnpm db:seed-connections` (no `--reset`)
+    → `inserted 4 row(s)` — Northstar gsc/ga4/semrush, Evergreen gsc, Atlas deliberately none.
+  - Verified as `authenticated` in transactions that each ended in `rollback`: the admin persona sees
+    `clients 3 / api_credentials 4`, the Northstar client persona sees `1 / 3`, so one tenant never
+    reads another's rows. `credential_reference` was non-null-selectable in both, which is the
+    row-level policy's recorded limitation, not a value leak — `listConnections()` never names the
+    column. Post-simulation count stayed 4.
+  - Personas were already there: hosted `users` = 1 `admin` (no tenant, per
+    `users_admin_has_no_client`) + 1 `client` bound to Northstar Studio, 2 `auth.users` total. The
+    "nothing bound to the demo clients" note is a **local-stack** condition only.
+  - **Rendered in a browser against hosted** (`pnpm dev` on :3000, Chrome DevTools MCP, signed in via
+    the demo card with `?next=/connections`): exactly one client card — **Northstar Studio** — with
+    Search Console, Analytics (GA4) and Semrush all reading "Linked Sep 30, 2026". Evergreen and
+    Atlas appear nowhere, so the tenant rule held end-to-end through the real `listConnections()`
+    path rather than only a simulated session. Connect renders `disabled` with "Recording a
+    connection needs a write path that does not exist yet"; Google Ads and Meta Ads sit under "Not
+    available yet". 0 console errors. Server killed and :3000 confirmed free afterwards.
+  - **Still uncovered:** no Playwright spec asserts any of the above —
+    `tests/identity/e2e/connections-guard.spec.ts` only checks the anonymous redirect, so a
+    regression in the authenticated render would not fail CI.
 
 - Build-warning + auth theme fix (2026-09-25) — two small, unrelated surface changes.
   - `lib/exports/pdf.ts`: `readFile(FONT_PATHS.*)` made Next emit
@@ -469,7 +512,7 @@ live-RLS integration slice.
 ## Open Questions
 
 - Audit findings still open (from the 2026-09-23 architecture review, in fix order):
-  1. **Sync pipeline is not implemented.** `lib/queue/worker.ts` returns `status: "mock_completed"`; `lib/agents/` holds only `authAgent`. `persistMetrics`, `markMetricsStale` and `writeSyncLog` in `lib/db/repository.ts` have zero non-test callers, and `api_credentials` is never read — all dashboard data comes from `scripts/seed.mjs`. ~~`AGENTS.md` documents the agents as if built.~~ **Docs fixed 2026-09-23:** unbuilt design now lives in `docs/target-state.md` and `AGENTS.md`/`architecture-context.md` describe only implemented code. The code itself is unchanged and still needs a real `syncAgent`.
+  1. **Sync pipeline is not implemented.** `lib/queue/worker.ts` returns `status: "mock_completed"`; `lib/agents/` holds only `authAgent`. `persistMetrics`, `markMetricsStale` and `writeSyncLog` in `lib/db/repository.ts` have zero non-test callers, and ~~`api_credentials` is never read~~ — **read since 2026-09-25, status only**: `listConnections()` feeds `/connections`. All dashboard data still comes from `scripts/seed.mjs`. ~~`AGENTS.md` documents the agents as if built.~~ **Docs fixed 2026-09-23:** unbuilt design now lives in `docs/target-state.md` and `AGENTS.md`/`architecture-context.md` describe only implemented code. The code itself is unchanged and still needs a real `syncAgent`. **Appended 2026-09-25:** `/connections` renders credential *status*; it fetches nothing, and item 2's worker-hosting decision still gates every fetch. The Connect button is deliberately inert until that closes — a credential stored today would be a live token with no reader.
   2. **No host for the BullMQ worker.** Vercel has only the cron, so jobs enqueue with no consumer. Needs a decision: always-on worker (Fly/Render), cron calls sync inline, or QStash.
   3. ~~**Tenant isolation is one layer.**~~ **Fixed 2026-09-23 (step 2).** The tenant gate (`listAccessibleClients`, new `canAccessClient`) now reads `clients` through `createServerSupabaseClient()`, so Postgres RLS decides visibility. Metric reads stay on `getAdminDb()` by design (see Recent Work) — reachable only with a `client_id` that already passed the gate.
   4. ~~**`NEXT_PUBLIC_DEMO_PASSWORD` ships in the client bundle** — move to a server-only credential minted through an endpoint.~~ **Fixed 2026-09-24** via the server-props treatment instead of an endpoint: private `DEMO_EMAIL`/`DEMO_PASSWORD` read in the login/sign-up server pages and prop-fed to `DemoAccess`; guarded by `tests/identity/unit/demo-creds.test.ts`. See Recent Work.
@@ -489,11 +532,16 @@ live-RLS integration slice.
   exercised against a real local Postgres (Docker + `supabase start`), not a faked PostgREST. The
   anon path throws (grant revoked → fail-closed 503) rather than returning `[]`.
 - **The `integration` tier is live.** `tests/<feature>/integration/` is wired in the Vitest
-  workspace; the first slice (tenant isolation, 5 tests) runs green against the local stack.
+  workspace; tenant isolation is now **9 tests across 2 files** — `rls-gate.test.ts` (5, `clients`)
+  and `credentials-visibility.test.ts` (4, `api_credentials`) — green against the local stack.
   Needs `pnpm exec supabase start` and a `.env.test` with `TEST_SUPABASE_URL` /
   `TEST_SUPABASE_PUBLISHABLE_KEY` / `TEST_SUPABASE_SERVICE_ROLE_KEY` /
-  `TEST_DEMO_PASSWORD` (see `AGENTS.md` → Verification, `tests/fixtures/README.md`). Without
-  those, the suite `skipIf`s — so CI stays effectively unit+e2e until a hosted test DB exists.
+  `TEST_DEMO_PASSWORD` (see `AGENTS.md` → Verification, `tests/fixtures/README.md`). Measured
+  2026-09-25: `.env.test` as it stands runs `9 passed` bare, no keys supplied inline. Note the skip
+  gate is `TEST_SUPABASE_URL` **alone** (`tests/helpers/db.ts`), so a URL that is live while the
+  keys are stale makes the tier *fail* rather than skip — read the counts, not the exit code. With
+  no `TEST_*` names at all it skips, so CI stays effectively unit+e2e until a hosted test DB exists.
+- ~~**`20260925000000_connections_read.sql` is applied to the local stack only.**~~ **Applied to hosted 2026-09-30.** `pnpm db:migrate` printed `apply 20260925000000_connections_read.sql` and `Applied 1 migration(s)` (the other three `skip`ped), so hosted `public.schema_migrations` went 3 rows → 4. `pnpm db:seed-connections` then printed `inserted 4 row(s)` — hosted had **zero** `api_credentials` rows before, so the migration alone would have rendered three "Not connected" cards. Verified as `authenticated` inside rolled-back transactions: the admin session sees 3 clients / 4 credentials, the Northstar client-role session sees 1 / 3, and the post-transaction count is still 4. Hosted still has no *real* credential — nothing writes one until the Connect flow exists, which stays gated on the worker-hosting decision (item 2). No spec covers the authenticated render: `tests/identity/e2e/connections-guard.spec.ts` asserts only the anonymous redirect, and `tests/dashboard/e2e/rail.spec.ts` never navigates to the page.
 - Profile display name: **decided 2026-09-24 — no `users` column needed.** Name editing already
   persists to `user_metadata.name` via Supabase Auth, which the profile reads; a public-schema
   mirror column would duplicate the auth store for no gain.

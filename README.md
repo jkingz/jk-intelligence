@@ -13,7 +13,7 @@ Deployed at `jk-intelligence.vercel.app`. Screenshot: dark theme, one client ("A
 
 Not live yet, do not demo them as working:
 
-- **Sync.** No consumer runs the queue — `lib/queue/worker.ts` returns `mock_completed`, and Trigger Sync only animates its own state. All rows come from `pnpm db:seed`.
+- **Sync.** No consumer runs the queue — `lib/queue/worker.ts` returns `mock_completed`, and Trigger Sync only animates its own state. All metric rows come from `pnpm db:seed`; the `api_credentials` rows `/connections` renders come from `pnpm db:seed-connections` — both placeholders.
 - **Stale banner / sync pill.** Reads the stored `is_stale` column; nothing writes it, so it cannot fire outside seed data.
 - **AI citations.** `aiCitations` is a hardcoded `[]`, so the card and grid always render their empty state. No LLM dependency exists.
 
@@ -41,9 +41,10 @@ pnpm test && pnpm typecheck && pnpm lint && pnpm build
 ```
 
 `pnpm test` is the Vitest **unit** project only. Tests live in `tests/<feature>/<tier>/`, so the
-full picture needs `pnpm test:all` (adds integration, which currently has no files and so collects
-zero) and `pnpm test:e2e` / `pnpm test:e2e:auth` for the Playwright tiers — the public tier runs in
-CI after the build, the authed tier is local-only because it needs real credentials.
+full picture needs `pnpm test:all` (adds the live-RLS integration tier, which needs
+`pnpm exec supabase start` and `.env.test` and skips without it) plus `pnpm test:e2e` and
+`pnpm test:e2e:auth` for the Playwright tiers — the public tier runs in CI after the build, the
+authed tier is local-only because it needs real credentials.
 
 CI (`.github/workflows/ci.yml`) runs the four above plus the public e2e tier on every push and PR.
 

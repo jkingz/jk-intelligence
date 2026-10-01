@@ -31,7 +31,7 @@ function MetricCard() {
 export default function DashboardSkeleton() {
   return (
     <div
-      className="min-h-screen w-full min-w-0 flex flex-col font-sans antialiased bg-background text-foreground"
+      className="w-full min-w-0 flex flex-col flex-1 font-sans antialiased bg-background text-foreground"
       aria-busy="true"
       aria-live="polite"
     >
@@ -40,15 +40,6 @@ export default function DashboardSkeleton() {
       <header className="border-b border-default bg-surface sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 sm:gap-6 min-w-0">
-            <div className="flex items-center gap-2.5 shrink-0">
-              <div className="h-8 w-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-serif text-lg font-bold">
-                J
-              </div>
-              <span className="font-serif text-base sm:text-lg tracking-tight font-medium truncate">
-                JK Intelligence
-              </span>
-            </div>
-            <div className="hidden sm:block h-4 w-px bg-border-subtle shrink-0" />
             <Block className="h-8 w-36 sm:w-56" />
           </div>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">

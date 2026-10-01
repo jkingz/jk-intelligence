@@ -35,10 +35,19 @@ describe("resolveProxyAction", () => {
       type: "redirect-login",
       next: "/profile",
     });
+    expect(resolveProxyAction("/connections", false)).toEqual({
+      type: "redirect-login",
+      next: "/connections",
+    });
+    expect(resolveProxyAction("/connections/atlas.example", false)).toEqual({
+      type: "redirect-login",
+      next: "/connections/atlas.example",
+    });
   });
 
   it("passes protected routes for authenticated users", () => {
     expect(resolveProxyAction("/dashboard", true)).toEqual({ type: "pass" });
     expect(resolveProxyAction("/profile", true)).toEqual({ type: "pass" });
+    expect(resolveProxyAction("/connections", true)).toEqual({ type: "pass" });
   });
 });

@@ -83,20 +83,25 @@ function AnimatedPanel({
   );
 }
 
-function EmptyShell({ accountMenu, message }: { accountMenu?: React.ReactNode; message: string }) {
+function EmptyShell({ message }: { message: string }) {
   return (
-    <div className="min-h-screen w-full min-w-0 flex flex-col font-sans antialiased bg-background text-foreground">
-      <header className="border-b border-default bg-surface">
-        <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-          <span className="font-serif text-base sm:text-lg tracking-tight font-medium">JK Intelligence</span>
-          {accountMenu}
-        </div>
-      </header>
+    <div className="flex w-full min-w-0 flex-1 flex-col font-sans antialiased bg-background text-foreground">
       <main className="max-w-7xl w-full min-w-0 mx-auto px-4 sm:px-6 py-6 sm:py-8 flex-1">
         <Card>
           <CardContent className="py-12 text-center text-sm text-text-muted">{message}</CardContent>
         </Card>
       </main>
+      {/* Brand-only footer: the rail shows the brand at lg+ only, so this is the one
+          brand on screen below lg in these states (08-app-shell.md, ui-context.md). The
+          loaded footer's three `overview.*` spans have no data here, so they stay out. */}
+      <footer className="border-t border-default bg-surface py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between text-xs text-text-muted gap-4">
+          <div className="flex items-center gap-2">
+            <span className="font-serif font-medium text-text-primary">JK Intelligence</span>
+            <span>— Agency SEO & AI Visibility System</span>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
@@ -150,19 +155,13 @@ export default function Dashboard({
 
   if (!selectedClient) {
     return (
-      <EmptyShell
-        accountMenu={accountMenu}
-        message="No reporting client is assigned to your account yet."
-      />
+      <EmptyShell message="No reporting client is assigned to your account yet." />
     );
   }
 
   if (!overview) {
     return (
-      <EmptyShell
-        accountMenu={accountMenu}
-        message={`No metrics have been synced for ${selectedClient.name} yet.`}
-      />
+      <EmptyShell message={`No metrics have been synced for ${selectedClient.name} yet.`} />
     );
   }
 
@@ -222,7 +221,7 @@ export default function Dashboard({
     (pendingView.clientId !== selectedClient.id || pendingView.days !== days);
 
   return (
-    <div className="min-h-screen w-full min-w-0 flex flex-col font-sans antialiased bg-background text-foreground">
+    <div className="w-full min-w-0 flex flex-col flex-1 font-sans antialiased bg-background text-foreground">
       <DashboardHeader
         accountMenu={accountMenu}
         exportMenu={exportMenu}

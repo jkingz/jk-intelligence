@@ -13,7 +13,7 @@ export default async function ProfilePage() {
   if (!profile) redirect("/auth/login");
 
   return (
-    <main className="flex min-h-svh w-full flex-col items-center justify-center gap-3 px-4">
+    <main className="flex w-full min-w-0 flex-1 flex-col items-center justify-center gap-3 px-4">
       <ProfileCard profile={profile} />
       <div className="w-full max-w-md">
         <SignOutButton />

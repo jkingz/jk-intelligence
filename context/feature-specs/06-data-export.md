@@ -38,7 +38,7 @@ Two GET handlers under `app/api/exports/[clientId]/`:
 - `lib/db/repository.ts` — reuses `listMetricSnapshots`; adds `listAllMetricSnapshots(clientId, from, to)` (all sources, for CSV) and `getLatestSnapshotTime(clientId, source)` on the existing admin-path read functions.
 - `next.config.ts` — `outputFileTracingIncludes` ships `lib/exports/fonts/*.ttf` with the export routes (the fonts are read from disk, which trace analysis cannot see).
 - Feature UI: `components/features/data-export/` — barrel exports `ExportMenu`; menu lives in the dashboard header (next to Trigger Sync) and downloads via a hidden anchor (`URL.createObjectURL` → `<a download>` revoke), with the standard toast lifecycle + `SlidingWindowLimiter` (a courtesy guard; the enforced limit is the server-side quota).
-- Wiring: `DashboardHeader` gains an `exportMenu?: React.ReactNode` slot; `app/dashboard/dashboard-view.tsx` renders `<ExportMenu client={...} days={...} />` through the feature barrel. No cross-feature imports.
+- Wiring: `DashboardHeader` gains an `exportMenu?: React.ReactNode` slot; `app/(app)/dashboard/dashboard-view.tsx` renders `<ExportMenu client={...} days={...} />` through the feature barrel. No cross-feature imports.
 
 ## Security
 - Auth + ownership enforced before any read via `getAuthUser()` then `listAccessibleClients()` (RLS-scoped); admin sees any client, client/staff only their own — identical to `/api/metrics/[clientId]/overview`.

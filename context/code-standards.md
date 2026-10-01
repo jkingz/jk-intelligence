@@ -146,8 +146,10 @@ cookie store; routes needing identity + role in one round trip use `getAuthSessi
 - metrics_snapshots is append-only — never update or delete historical rows. `keyword_rankings`
   cascades from it, so a delete silently destroys keyword history too.
 - current_metrics is the only mutable cache layer — one row per `(client_id, source)`.
-- `api_credentials` holds a `vault:<uuid>` **reference**, never key material, and RLS denies direct
-  select. Nothing in `.env`, logs, or responses may carry a provider key.
+- `api_credentials` holds a `vault:<uuid>` **reference**, never key material.
+  `api_credentials_select_tenant_or_admin` lets a tenant (or an admin) select its own rows, and no
+  code path selects `credential_reference`. Nothing in `.env`, logs, or responses may carry a
+  provider key.
 - Never expose the service-role key to client components or `NEXT_PUBLIC_*` vars. It is read only
   in `lib/db/admin.ts`, which is `server-only`.
 - RLS enabled on every table — policies must match the role model (admin/client/staff), with
@@ -185,7 +187,7 @@ const [gsc, ga4, semrush] = await Promise.allSettled([
   return 503; a thrown error in a handler becomes an HTML error page that the client `fetch` cannot
   parse.
 - The dashboard has no cached-data fallback yet: a failed boot shows `"Failed to load dashboard
-  data"` (`app/dashboard/dashboard-view.tsx`). Do not claim offline resilience until it exists.
+  data"` (`app/(app)/dashboard/dashboard-view.tsx`). Do not claim offline resilience until it exists.
 - Sync failures (when built) write `sync_logs` → mark `is_stale` → alert admin. Agents never throw
   to a client.
 - API errors logged with: clientId, source, timestamp, sanitized message. **No credentials, no
@@ -231,8 +233,9 @@ scripts/        — migrations runner, seed, demo user (the only way data lands 
 Vitest, Node environment, split into `unit` and `integration` projects. `pnpm test` runs the unit
 project only; `pnpm test tenant-isolation` narrows by path — `pnpm test -- tenant-isolation` does
 not, it silently runs the whole tier. A filter that matches nothing exits 1, so a moved file
-announces itself instead of passing empty. `pnpm test:all` adds integration (which today collects
-**zero** files and passes on `--passWithNoTests` — green that means nothing), `pnpm test:e2e` is
+announces itself instead of passing empty. `pnpm test:all` adds integration, which runs the tenant
+policies against a **real Postgres** (`pnpm exec supabase start` + `.env.test`; it `skipIf`s without
+`TEST_SUPABASE_URL`, so read the passed/skipped counts rather than the exit code), `pnpm test:e2e` is
 the public Playwright tier and `pnpm test:e2e:auth` the credential-gated one. Quote counts from the
 run's own output rather than restating them here.
 
