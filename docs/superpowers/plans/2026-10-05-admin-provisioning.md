@@ -36,9 +36,36 @@ These seven were found by reading code while planning. Each is deliberate, each 
 2. **`admin_attach_member` collapses §7's two `23503` messages into one.** Both halves of that row (missing client, missing auth account) come from the same FK on `users.client_id` and the same upsert, so the handler cannot tell them apart from `error.code` alone. The single message is `"That account or client no longer exists."` — one string, no message parsing.
 3. **The role set gets a single source of truth in `types/metrics.ts`.** §3 names three places that must agree and asks §8's unit tier to pin them with a table. Rather than pin three literals, `export const MEMBER_ROLES = ["admin", "client", "staff"] as const` plus `export type MemberRole` joins the file every one of them already imports, and a test asserts it equals the list inside `users_role_check`'s DDL. See Task 4.
 4. **The fixture helper is `ensureLink`, not `linkUser`.** §8 cites `linkUser()`; the real name at `tests/fixtures/identity-users.ts:72-85` is `ensureLink`. Same function, same signature, already typed for `"admin"`.
-5. **The 1000-row directory cap is partly unmeasurable, and that gets recorded rather than papered over.** `max_rows = 1000` (`supabase/config.toml:18`) is a PostgREST limit, so a `psql` call cannot observe it; the probe measures the SQL side and the row count, and the cap is then reported as **inherited from config** unless the synthetic overflow passes. See Task 2.
+5. **The 1000-row directory cap is partly unmeasurable, and that gets recorded rather than papered over.** `max_rows = 1000` (`supabase/config.toml:18`) is a PostgREST limit, so a `psql` call cannot observe it; the probe measures the SQL side and the row count, and the cap is then reported as **inherited from config** unless the synthetic overflow passes. See Task 2. **Closed during execution (2026-10-05): measured.** A set-returning definer probe returned exactly 1000 rows against 1003 in `auth.users`, so the ceiling is real and the inherited-from-comment framing is no longer needed.
 6. **`docs/target-state.md` step 12 becomes `⚠️`, not `✅`.** The panel ships provisioning only; sync logs, credential writes, and the manual trigger are still absent (§2), so a clean check would be a new false claim. The line reads done-for-provisioning.
 7. **Two extra leaf files beyond §5's tree**: `lib/admin/http.ts` (the JSON response + body-read trio the four handlers share — repeating fifteen header lines four times is how one of them drifts) and `components/features/admin/lib/select-items.ts` (the `Select` `items` arrays, which must be plain data because base-ui's `Select` takes `items` as a prop). Both are leaf modules with one importer group; no behaviour moves into them.
+
+## Substrate notes, corrected during execution (2026-10-05)
+
+Three commands in this plan assumed tooling this machine does not have. The intent of every step is
+unchanged; the mechanism is not what is written below in Tasks 2, 3, and 5.
+
+- **`psql` is not on PATH.** Every `psql "$pg" -c "…"` in this plan became a throwaway `.mjs` under
+  `/tmp` using the repository's existing `pg` dependency (`scripts/run-migrations.mjs:5` already
+  imports it), loaded from a project script with `createRequire("<repo>/package.json")` so module
+  resolution works outside the repo. It refused any connection string that was not
+  `127.0.0.1:54322` — the same guard the plan's "never bare" rule wants.
+- **`.env.test` carries four names only** — `TEST_SUPABASE_URL`, `_PUBLISHABLE_KEY`,
+  `_SERVICE_ROLE_KEY`, `TEST_DEMO_PASSWORD`. There is **no `TEST_DATABASE_URL`**, so
+  `grep -m1 '^TEST_DATABASE_URL=' .env.test` yields an empty string, and because
+  `run-migrations.mjs:10` uses `??` an empty `SUPABASE_DB_URL` does not fall through — it reaches
+  `pg` and fails. Use the local stack's own string: `pnpm exec supabase status` prints it, currently
+  `postgresql://postgres:postgres@127.0.0.1:54322/postgres`.
+- **`supabase db query --local --file X.sql` refuses a multi-statement file** ("cannot insert
+  multiple commands into a prepared statement"). There is no `--sql` flag either — a single
+  statement is a positional argument (`supabase db query --local "select …"`). A migration-sized
+  file goes through `pg`, which is how Task 3's verification queries are run as well.
+- **Docker Desktop must already be running.** `pnpm exec supabase start` fails with
+  `Cannot connect to the Docker daemon` otherwise, and `supabase status` reports that rather than
+  "stopped".
+- **Auth keys are stable across local restarts.** `.env.test`'s pair signed in against a freshly
+  started stack without re-exporting, which is what makes the integration tier's `withSession()`
+  reproducible.
 
 ## File structure
 
