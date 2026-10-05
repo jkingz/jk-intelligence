@@ -62,7 +62,7 @@ const row: any = await fetchGSC()
 - `next.config.ts` owns the `Content-Security-Policy` (non-nonce) and applies it to every route; keep `proxy.ts` auth-only.
 - Trusted Types are **not** enforced via `require-trusted-types-for` — the Next.js client router re-creates head `<script>`/`<link>` elements on route transitions and React DOM parses scripts through an HTML sink (`div.innerHTML = "<script></script>"`), so enforcing the directive blocks client-side navigation in production ("This document requires 'TrustedHTML'/'TrustedScriptURL' assignment"). Production and dev send only `trusted-types nextjs` on the enforced policy (defense in depth against injected `createPolicy` calls); dev additionally carries `require-trusted-types-for 'script'` on `Content-Security-Policy-Report-Only` for observability.
 - `trusted-types` must list `nextjs` — the policy Next.js creates in `next/dist/client/trusted-types.js`.
-- `connect-src` is dev-wide (`ws: wss: https:`) and production-scoped (`https://*.supabase.co wss://*.supabase.co`). Any new external origin (APIs, fonts, images) must be added to the matching directive in `next.config.ts`.
+- `connect-src` is dev-wide (`ws: wss: https:` plus `http://127.0.0.1:54321` / `http://localhost:54321`, which is how the `@auth` Playwright tier reaches a `supabase start` stack over plain HTTP) and production-scoped (`https://*.supabase.co wss://*.supabase.co`). Any new external origin (APIs, fonts, images) must be added to the matching directive in `next.config.ts`.
 
 ## Images
 

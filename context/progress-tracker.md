@@ -76,7 +76,7 @@ the build and the first live-RLS integration slice landed (2026-09-24).
 - Fragment-Ref `InView` primitive + Trusted Types CSP (follow-up to React 19.3 upgrade):
   - `components/ui/in-view.tsx` (barrel-exported) — headless `InView` on React 19.3 Fragment Refs: `useRef<FragmentInstance>` + `<Fragment ref>` observes its first-level children with a single `IntersectionObserver` via `observeUsing` / `unobserveUsing`. Props: `once` (disconnect after first hit), `threshold`, `rootMargin`, `onChange(inView)`. `onChange` is wrapped in `useEffectEvent` so an inline callback does not re-subscribe the observer.
   - `dashboard-chart.tsx` now uses `<InView once>` + `revealed` state instead of `motion`'s `whileInView` / `viewport`; the reveal is a CSS transition (`opacity` / `translate-y`, `motion-reduce:transition-none`) with `isRevealed = revealed || shouldReduceMotion`. `motion` still drives the scroll parallax (`useScroll` / `useTransform`). No `whileInView` remains in the codebase.
-  - `next.config.ts` now sends a `Content-Security-Policy` on every route. Production enforces `require-trusted-types-for 'script'; trusted-types nextjs`; development enforces the base policy but carries the Trusted Types directives on `Content-Security-Policy-Report-Only`, because React dev `eval`-based stack reconstruction and Turbopack HMR assign raw strings to script sinks (verified: enforcing in dev throws `TrustedScript` / `TrustedScriptURL` violations). `connect-src` is dev-wide (`ws: wss: https:`) and production-scoped (`https://*.supabase.co wss://*.supabase.co`), per the nonce-less Next CSP guide.
+  - `next.config.ts` now sends a `Content-Security-Policy` on every route. Production enforces `require-trusted-types-for 'script'; trusted-types nextjs`; development enforces the base policy but carries the Trusted Types directives on `Content-Security-Policy-Report-Only`, because React dev `eval`-based stack reconstruction and Turbopack HMR assign raw strings to script sinks (verified: enforcing in dev throws `TrustedScript` / `TrustedScriptURL` violations). `connect-src` is dev-wide (`ws: wss: https:`, and since 2026-10-06 the two `http://…:54321` local-stack origins) and production-scoped (`https://*.supabase.co wss://*.supabase.co`), per the nonce-less Next CSP guide.
   - Verified against a production build (`pnpm build && pnpm start`): `/auth/dashboard-test` and `/auth/login` load with 0 console errors under enforced Trusted Types; positive control confirms `script.src = string` throws `TypeError`; Next's `nextjs` policy is present; the chart card computes `opacity: 1` after the InView reveal.
   - Documented in `context/code-standards.md` → "React 19.3 Rendering" / new "Security Headers", `context/ui-context.md` → "Motion", `context/feature-specs/04-dashboard.md`. 28 tests, typecheck, lint, build pass.
 
@@ -255,7 +255,38 @@ the build and the first live-RLS integration slice landed (2026-09-24).
     11: it needs an admin to sign in as, so either those two cases scope to `FIXTURE_USERS.admin`'s
     id, or the `@auth` specs run on a stack that never runs the integration tier. First option is
     small and removes a landmine but edits a shipped Task 6 file, so it is King's call.
-  - Unit tier is now **35 files / 221 tests**, typecheck/lint/build clean, `/dashboard` still `○`.
+  - **The page renders, read-only (Task 11, 2026-10-06).** `app/(app)/admin/page.tsx` —
+    `force-dynamic` for the same load-bearing reason `/connections` has it, `requireAdmin()` then
+    `redirect("/dashboard")` — over `components/features/admin/`: the panel, two raw `<table>`s in
+    the shipped `bg-surface`/`font-mono text-[11px]` vocabulary, and two dialog stubs whose triggers
+    are `disabled` until Task 12. `AccountMenu` gains one conditional item. `pnpm build`: **`ƒ /admin`**,
+    `○ /dashboard` unchanged.
+  - **The `@auth` tier can run against the local stack now — it never could before.** The blocker was
+    the CSP, not the env: dev's `connect-src` never admitted `http://127.0.0.1:54321`, so the browser
+    refused the token request and all 16 specs died inside `logIn`. Widened for dev only, at King's
+    call; production's directive is untouched. Two more prerequisites after that: `pnpm db:seed --
+    --days 90` (the stack's rows stopped at 2026-09-25, outside the default 7-day window) and
+    `pnpm db:demo-user` with `DEMO_EMAIL=demo@rls-test.local`, because the fixture tenant
+    `client@a.rls-test.local` has no metric rows and the dashboard's `EmptyShell` then renders no
+    header at all. **So `@auth`'s demo user is no longer `FIXTURE_USERS.clientA`** — the fixture
+    tenants stay as the integration tier expects them, and the e2e tier got its own data-bearing
+    local account. Result: `pnpm test:e2e:auth` **26 passed** (9 public + 17 auth, 8 of them new);
+    `pnpm test:all` **38 files / 240 tests**, which is the evidence the new rows disturb neither the
+    RLS cases nor the last-admin ones.
+  - **Open item — a design gap, not a bug: the panel's only entry point can be absent.**
+    `AccountMenu` is rendered by exactly one file, `app/(app)/dashboard/dashboard-view.tsx:236`, and
+    `components/features/dashboard/components/dashboard.tsx:86` (`EmptyShell`) renders **no header**
+    in its two no-data states. A new admin on a project whose first accessible client has no synced
+    rows therefore sees no route to `/admin` — the provisioning panel is unreachable precisely when
+    provisioning is what is needed. §4 chose the menu because it already carried the role, and never
+    asked whether the menu is always on screen. Candidates: a role-gated fourth rail destination (the
+    row `08-app-shell.md` just retired), a link inside `EmptyShell`, or a header of the panel's own.
+    King's call, and it should land before Task 12 wires dialogs to a button nobody can press.
+  - Task 11's `pending@rls-test.local` auth account is what makes the Attach trigger render; with the
+    trigger disabled a pending account has no visible representation, because its list lives inside
+    the dialog. Task 12 changes that.
+  - Unit tier **35 files / 221 tests**; with integration **38 / 240**. Typecheck/lint/build clean,
+    `/dashboard` still `○`.
 
 ## Recent Work
 

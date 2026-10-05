@@ -13,7 +13,9 @@ const baseDirectives = [
   "form-action 'self'",
   "frame-ancestors 'none'",
   isDev
-    ? "connect-src 'self' ws: wss: https:"
+    ? // `supabase start` serves plain HTTP, so the browser-side auth call needs it
+      // here or every @auth spec fails at the login form against the local stack.
+      "connect-src 'self' ws: wss: https: http://127.0.0.1:54321 http://localhost:54321"
     : "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
 ];
 

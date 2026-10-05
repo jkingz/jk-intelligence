@@ -124,11 +124,14 @@ Planned and absent: `POST /api/sync/trigger`, `GET /api/metrics/{clientId}`,
 ## Pages and caching
 
 `app/` routes: `/` (landing), `/auth/{login,sign-up,forgot-password,reset-password}`, `/privacy`,
-`/terms`, plus `app/auth/callback/route.ts` (PKCE exchange). `/dashboard`, `/profile` and
-`/connections` live in the `app/(app)/` route group — the group folder adds no URL segment — under
-one server-component shell (`app/(app)/layout.tsx` → `components/features/app-shell`) whose rail
-renders its links from `lib/navigation/destinations.ts`; the shell reads no session, so it cannot
-make a page dynamic. There is **no** admin panel page, no `sitemap.ts`/`robots.ts`, and no
+`/terms`, plus `app/auth/callback/route.ts` (PKCE exchange). `/dashboard`, `/profile`,
+`/connections` and `/admin` live in the `app/(app)/` route group — the group folder adds no URL
+segment — under one server-component shell (`app/(app)/layout.tsx` →
+`components/features/app-shell`) whose rail renders its links from `lib/navigation/destinations.ts`;
+the shell reads no session, so it cannot make a page dynamic. `/admin` is not a destination:
+`activeDestination("/admin")` is `null`, the rail renders three links with none active, and the only
+visible entry is the role-gated item in `AccountMenu` — which the dashboard's `EmptyShell` states do
+not render, a gap tracked in `context/feature-specs/07-admin.md`. No `sitemap.ts`/`robots.ts`, and no
 LLM/Claude dependency.
 
 `lib/cache/invalidate.ts` owns `DASHBOARD_OVERVIEW_TAG = "dashboard-overview"`; revalidation happens

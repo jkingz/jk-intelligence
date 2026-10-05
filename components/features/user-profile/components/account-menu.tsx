@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, UserRound } from "lucide-react";
+import { LogOut, ShieldCheck, UserRound } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -80,6 +80,12 @@ export function AccountMenu({ profile }: { profile: ProfileView | null }) {
               <UserRound aria-hidden="true" />
               Profile
             </DropdownMenuItem>
+            {profile?.role === "admin" && (
+              <DropdownMenuItem onClick={() => router.push("/admin")}>
+                <ShieldCheck aria-hidden="true" />
+                Admin
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={logOut} closeOnClick={false} disabled={pending} aria-busy={pending}>
               <LogOut aria-hidden="true" />
               {pending ? "Logging out…" : "Log out"}

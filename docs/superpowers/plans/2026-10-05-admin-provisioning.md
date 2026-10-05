@@ -2927,7 +2927,7 @@ Ship the panel with no working buttons first, and answer §10.2's build question
 - Consumes: `getAdminView()` and its exported view types (Task 9), `AppShell` via `app/(app)/layout.tsx` (no import needed — the route group wraps it), `activeDestination("/admin") → null`, `Badge`/`Button` variants from `components/ui`.
 - Produces: `<AdminPanel view={…} />` and a rendered `/admin`. Task 12 replaces the disabled controls with real ones.
 
-- [ ] **Step 1: Write the page.** Create `app/(app)/admin/page.tsx`:
+- [x] **Step 1: Write the page.** Create `app/(app)/admin/page.tsx`:
 
 ```tsx
 import type { Metadata } from "next";
@@ -2955,13 +2955,16 @@ export default async function Page() {
 
 The `redirect` is the second of §4's two gates: a prefix match proves a session exists, not that it is an admin.
 
-- [ ] **Step 2: Write the barrel.** Create `components/features/admin/index.ts`:
+Shipped as drafted, with the three imports sorted (`@/components/features/admin`, `@/lib/admin/provisioning`,
+`@/lib/agents/authAgent`) because the drafted order interleaved the two `lib` paths.
+
+- [x] **Step 2: Write the barrel.** Create `components/features/admin/index.ts`:
 
 ```ts
 export { AdminPanel } from "./components/admin-panel";
 ```
 
-- [ ] **Step 3: Write the panel shell.** Create `components/features/admin/components/admin-panel.tsx`:
+- [x] **Step 3: Write the panel shell.** Create `components/features/admin/components/admin-panel.tsx`:
 
 ```tsx
 import { AttachMemberDialog } from "./attach-member-dialog";
@@ -3025,7 +3028,18 @@ export function AdminPanel({ view }: { view: AdminView }) {
 
 Stacked, never side-by-side, and it stays stacked at `lg` (§5). The three copy strings are §7's empty states in the order a real account meets them.
 
-- [ ] **Step 4: Write the two tables.** Create `components/features/admin/components/client-table.tsx`:
+**Step 3 shipped a different vocabulary than drafted, on purpose.** The draft wrote raw
+`<section>`/`<div>` with `text-foreground` / `text-muted-foreground` / `font-semibold`; those token
+names are the shadcn defaults, and this app overrides them — `context/ui-context.md` and every
+shipped page use `text-text-primary` / `text-text-muted` / `text-text-faint` and `font-serif`
+headings at `font-medium`. `app/(app)/connections/…/connections-page.tsx` is the closest analogue
+(a server page inside the shell), so the panel copies its `<main className="max-w-7xl …">` chrome
+and puts each table in a `Card` with `CardHeader`/`CardTitle`/`CardAction`/`CardContent`, which is
+what `components/ui/card.tsx` exists for — `CardAction` is what turns the header grid into
+`1fr auto` so the dialog trigger sits at the right edge. §5's stacking rule and §7's three strings
+are unchanged; the strings are verbatim.
+
+- [x] **Step 4: Write the two tables.** Create `components/features/admin/components/client-table.tsx`:
 
 ```tsx
 import { Badge } from "@/components/ui/badge";
@@ -3085,6 +3099,18 @@ export function ClientTable({ clients }: { clients: PanelClient[] }) {
 
 The `disabled` controls are Task 12's slot, and the component owns its own status strings ("Active" / "Paused") the way the catalog owns its own — a `bool ? "Active" : "Inactive"` inlined twice would be the drift the last session's fix targeted. Secondary columns (`Domain`, `Members`) drop below `sm`, and the clipper is `relative overflow-x-auto` because a plain `overflow-x-auto` lets `sr-only` descendants escape it.
 
+Both tables keep the drafted column set, the `hidden … sm:table-cell` drop and the clipper. Three
+changes: the header row uses the shipped table vocabulary (`bg-surface border-b border-default
+text-text-muted font-medium font-mono text-[11px]`, `divide-y divide-border-default`,
+`hover:bg-secondary/30 transition-colors`) copied from `components/features/dashboard/components/query-table.tsx`,
+which is the only other raw `<table>` in the app — nothing imports `components/ui/table.tsx`, so
+that file is the precedent, not the primitive; each table gains a `<caption className="sr-only">`
+so the landmark announces itself to a screen reader; and the member table's account cell no longer
+prints the email twice. The drafted cell rendered `name ?? email` above `email`, so every account
+without a display name showed the same string on both lines (all of them, on this stack). It now
+derives `primary = name ?? email ?? "Unnamed account"` and shows the second line only when it adds
+something — a distinct email, or `"Not in the directory"` for an `unlisted` row.
+
 Create `components/features/admin/components/member-table.tsx`:
 
 ```tsx
@@ -3141,7 +3167,7 @@ export function MemberTable({ members }: { members: ProvisionedMember[] }) {
 
 `"Unassigned"` is a value, not an error (§7). `role` renders as stored — `admin` / `client` / `staff` — because the panel is a control surface and translating role names into product nouns would invent a second vocabulary.
 
-- [ ] **Step 5: Stub the two dialogs so the build compiles.** Create `components/features/admin/components/client-dialog.tsx` and `components/features/admin/components/attach-member-dialog.tsx` with the shapes Task 12 fills in — a `Dialog` trigger button, `disabled`, no form yet:
+- [x] **Step 5: Stub the two dialogs so the build compiles.** Create `components/features/admin/components/client-dialog.tsx` and `components/features/admin/components/attach-member-dialog.tsx` with the shapes Task 12 fills in — a `Dialog` trigger button, `disabled`, no form yet:
 
 ```tsx
 // client-dialog.tsx
@@ -3212,7 +3238,13 @@ export function AttachMemberDialog({ accounts }: { accounts: PendingAccount[] })
 
 (`client-table.tsx` renders its own disabled Rename button in Step 4; Task 12 replaces that with `<ClientDialog mode="rename" … />`. Verify `DialogTrigger`'s prop name against `components/ui/dialog.tsx` before writing — `profile-dialog.tsx` shows `DialogContent` takes `overlayClassName`, and the account menu shows the `render={<Button/>}` idiom, but read the file rather than trusting either.)
 
-- [ ] **Step 6: Add the entry point.** In `components/features/user-profile/components/account-menu.tsx`, insert between the Profile item (`:79-82`) and the Log out item:
+Checked: `DialogTrigger` takes `render` (Base UI, not Radix's `asChild`), and `DialogContent` takes
+`overlayClassName`. One deviation — the drafted attach-member trigger forgot `disabled`, and Step 5's
+own instruction is "a `Dialog` trigger button, `disabled`, no form yet". Both triggers ship
+`<Button size="sm" disabled />`, so nothing in Task 11's page opens a dialog that cannot submit.
+`DialogTrigger`'s prose is otherwise verbatim, including the `accounts[0].email` conditional.
+
+- [x] **Step 6: Add the entry point.** In `components/features/user-profile/components/account-menu.tsx`, insert between the Profile item (`:79-82`) and the Log out item:
 
 ```tsx
             {profile?.role === "admin" && (
@@ -3225,7 +3257,18 @@ export function AttachMemberDialog({ accounts }: { accounts: PendingAccount[] })
 
 and add `ShieldCheck` to the existing `lucide-react` import. One conditional on a prop the component already receives — no new server prop, no change to `/api/dashboard/boot`, no role filter in `lib/navigation/destinations.ts`.
 
-- [ ] **Step 7: Widen `logIn` to take a role.** Replace `tests/helpers/log-in.ts` with:
+**This is the step that needs a follow-up decision, and Step 8 found it.** `AccountMenu` is rendered
+by exactly one file — `app/(app)/dashboard/dashboard-view.tsx:236`, in the dashboard header — and
+`components/features/dashboard/components/dashboard.tsx:86` (`EmptyShell`) renders *no header* for
+its two no-data states (`!selectedClient`, and `!overview`). So the panel's only visible entry point
+disappears precisely when the admin has nothing to look at: a brand-new admin on a project whose
+first accessible client has no synced rows sees the empty shell, and from there the rail's three
+destinations are the only links on the page. §4 chose `AccountMenu` over a rail row on the reasoning
+that the menu already had the role; it did not check that the menu is always on screen. Recorded in
+`context/progress-tracker.md` as an open item for Task 13 — the candidates are a fourth rail
+destination for admins, a link inside `EmptyShell`, or giving the dashboard header its own gate.
+
+- [x] **Step 7: Widen `logIn` to take a role.** Replace `tests/helpers/log-in.ts` with:
 
 ```ts
 import { expect, type Page } from "@playwright/test";
@@ -3258,7 +3301,11 @@ export async function logIn(page: Page, role: FixtureRole = "demo") {
 
 The default argument keeps all five existing `@auth` call sites unchanged.
 
-- [ ] **Step 8: Write the two `@auth` specs.** Create `tests/admin/e2e/panel.spec.ts`:
+Shipped as drafted: five spec files, six `logIn(page)` call sites, none edited. The throw earns its
+place — it separates "the credential name is missing from the environment" from "the login did not
+land", which is exactly the split Step 10 had to make.
+
+- [x] **Step 8: Write the two `@auth` specs.** Create `tests/admin/e2e/panel.spec.ts`:
 
 ```ts
 import { expect, test } from "@playwright/test";
@@ -3329,7 +3376,28 @@ for (const viewport of [
 
 `activeDestination("/admin")` returns `null`, so no rail link carries the active state here — that is the second spec's whole point, and it is why Task 8 must not add a destination row.
 
-- [ ] **Step 9: Answer the build question.**
+Three defects in the drafted specs, all found by running them:
+
+1. **The drafted third panel test cannot pass.** It calls `logIn(page, "demo")`, inspects the menu,
+   then calls `logIn(page, "admin")` on the same page — but `/auth/login` redirects a signed-in
+   visitor, so the second call never reaches the form and dies on `form.getByLabel("Email")` after
+   30 s. Split into two tests, one role each, which is also the idiomatic shape: Playwright gives
+   every test a fresh context, so no cookie surgery is needed. That makes **8 new tests** (4 panel
+   + 4 layout), not the 5 Step 10's expected count claims.
+2. **The admin half needs a client that has metrics**, because of Step 6's finding: on this stack the
+   admin's default selection is an RLS fixture with no rows, so the dashboard paints `EmptyShell` and
+   there is no `Account menu` button to click. The test reads `/api/dashboard/boot` (a GET; the tier
+   stays read-only) and walks the accessible ids until the header appears, and throws a sentence that
+   names the condition if none does. It is slower than its siblings (9.9 s vs ~2.5 s) and still nowhere
+   near the timeout.
+3. **The drafted layout assertion about the rail was wrong**, and `tests/dashboard/e2e/rail.spec.ts:36`
+   already documents why: both `Sections` landmarks stay in the DOM at every width and only `:visible`
+   tells them apart, so `getByRole("link", { name: "Dashboard" })` → `toHaveCount(1)` would have
+   counted two. Shipped as `page.locator("nav[aria-label='Sections']:visible")` → `toHaveCount(1)`,
+   plus `sections.locator("[aria-current]")` → `toHaveCount(0)`, which is the actual claim: the rail is
+   rendered, and nothing in it is marked active.
+
+- [x] **Step 9: Answer the build question.**
 
 Run: `pnpm build`
 Expected: the route table prints **`ƒ /admin`** and **`○ /dashboard`**. If `/dashboard` has become `ƒ`, stop and find out why before continuing — the shell reads no session and must stay that way (Task 13 documents this). If `/admin` builds as `○`, the `force-dynamic` line is not doing what its comment claims; check whether Next opted the segment out on its own and record which.
@@ -3337,7 +3405,12 @@ Expected: the route table prints **`ƒ /admin`** and **`○ /dashboard`**. If `/
 Run: `pnpm test && pnpm typecheck && pnpm lint`
 Expected: green.
 
-- [ ] **Step 10: Run the `@auth` tier against the local stack, not hosted.** The panel writes nothing, so reading hosted would be acceptable — but this checkout's `.env` points at hosted production, and the admin account Task 10 provisioned exists only locally. Override the four names in the shell, where they beat `--env-file`:
+Measured: `pnpm build` prints **`ƒ /admin`** (dynamic, as its comment claims) and **`○ /dashboard`**
+(unchanged — the shell still reads no session), alongside `ƒ /connections` and `ƒ /profile`.
+`pnpm test:all` 38 files / 240 tests, `pnpm typecheck` and `pnpm lint` clean. The build was re-run
+after the Step 10 CSP change and after the member-table cell fix; both times the route table matched.
+
+- [x] **Step 10: Run the `@auth` tier against the local stack, not hosted.** The panel writes nothing, so reading hosted would be acceptable — but this checkout's `.env` points at hosted production, and the admin account Task 10 provisioned exists only locally. Override the four names in the shell, where they beat `--env-file`:
 
 ```bash
 pnpm exec supabase start
@@ -3349,7 +3422,61 @@ ADMIN_EMAIL="$(grep -m1 '^TEST_ADMIN_EMAIL=' .env.test 2>/dev/null | cut -d= -f2
 
 If `TEST_ADMIN_EMAIL` is not a name `.env.test` carries, export `ADMIN_EMAIL=admin@rls-test.local ADMIN_PASSWORD=<FIXTURE_PASSWORD>` inline instead and say in the tracker which pair the run used — the run must be reproducible by whoever reads the line next. Expected: 16 existing passed plus the 5 new.
 
-- [ ] **Step 11: Use the page in a browser before calling it done.**
+**The drafted command cannot run this tier, and the tier had never run against the local stack
+before.** What it took, in order:
+
+- **The admin pair.** `.env.test` carries four names only (`TEST_SUPABASE_URL`,
+  `TEST_SUPABASE_PUBLISHABLE_KEY`, `TEST_SUPABASE_SERVICE_ROLE_KEY`, `TEST_DEMO_PASSWORD`) — no
+  `TEST_ADMIN_EMAIL`, so the fallback applies: `ADMIN_EMAIL=admin@rls-test.local` /
+  `ADMIN_PASSWORD=test-fixture-password-123`, i.e. `FIXTURE_USERS.admin` with `FIXTURE_PASSWORD`
+  from `tests/fixtures/identity-users.ts`. Deliberately the *existing* fixture admin: provisioning a
+  second one would break the two last-admin integration cases (Task 10's open decision).
+- **Five overrides, not four.** `SUPABASE_SERVICE_ROLE_KEY` has to move with the rest — the metric
+  reads go through `getAdminDb()` (RLS bypassed, by design), so leaving it at `.env`'s value would
+  read production rows behind a local-stack session. `NEXT_PUBLIC_APP_URL=http://localhost:3000`
+  too, or the auth host comes from the hosted `.env`. And the dev server must already be up under
+  the same overrides: `webServer.reuseExistingServer` is true off CI, so a cold `pnpm test:e2e:auth`
+  starts a *bare* `pnpm dev -p 3000`, which reads `.env` and points the whole tier at hosted.
+- **The real blocker was the CSP, not the env.** First run: 9 passed / 16 failed, every failure
+  inside `logIn` waiting on `/dashboard`, the dev log showing GETs and no POST. A console-logging
+  probe found it: `Connecting to 'http://127.0.0.1:54321/auth/v1/token?grant_type=password'
+  violates the following Content Security Policy directive: "connect-src 'self' ws: wss: https:"`.
+  `supabase start` serves plain HTTP and the dev policy has never admitted it, so **the `@auth` tier
+  has only ever been runnable against hosted** — 16 failures were the tier's local-stack debut, not a
+  regression. King chose "allow the local stack in dev": `next.config.ts` now appends
+  `http://127.0.0.1:54321 http://localhost:54321` to the dev `connect-src` only, production untouched,
+  and the three places that recorded the directive are updated with it
+  (`context/code-standards.md`, `context/feature-specs/04-dashboard.md`, `context/progress-tracker.md`).
+- **Then the data problem.** 6 still failed: `overview`, `tab-deep-link`, `mobile-layout` ×2,
+  `export/csv` and the new menu test — all of them waiting on a dashboard that had painted
+  `EmptyShell`. `DEMO_EMAIL=client@a.rls-test.local` is `FIXTURE_USERS.clientA`, tenant "RLS Client
+  A", which has **0** rows in `metrics_snapshots` and `current_metrics`; `scripts/seed.mjs` fills
+  only its three hard-coded domains. Two local-stack steps fix it: `pnpm db:seed -- --days 90` (the
+  existing rows stopped at 2026-09-25, outside the default 7-day window, so even a seeded tenant read
+  empty) and `pnpm db:demo-user` with `DEMO_EMAIL=demo@rls-test.local`, which links that account to
+  Northstar Studio. **So this tier's demo user is no longer `FIXTURE_USERS.clientA`** — the fixture
+  tenants stay untouched for the integration tier, and `@auth` gets its own data-bearing local
+  account. Both commands were run with the `TEST_*` names overridden inline, never bare.
+- **Result: 26 passed** (9 public + 17 auth — 9 pre-existing and 8 new, not "16 existing plus the 5
+  new"). `pnpm test:all` afterwards: 38 files / 240 tests green, which is the evidence that the new
+  `demo@rls-test.local` row, Task 11's `pending@rls-test.local` auth account and the fresh snapshots
+  disturb neither the RLS cases nor the last-admin ones.
+
+The reproducible form, from a clean shell with the stack up:
+
+```bash
+set -a; . ./.env.test; set +a
+export NEXT_PUBLIC_SUPABASE_URL="$TEST_SUPABASE_URL" \
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$TEST_SUPABASE_PUBLISHABLE_KEY" \
+  SUPABASE_SERVICE_ROLE_KEY="$TEST_SUPABASE_SERVICE_ROLE_KEY" \
+  NEXT_PUBLIC_APP_URL=http://localhost:3000 \
+  ADMIN_EMAIL=admin@rls-test.local ADMIN_PASSWORD=test-fixture-password-123 \
+  DEMO_EMAIL=demo@rls-test.local DEMO_PASSWORD=test-fixture-password-123
+pnpm dev -p 3000 &        # must be up, and up under these names
+pnpm test:e2e:auth
+```
+
+- [x] **Step 11: Use the page in a browser before calling it done.**
 
 ```bash
 pnpm dev -p 3000
@@ -3357,7 +3484,35 @@ pnpm dev -p 3000
 
 Visit `http://localhost:3000/admin` signed in as the admin fixture: the two regions render, the client table shows every seeded client including any paused one, the Members table shows the admin's own email from the directory, the rail shows three links with none active, and narrowing to 320 px clips the tables inside their own boxes rather than the document. Then visit it signed out (login redirect with `next=%2Fadmin`) and as a `client` account (bounced to `/dashboard`). If any of those four views cannot be exercised locally, say so in the tracker rather than claiming the surface was seen.
 
-- [ ] **Step 12: Commit.**
+Seen in Chrome against the local stack, signed in as `admin@rls-test.local`:
+
+- **Both regions render.** Clients: five rows, `Domain` in mono, `Active` badges, member counts
+  0 / 0 / 1 / 2 / 1, disabled Rename and Pause on every row. Members: five rows, `Role` badges,
+  `Detach` disabled.
+- **The paused state had to be made, because nothing on the stack was inactive.** A direct
+  `update public.clients set is_active = false where name = 'Atlas Coffee'` over the local
+  connection (`127.0.0.1:54322`) put a `Paused` badge and a `Resume` button on that row — and it is
+  the row's *presence* that is the finding: `admin_directory` carries no `is_active` filter, which is
+  what lets an admin resume what a tenant can no longer see. Restored to `true` afterwards.
+- **The admin's own email is in the Members table**, role `admin`, Client `Unassigned` — from the
+  directory, not from the session, which is §6's point.
+- **The Step 4 cell fix is visible on this data.** The demo account renders as two lines,
+  "Demo User" over `demo@rls-test.local`, because `create-demo-user.mjs` writes
+  `user_metadata.name`; the four fixture accounts have no display name and now render one line
+  rather than the same email twice.
+- **`pending@rls-test.local` is absent from the table, correctly** — it is not provisioned. It is
+  what makes `members.pending.length > 0`, which is the only reason the Attach account trigger
+  renders at all. Its list lives *inside* that dialog, so while the trigger is disabled a pending
+  account has no visible representation beyond the button. Task 12's note.
+- **Rail: three links, none active** at 1280, and the destination strip replaces it below `lg`.
+  Tables clip inside their own boxes at 320 and 390; `Domain` drops below `sm`.
+- **The signed-out and client-role visits were exercised by specs, not by hand**:
+  `tests/identity/e2e/admin-guard.spec.ts` (Task 8) asserts the login redirect with `next=%2Fadmin`,
+  and `tests/admin/e2e/panel.spec.ts` asserts the bounce. Both run in a real browser.
+- One artifact noticed and **not** this panel's: the shell's theme toggle floats bottom-left over
+  content at 390 px on `/admin` — and on `/connections` too, so it is the shell's, pre-existing.
+
+- [x] **Step 12: Commit.**
 
 ```bash
 git add "app/(app)/admin" components/features/admin \

@@ -21,6 +21,11 @@ admin can name the tenant it attaches to.
 - No left-rail row. `/admin` is a protected prefix, not a destination, so
   `activeDestination("/admin")` returns `null` and the rail renders with nothing active. The
   entry point is the Admin item in `AccountMenu`, shown only when `profile.role === "admin"`.
+  **Known gap, open as of 2026-10-06:** `AccountMenu` is rendered only by the dashboard's loaded
+  header, and `dashboard.tsx`'s `EmptyShell` (no client assigned, or no overview for the selected
+  client) renders no header — so an admin whose first accessible client has no synced rows sees no
+  route here at all. The gate is sound (`/admin` answers the role server-side); only the visible
+  door is missing.
 - No hard delete on a client. `api_credentials.client_id … on delete cascade` and
   `users.client_id … on delete set null` mean deleting a client destroys its credentials and
   un-homes its members. Deactivate instead.
