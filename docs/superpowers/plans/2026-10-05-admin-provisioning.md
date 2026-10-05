@@ -25,7 +25,9 @@ Every task's requirements implicitly include this section.
 - **Zero new npm dependencies and zero new `components/ui/*`** (§5, "Deliberately absent").
 - **`@auth` e2e stays read-only.** No browser spec creates a client or attaches a member (§8).
 - **`context/` files are updated in the same task that makes them true** (§9), and `AGENTS.md` below the `# SERVICE ARCHITECTURE` heading is hand-maintained — edit it, do not regenerate it.
-- **Commit each task. Do not push. Do not open a PR.** (`RULES.md` §7 — pushing is the user's separate yes.)
+- **Finish each task, run its gate, then stop and report the diff — do not commit until King says so.**
+  He asked for this on 2026-10-05, partway through execution: he reads the code changes before they
+  become a commit. Do not push and do not open a PR either way (`RULES.md` §7).
 - Copy rules: sentence case in buttons and headings, no em-dash filler, status strings owned by the component that renders them.
 
 ## Known deviations from the spec
@@ -67,10 +69,11 @@ unchanged; the mechanism is not what is written below in Tasks 2, 3, and 5.
   started stack without re-exporting, which is what makes the integration tier's `withSession()`
   reproducible.
 
-### Two defects the plan carried, caught by running Step 1
+### What the plan got wrong, caught by running it
 
-The plan's own SQL was wrong twice, and both were only visible against a live Postgres. The code
-blocks above now hold the fixed versions.
+Four findings from executing the steps rather than trusting the drafted code. Items 1-2 are SQL and
+were only visible against a live Postgres; item 4 was only visible against the plan's own test. The
+code blocks above now hold the fixed versions.
 
 1. **`admin_directory()` had no guard, and leaked every account's email address.** It was drafted
    `language sql`, which cannot `raise`, so the privilege check simply was not there. Measured
@@ -89,6 +92,11 @@ blocks above now hold the fixed versions.
    grantee-specific entry. Not a hole: the guard reads the caller JWT, so the key's call answers
    `42501` (measured). Recorded here so a later reader does not claim the revokes are exhaustive;
    the comment in the migration states the same thing.
+4. **Task 4's `domainHost` could not pass its own test.** Step 1 asserts `parse("  Atlas.Example/ ")`
+   yields `"atlas.example"`, but Step 4's transform only lowercased, so the trailing slash reached
+   `BARE_HOST` and threw. Step 4 now strips trailing slashes before the regex (`replace(/\/+$/, "")`),
+   which is also the right behaviour: a pasted `https://atlas.example/` should not become a second
+   client. Verified: 7 cases green.
 
 ## File structure
 
@@ -712,7 +720,7 @@ Pure TypeScript, no database, no React — this is the task where the §7 table 
 - Consumes: `types/metrics.ts` (already imported by `types/database.ts:1`).
 - Produces: `clientName`, `domainHost`, `memberRole`, `createClientBody`, `updateClientBody`, `attachMemberBody`; `adminErrorStatus(code: string | undefined): number`, `adminErrorMessage(rpc: AdminWriteRpc, code): string`, `type AdminWriteRpc`; `MEMBER_ROLES`, `MemberRole`. Task 7's handlers import the schemas and both error functions; Task 5 derives its own function-name union from `types/database.ts` and imports neither.
 
-- [ ] **Step 1: Write the failing schema test.** Create `tests/admin/unit/schemas.test.ts`:
+- [x] **Step 1: Write the failing schema test.** Create `tests/admin/unit/schemas.test.ts`:
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -789,12 +797,12 @@ describe("attachMemberBody", () => {
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails.**
+- [x] **Step 2: Run it to verify it fails.**
 
 Run: `pnpm test admin/unit/schemas`
 Expected: module-not-found for `@/lib/admin/schemas`.
 
-- [ ] **Step 3: Add the role list to `types/metrics.ts`.** Append at the end of the file:
+- [x] **Step 3: Add the role list to `types/metrics.ts`.** Append at the end of the file:
 
 ```ts
 export const MEMBER_ROLES = ["admin", "client", "staff"] as const;
@@ -802,7 +810,7 @@ export const MEMBER_ROLES = ["admin", "client", "staff"] as const;
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 ```
 
-- [ ] **Step 4: Write the schemas.** Create `lib/admin/schemas.ts`:
+- [x] **Step 4: Write the schemas.** Create `lib/admin/schemas.ts`:
 
 ```ts
 import { z } from "zod";
@@ -849,7 +857,7 @@ export type AttachMemberBody = z.infer<typeof attachMemberBody>;
 
 `z.uuid()` and `.trim()`-before-`.min()` match the existing idiom (`z.uuid()` in `lib/db/repository.ts`, `clientName` bounds per §3 "text bounds belong to zod"). `attachMemberBody.clientId` is `nullable().optional()` because the PUT sends either key — `null` means "leave them unassigned", absent means the same — and §7's "Unassigned is not an error" needs the first form to be expressible.
 
-- [ ] **Step 5: Write the failing error-map test.** Create `tests/admin/unit/errors.test.ts`:
+- [x] **Step 5: Write the failing error-map test.** Create `tests/admin/unit/errors.test.ts`:
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -912,12 +920,12 @@ describe("adminErrorMessage", () => {
 });
 ```
 
-- [ ] **Step 6: Run it to verify it fails.**
+- [x] **Step 6: Run it to verify it fails.**
 
 Run: `pnpm test admin/unit/errors`
 Expected: module-not-found for `@/lib/admin/errors`.
 
-- [ ] **Step 7: Write the error map.** Create `lib/admin/errors.ts`:
+- [x] **Step 7: Write the error map.** Create `lib/admin/errors.ts`:
 
 ```ts
 export type AdminWriteRpc =
@@ -980,9 +988,9 @@ export function adminErrorMessage(rpc: AdminWriteRpc, code: string | undefined):
 
 `23514 → 500` is deliberate: §7 calls it out as "loud; a polite message here would hide a function bug." `admin_create_client` has no `45002` entry because that function cannot match zero rows — an insert either returns a row or raises.
 
-- [ ] **Step 8: Point the three duplicated role unions at the list.** In `lib/agents/authAgent.ts`, change the `authUserSchema` role field from `z.enum(["admin", "client", "staff"])` to `role: z.enum(MEMBER_ROLES)` and add `import { MEMBER_ROLES } from "@/types/metrics";`. In `components/features/user-profile/lib/profile.ts`, change `role: "admin" | "client" | "staff" | null` to `role: MemberRole | null` with `import type { MemberRole } from "@/types/metrics";`. In `types/database.ts:85`, change `role: "admin" | "client" | "staff"` to `role: MemberRole` and extend the existing import on line 1 to include `MemberRole`.
+- [x] **Step 8: Point the three duplicated role unions at the list.** In `lib/agents/authAgent.ts`, change the `authUserSchema` role field from `z.enum(["admin", "client", "staff"])` to `role: z.enum(MEMBER_ROLES)` and add `import { MEMBER_ROLES } from "@/types/metrics";`. In `components/features/user-profile/lib/profile.ts`, change `role: "admin" | "client" | "staff" | null` to `role: MemberRole | null` with `import type { MemberRole } from "@/types/metrics";`. In `types/database.ts:85`, change `role: "admin" | "client" | "staff"` to `role: MemberRole` and extend the existing import on line 1 to include `MemberRole`.
 
-- [ ] **Step 9: Write the role-set test.** Create `tests/admin/unit/role-set.test.ts` — this is §8's "one table rather than trusting three comments", made real by reading the DDL:
+- [x] **Step 9: Write the role-set test.** Create `tests/admin/unit/role-set.test.ts` — this is §8's "one table rather than trusting three comments", made real by reading the DDL:
 
 ```ts
 import { readFileSync, readdirSync } from "node:fs";
@@ -1023,7 +1031,7 @@ describe("the member role set", () => {
 });
 ```
 
-- [ ] **Step 10: Run the three tests, then the gate.**
+- [x] **Step 10: Run the three tests, then the gate.**
 
 Run: `pnpm test admin`
 Expected: three files pass, every case green. If `role-set.test.ts` fails on the DDL regex, fix the **test's regex** to the real DDL text — read `supabase/migrations/20260920000000_add_staff_role.sql` — and do not touch the migration to satisfy a test.
@@ -1031,7 +1039,10 @@ Expected: three files pass, every case green. If `role-set.test.ts` fails on the
 Run: `pnpm test && pnpm typecheck && pnpm lint && pnpm build`
 Expected: green; `Tests` counts the 160 baseline plus the three new files' cases, `○ /dashboard`, no warnings. The three modified files are type-level only, so `typecheck` is the real proof they changed nothing behavioural.
 
-- [ ] **Step 11: Commit.**
+- [ ] **Step 11: Report the diff and commit on approval.** King reads the code changes before they
+  become a commit (asked for on 2026-10-05, partway through this plan), so this step is: show
+  `git status --short`, the diff of the four modified files, and the five new files — then wait for a
+  yes. Once he says so:
 
 ```bash
 git add lib/admin/schemas.ts lib/admin/errors.ts types/metrics.ts types/database.ts \
