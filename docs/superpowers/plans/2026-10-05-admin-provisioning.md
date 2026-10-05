@@ -67,6 +67,29 @@ unchanged; the mechanism is not what is written below in Tasks 2, 3, and 5.
   started stack without re-exporting, which is what makes the integration tier's `withSession()`
   reproducible.
 
+### Two defects the plan carried, caught by running Step 1
+
+The plan's own SQL was wrong twice, and both were only visible against a live Postgres. The code
+blocks above now hold the fixed versions.
+
+1. **`admin_directory()` had no guard, and leaked every account's email address.** It was drafted
+   `language sql`, which cannot `raise`, so the privilege check simply was not there. Measured
+   before fixing it: a `staff@a` session and a `client@b` session each received **all four**
+   directory rows, including every email — the exact cross-tenant disclosure the spec's whole
+   "reads for an admin" framing is meant to prevent. Rewritten as plpgsql with the guard as the
+   first statement; re-measured, both non-admin sessions now answer `42501` with zero rows.
+   The read-only consequence for later tasks: `admin_directory` is the one RPC whose guard failure
+   looks like an empty list, so Task 6 asserts the refusal rather than the row count.
+2. **`42804` on the admin path.** `auth.users.email` is `varchar(255)`; the declared OUT column is
+   `text`, and plpgsql will not coerce it. An admin call failed with "structure of query does not
+   match function result type". Fixed with `u.email::text` in the projection. PostgREST hides this
+   — only a direct RPC call surfaces it, which is why the unit tier could never have found it.
+3. **`service_role` keeps EXECUTE on all five functions** despite the `revoke … from public` —
+   Supabase's default function ACL names the role, and revoking from `PUBLIC` does not reach a
+   grantee-specific entry. Not a hole: the guard reads the caller JWT, so the key's call answers
+   `42501` (measured). Recorded here so a later reader does not claim the revokes are exhaustive;
+   the comment in the migration states the same thing.
+
 ## File structure
 
 ```
@@ -127,7 +150,7 @@ Order matters: Task 2's probes gate Task 3's SQL, Task 4's pure modules gate Tas
 - Consumes: nothing.
 - Produces: the contract every later task cites by section name (`What this is not`, `Writes`, `Errors`).
 
-- [ ] **Step 1: Write the spec file.** Create `context/feature-specs/07-admin.md` with exactly this content:
+- [x] **Step 1: Write the spec file.** Create `context/feature-specs/07-admin.md` with exactly this content:
 
 ```markdown
 # Admin: provisioning
@@ -208,18 +231,18 @@ client* in a browser round-trips; the unit tier owns the handler, the integratio
 function.
 ```
 
-- [ ] **Step 2: Add the tracker entry.** In `context/progress-tracker.md`, replace the single bullet under `## In Progress` with:
+- [x] **Step 2: Add the tracker entry.** In `context/progress-tracker.md`, replace the single bullet under `## In Progress` with:
 
 ```markdown
 - **Admin panel: provisioning only** (2026-10-05) — spec `docs/superpowers/specs/2026-10-05-admin-panel-provisioning-design.md`, plan `docs/superpowers/plans/2026-10-05-admin-provisioning.md`, feature spec `context/feature-specs/07-admin.md`. Five `public` definer RPCs called with the user-scoped client; no new table grants. Enters from `AccountMenu`, not the rail.
 ```
 
-- [ ] **Step 3: Verify nothing else moved.**
+- [x] **Step 3: Verify nothing else moved.**
 
 Run: `git status --short`
 Expected: `context/feature-specs/07-admin.md` untracked, `context/progress-tracker.md` modified. Nothing else.
 
-- [ ] **Step 4: Gate and commit.**
+- [x] **Step 4: Gate and commit.**
 
 Run: `pnpm test && pnpm typecheck && pnpm lint && pnpm build`
 Expected: `Test Files 26 passed (26)` / `Tests 160 passed (160)`, `tsc --noEmit` silent, lint silent, `○ /dashboard` present, no build warnings.
@@ -243,7 +266,7 @@ git commit -m "docs: spec the admin provisioning slice beside the code that will
 - Consumes: a running local stack (`pnpm exec supabase start`) and a filled `.env.test`.
 - Produces: a recorded verdict on three questions — can a definer read `auth.users`, does `private.current_user_role()` see the *caller* when nested, and does the directory cap bite. Task 3 consumes the verdict; Task 6's first case is the nested-role question proven live.
 
-- [ ] **Step 1: Start the local stack and confirm which database you are talking to.**
+- [x] **Step 1: Start the local stack and confirm which database you are talking to.**
 
 ```bash
 pnpm exec supabase start
@@ -258,7 +281,7 @@ console.log("TEST_SUPABASE_URL =", pick("TEST_SUPABASE_URL"));
 
 Expected: a URL whose host is `127.0.0.1:54321`. If it is not, **stop** — the probes would be measuring hosted production.
 
-- [ ] **Step 2: Write the SQL probe.** Create `/tmp/admin-probe.sql`. It creates a temporary definer function that reads `auth.users` and reports the nested helper's view of the caller:
+- [x] **Step 2: Write the SQL probe.** Create `/tmp/admin-probe.sql`. It creates a temporary definer function that reads `auth.users` and reports the nested helper's view of the caller:
 
 ```sql
 create or replace function public.probe_definer_reads_auth()
@@ -281,7 +304,7 @@ select 'nested helper role (service role => null/other, not a policy bug)',
 drop function public.probe_definer_reads_auth();
 ```
 
-- [ ] **Step 3: Run the SQL probe as the migration role.**
+- [x] **Step 3: Run the SQL probe as the migration role.**
 
 ```bash
 SUPABASE_DB_URL="$(grep -m1 '^TEST_DATABASE_URL=' .env.test | cut -d= -f2-)" \
@@ -296,7 +319,7 @@ pnpm exec supabase db query --file /tmp/admin-probe.sql
 
 Expected: three result rows. Row 2 must be `1` (the function exists and returned a row) — if instead it raises `permission denied for table users` (sqlstate `42501`) on `auth.users`, **§3's read side is invalid**: use the §10.1 fallback (`auth.admin.listUsers()` in `lib/admin/rpc.ts`), and write one comment line in `lib/admin/rpc.ts` naming the service-role key in the request path as the accepted cost. Record which branch you took; do not leave it implicit.
 
-- [ ] **Step 4: Prove the nested helper sees the caller, through the API not psql.** `psql` runs as the owner, so it cannot answer "what does the *caller's* role read". `/tmp/admin-probe.mjs` does, with a real session against the local stack:
+- [x] **Step 4: Prove the nested helper sees the caller, through the API not psql.** `psql` runs as the owner, so it cannot answer "what does the *caller's* role read". `/tmp/admin-probe.mjs` does, with a real session against the local stack:
 
 ```js
 import { createClient } from "@supabase/supabase-js";
@@ -338,7 +361,7 @@ Expected: the RPC returns the literal string `client`. That is the proof that `a
 pnpm exec supabase db query --sql "drop function if exists public.probe_role_visible(); drop function if exists public.probe_definer_reads_auth();"
 ```
 
-- [ ] **Step 5: Measure the directory cap where it can be measured.** The `1000` in `supabase/config.toml:18` is a PostgREST response cap, so it applies to a set-returning RPC called over the API — and it cannot be observed at all in `psql`. Note the fact, then test it honestly with a synthetic overflow, cleaned up by a pattern only a probe would use:
+- [x] **Step 5: Measure the directory cap where it can be measured.** The `1000` in `supabase/config.toml:18` is a PostgREST response cap, so it applies to a set-returning RPC called over the API — and it cannot be observed at all in `psql`. Note the fact, then test it honestly with a synthetic overflow, cleaned up by a pattern only a probe would use:
 
 ```bash
 pg="$(grep -m1 '^TEST_DATABASE_URL=' .env.test | cut -d= -f2-)"
@@ -359,9 +382,9 @@ psql "$pg" -c "select count(*) from auth.users;"
 
 Expected cleanup result: back to the pre-probe count (six accounts plus the fixture rows). **If `psql` is not on PATH** (devcontainer/CI check with `command -v psql`), do not improvise a hosted path — record this step as *not measured*, note in the tracker that the 1000 ceiling is inherited from `config.toml:18` rather than observed, and leave the cap in the migration comment. Per the standing rule about claims: label which of the three questions were executed and which were reasoned.
 
-- [ ] **Step 6: Probe the build marker question from §10.2.** This question needs the page, which does not exist yet. Write down its answer as a gate for Task 11 instead: **`pnpm build` must print `ƒ /admin` and still print `○ /dashboard`.** If `/admin` refuses to be dynamic, add `export const dynamic = "force-dynamic"` and note in the tracker that this is the second live instance of the `databaseOperation()` defect that forced the same line on `/connections`.
+- [x] **Step 6: Probe the build marker question from §10.2.** This question needs the page, which does not exist yet. Write down its answer as a gate for Task 11 instead: **`pnpm build` must print `ƒ /admin` and still print `○ /dashboard`.** If `/admin` refuses to be dynamic, add `export const dynamic = "force-dynamic"` and note in the tracker that this is the second live instance of the `databaseOperation()` defect that forced the same line on `/connections`.
 
-- [ ] **Step 7: Record the verdicts and clean up.** Append to `context/progress-tracker.md`, as a nested bullet under the Task 1 In Progress entry:
+- [x] **Step 7: Record the verdicts and clean up.** Append to `context/progress-tracker.md`, as a nested bullet under the Task 1 In Progress entry:
 
 ```markdown
   - **Probes run against the local stack (2026-10-05).** Definer read of `auth.users`: `<pass | failed — listUsers fallback taken>`. Nested `private.current_user_role()` through a real user session: `<returns "client">`. Directory cap: `<measured at N rows | not measured — ceiling inherited from supabase/config.toml:18>`.
@@ -369,7 +392,7 @@ Expected cleanup result: back to the pre-probe count (six accounts plus the fixt
 
 Delete `/tmp/admin-probe.mjs` and `/tmp/admin-probe.sql`.
 
-- [ ] **Step 8: Gate and commit.**
+- [x] **Step 8: Gate and commit.**
 
 Run: `pnpm test && pnpm typecheck && pnpm lint && pnpm build`
 Expected: unchanged baseline — `26 passed (26)` / `160 passed (160)`, `○ /dashboard`, no warnings.
@@ -392,7 +415,7 @@ Everything the guard needs is decided: `raise` not "return no rows" (§3), `is d
 - Consumes: `private.current_user_role()` / `private.current_user_client_id()` (`20260917000000_seo_poc.sql:126,136`), `clients_domain_key` (`:18`), `users_admin_has_no_tenant` (`:26`), `users_role_check` as rewritten by `20260920000000_add_staff_role.sql`.
 - Produces: `public.admin_directory()`, `admin_create_client`, `admin_update_client`, `admin_attach_member`, `admin_detach_member` — the names Task 5 types and Task 6 calls.
 
-- [ ] **Step 1: Write the file.** Create `supabase/migrations/20261005000000_admin_provisioning.sql`:
+- [x] **Step 1: Write the file.** Create `supabase/migrations/20261005000000_admin_provisioning.sql`:
 
 ```sql
 -- Admin provisioning: five security definer functions in public, no new table grants.
@@ -404,28 +427,55 @@ Everything the guard needs is decided: `raise` not "return no rows" (§3), `is d
 -- authenticated instead of service_role.
 --
 -- Reserved raise codes for this feature: 45001 (business rule refused),
--- 45002 (detach matched no row). 42501 is the role guard, 23505 / 23503 / 23514 are
+-- 45002 (a write matched no row). 42501 is the role guard, 23505 / 23503 / 23514 are
 -- Postgres' own and propagate untouched.
 --
 -- Advisory lock key 800100 guards the last-admin rule. It is the repository's first
 -- pg_advisory_xact_lock; the key is registered here because a magic number with no
 -- registry is how two features discover they share one lock.
 --
--- admin_directory() is set-returning, so max_rows = 1000 (supabase/config.toml:18) caps it.
+-- admin_directory() is set-returning, so max_rows = 1000 (supabase/config.toml:18) caps
+-- it. Measured on the local stack on 2026-10-05: with 1003 rows in auth.users the RPC
+-- returned exactly 1000.
+--
+-- Grants, stated honestly: the revokes below take EXECUTE from public, anon and
+-- authenticated, then grant it back to authenticated so the PostgREST role can call the
+-- RPCs at all. service_role keeps EXECUTE anyway -- Supabase's default function ACL names
+-- it, and revoking from PUBLIC does not reach a grantee-specific entry. That is not a
+-- hole: the guard reads the caller's JWT via auth.uid(), and a service-role key carries
+-- no user id, so the privilege check runs before any row is touched. Measured on the
+-- local stack on 2026-10-05: admin_create_client() with the service-role key answers
+-- 42501. What the key *can* still do is insert into public.clients directly, which it has
+-- always been able to do; these functions add no new surface for it.
 
 create or replace function public.admin_directory()
 returns table (id uuid, email text, name text, created_at timestamptz)
-language sql
+language plpgsql
 stable
 security definer
 set search_path = ''
 as $$
-  select u.id,
-         u.email,
-         u.raw_user_meta_data ->> 'name',
-         u.created_at
-    from auth.users u
-   order by u.created_at;
+begin
+  -- plpgsql rather than sql, and named rather than anonymous: language sql cannot
+  -- raise, and without this guard every signed-in user receives every account's
+  -- email address. Verified on the local stack on 2026-10-05: with the guard absent
+  -- a staff session and a client@b session each got all four directory rows.
+  if private.current_user_role() is distinct from 'admin' then
+    raise exception 'admin privilege required' using errcode = '42501';
+  end if;
+
+  -- u.email is varchar(255) in auth.users; the declared OUT column is text, and
+  -- plpgsql will not coerce it. Without the cast an admin call fails with
+  -- 42804 "structure of query does not match function result type" (local stack,
+  -- 2026-10-05). The jsonb text extraction is already text.
+  return query
+    select u.id,
+           u.email::text,
+           u.raw_user_meta_data ->> 'name',
+           u.created_at
+      from auth.users u
+     order by u.created_at;
+end;
 $$;
 
 create or replace function public.admin_create_client(
@@ -570,36 +620,68 @@ grant execute on function public.admin_detach_member(uuid)             to authen
 
 Note the last-admin rule in `admin_attach_member` is evaluated *after* the upsert, inside the same transaction, and the `45001` raise aborts the whole write — so a refused demotion leaves the row exactly as it was. That is why no rollback bookkeeping appears.
 
-- [ ] **Step 2: Apply to the local stack only.** `run-migrations.mjs` takes whatever `SUPABASE_DB_URL` it finds, and `.env` on this checkout is hosted production — so the name is set inline, never inherited:
+- [x] **Step 2: Apply to the local stack only.** `run-migrations.mjs` takes whatever `SUPABASE_DB_URL`
+  it finds, and `.env` on this checkout is hosted production — so the name is set inline, never
+  inherited. (As drafted this used `grep '^TEST_DATABASE_URL=' .env.test`; that name does not exist
+  in the file, and an empty `SUPABASE_DB_URL` does not fall through `run-migrations.mjs:10`'s `??`.
+  Use the local stack's own string from `pnpm exec supabase status`.)
 
 ```bash
-SUPABASE_DB_URL="$(grep -m1 '^TEST_DATABASE_URL=' .env.test | cut -d= -f2-)" \
+SUPABASE_DB_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
   node scripts/run-migrations.mjs
 ```
 
-Expected: the run lists `20261005000000_admin_provisioning.sql` as applied (or "already applied" on a re-run) and records it in `public.schema_migrations`. If instead it prints no new file, the local ledger already holds it — confirm with `pnpm exec supabase db query --sql "select filename from public.schema_migrations order by filename;"`.
-
-- [ ] **Step 3: Smoke-test the guard as a non-admin.** Reuse Task 2's `/tmp/admin-probe.mjs` shape with a `client` session, calling the real function:
-
-```bash
-# with the probe script edited to call: await user.rpc("admin_create_client", { p_name: "Probe", p_domain: "probe.example" })
-node /tmp/admin-probe.mjs
-```
-
-Expected: `error.code === '42501'`. A `client` reaching the insert would mean the guard is decoration. (Task 6 makes this an assertion in the repo rather than a one-off script.)
-
-- [ ] **Step 4: Verify no table grant appeared.**
+Expected: the run lists `20261005000000_admin_provisioning.sql` as applied (or `skip` on a re-run)
+and records it in `public.schema_migrations`. The ledger column is `version`, not `filename`:
 
 ```bash
-pnpm exec supabase db query --sql "
-select table_name, privilege_type from information_schema.table_privileges
- where grantee = 'authenticated' and table_name in ('clients','users')
- order by table_name, privilege_type;"
+pnpm exec supabase db query --local "select version from public.schema_migrations order by version;"
 ```
 
-Expected: `select` only, on both tables — `20260920000001`'s "no write grants on tables" stance intact. Any `insert`/`update`/`delete` row means something in Step 1 reached for a grant; delete it.
+- [x] **Step 3: Smoke-test the guard from real sessions.** `supabase.rpc()` through PostgREST is the
+  only substrate that carries a caller JWT, so this is a throwaway `.mjs` under `/tmp` with signed-in
+  clients, not a `psql` call:
 
-- [ ] **Step 5: Gate and commit.**
+```js
+const sc = createClient(process.env.TEST_SUPABASE_URL,
+  process.env.TEST_SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: false } });
+await sc.auth.signInWithPassword({ email, password: "test-fixture-password-123" });
+const r = await sc.rpc("admin_create_client", { p_name: "Probe", p_domain: "probe.local" });
+console.log(email, "->", r.error?.code ?? "none", "| rows written:", r.data ? 1 : 0);
+```
+
+Run it for `email` in `staff@a.rls-test.local`, `client@b.rls-test.local`, then
+`admin@rls-test.local`, and for each of the five function names. Measured on the local stack on
+2026-10-05 against the applied migration:
+
+| call | result |
+| --- | --- |
+| any of the five, `staff` or `client` session | `42501`, nothing written |
+| `admin_directory()` as `admin` | no error, 4 rows, emails present |
+| `admin_create_client(" Guard Probe ", "  GUARD-PROBE.local ")` as `admin` | `name` trimmed, `domain` lowercased |
+| re-run with `"guard-probe.local"` | `23505` (the unique index, not a friendly message) |
+| `admin_update_client(<missing uuid>)` | `45002` |
+| `admin_update_client(id, p_is_active: false)` | name kept, `is_active` flipped |
+
+Delete the probe client afterwards. A `client` reaching the insert would mean the guard is decoration.
+Task 6 turns this into an assertion in the repo rather than a one-off script.
+
+- [x] **Step 4: Verify no table grant appeared.** `supabase db query --local` takes a single
+  positional statement and `information_schema.table_privileges` is noisy, so read the ACL directly:
+
+```bash
+pnpm exec supabase db query --local "
+select c.relname, c.relacl::text[] from pg_class c
+ join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname = 'public' and c.relkind = 'r' and c.relname in ('clients','users');"
+```
+
+Expected: `authenticated=r/postgres` on both — `select` only, so `20260920000001`'s "no write grants
+on tables" stance is intact. Any `w`/`a`/`d` entry means something in Step 1 reached for a grant;
+delete it. The five `admin_*` ACLs should read `authenticated=X` (execute only) — see the
+`service_role` note in the Substrate section for the entry that survives the revokes.
+
+- [x] **Step 5: Gate and commit.**
 
 Run: `pnpm test && pnpm typecheck && pnpm lint && pnpm build`
 Expected: baseline unchanged (`160 passed`); the migration is SQL, so no test knows about it yet.
