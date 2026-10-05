@@ -207,6 +207,23 @@ the build and the first live-RLS integration slice landed (2026-09-24).
     unassigns, the member dialog must require a client for `client`/`staff` roles rather than the
     schema growing a refine. AGENTS.md's HTTP table gains these rows in
     Task 13, when the panel that calls them also exists.
+  - **The read exists, and it merges rather than queries (Task 9, 2026-10-05):**
+    `lib/admin/provisioning.ts` runs three reads — `clients` and `users` through the cookie-bound
+    client (RLS decides), `admin_directory` through `callAdminRpc` — and does the join in TypeScript:
+    `buildMemberViews()` splits the directory into provisioned/pending by `users` row presence,
+    `withMemberCounts()` groups in one pass, `attachClientNames()` resolves the tenant label. The two
+    pure functions take rows and return rows, so the merge is tested without a database
+    (`tests/admin/unit/provisioning.test.ts`, 7 cases). Load-bearing: **no `is_active` filter** on the
+    `clients` select, because a panel that hides deactivated clients makes Pause irreversible;
+    failures throw `Admin read failed: <table>` and never Postgres' message; `z.array(...).parse`
+    means an unnamed role throws instead of rendering a half-truth; and email/display name come only
+    from the directory, with `unlisted: true` for a member the 1000-row cap hid. Verified against the
+    DDL rather than assumed: `users_select_self_or_admin`
+    (`supabase/migrations/20260917000000_seo_poc.sql:162-167`) gives an admin every `users` row, which
+    is the whole reason this read works at all. Unit tier is now **34 files / 217 tests**, lint and
+    typecheck clean, `/dashboard` still `○`. Caveat recorded as plan finding 9: green `tsc` here does
+    **not** prove the zod row schemas match `types/database.ts` — `.parse()` swallows the inferred
+    type, so the first live read (Task 11) is the evidence for the column names.
 
 ## Recent Work
 

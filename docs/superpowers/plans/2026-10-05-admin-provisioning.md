@@ -71,9 +71,10 @@ unchanged; the mechanism is not what is written below in Tasks 2, 3, and 5.
 
 ### What the plan got wrong, caught by running it
 
-Seven findings from executing the steps rather than trusting the drafted code. Items 1-2 are SQL and
-were only visible against a live Postgres; item 4 was only visible against the plan's own test; item 7
-was only visible by reading the shipped handler back against the migration. The code blocks above now
+Nine findings from executing the steps rather than trusting the drafted code. Items 1-2 are SQL and
+were only visible against a live Postgres; items 4, 5 and 8 were only visible against the plan's own
+tests or typecheck; item 7 was only visible by reading the shipped handler back against the migration;
+item 9 is a claim the plan made about its own evidence that does not hold. The code blocks above now
 hold the fixed versions.
 
 1. **`admin_directory()` had no guard, and leaked every account's email address.** It was drafted
@@ -119,6 +120,24 @@ hold the fixed versions.
    omission means unassign, `attachMemberBody` accepts `{ role: "client" }` with no `clientId` and
    produces a client-role row with no tenant — invisible to every read. The dialog must require a
    client for `client` and `staff`, rather than the schema growing a refine the panel never hits.
+8. **Task 9's drafted test contradicted its own title, and would not compile.** The
+   `keeps pending accounts in signup order` case fed the directory in as
+   `[directory[2], directory[0], directory[1]]` and asserted that same order back — which is *input*
+   order, not signup order, and passes even if the merge stops sorting. The implementation sorts by
+   `created_at` (as `admin_directory()`'s own `order by u.created_at` does), so the case now asserts
+   `ada, bob, cara`, the signup order its title promises. Separately, the first case bound a local
+   `users` array, which widens `role: "staff"` to `string` and failed `tsc` with `TS2345` against the
+   inferred `UserRow`; the row literal now goes into the call directly, where contextual typing keeps
+   the union. Neither defect was visible by reading the draft — one needed running the case, the other
+   needed running typecheck.
+9. **Step 3 overstates what `typecheck` proves about the row schemas.** `z.array(clientRow).parse(data)`
+   accepts `unknown`, so the compiler cannot see drift between the hand-written zod schema and
+   `Database["public"]["Tables"]["clients"]["Row"]`; a renamed or widened column would still typecheck
+   and only surface as a runtime parse throw. What typecheck genuinely covers here is the RPC contract
+   (`admin_directory`'s generated `Args: Record<PropertyKey, never>` and `Returns` array) and that
+   `createServerSupabaseClient()` takes those selects at all. The zod-vs-DDL alignment is therefore
+   evidenced by the first live read — Task 11's page render against the local stack — and not by
+   `tsc`. Recorded so nobody cites this task's green typecheck as coverage of the column names.
 
 ## File structure
 
@@ -2343,7 +2362,7 @@ getAdminView(): Promise<AdminView>
 
 Task 10's page awaits `getAdminView()`; Task 12's mutations cause it to re-run through `router.refresh()`.
 
-- [ ] **Step 1: Write the failing merge test.** Create `tests/admin/unit/provisioning.test.ts`:
+- [x] **Step 1: Write the failing merge test.** Create `tests/admin/unit/provisioning.test.ts`:
 
 ```ts
 import { describe, expect, it, vi } from "vitest";
@@ -2363,10 +2382,19 @@ const directory = [
 
 describe("buildMemberViews", () => {
   it("splits the directory into provisioned and pending by users-row presence", () => {
-    const users = [
-      { id: uuid("cccc"), role: "staff", client_id: uuid("d1d1"), created_at: "2026-09-04T00:00:00Z" },
-    ];
-    const views = buildMemberViews(users, directory);
+    // The row literal goes in as an argument, not through a local: a local widens
+    // `role` to string and stops matching the inferred UserRow.
+    const views = buildMemberViews(
+      [
+        {
+          id: uuid("cccc"),
+          role: "staff",
+          client_id: uuid("d1d1"),
+          created_at: "2026-09-04T00:00:00Z",
+        },
+      ],
+      directory,
+    );
     expect(views.provisioned.map((m) => m.userId)).toEqual([uuid("cccc")]);
     expect(views.pending.map((p) => p.userId)).toEqual([uuid("aaaa"), uuid("bbbb")]);
   });
@@ -2399,10 +2427,12 @@ describe("buildMemberViews", () => {
 
   it("keeps pending accounts in signup order", () => {
     const views = buildMemberViews([], [directory[2], directory[0], directory[1]]);
+    // Sorted by created_at, not left in argument order: an assertion that echoes
+    // the input back would pass even if the merge stopped sorting.
     expect(views.pending.map((p) => p.email)).toEqual([
-      "cara@example.com",
       "ada@example.com",
       "bob@example.com",
+      "cara@example.com",
     ]);
   });
 
@@ -2452,10 +2482,12 @@ describe("withMemberCounts", () => {
 });
 ```
 
-Run: `pnpm test admin/unit/provisioning`
-Expected: module-not-found.
+Run: `pnpm vitest run --project unit tests/admin/unit/provisioning.test.ts`
+Expected: module-not-found. Measured: `1 failed (1) / Tests no tests`, and typecheck on the same draft
+reported `TS2345` before a single case ran — see finding 8, which also fixes this file's pending-order
+case.
 
-- [ ] **Step 2: Write `lib/admin/provisioning.ts`.**
+- [x] **Step 2: Write `lib/admin/provisioning.ts`.**
 
 ```ts
 import "server-only";
@@ -2633,15 +2665,15 @@ export async function getAdminView(): Promise<AdminView> {
 
 Three things are load-bearing in that body and get a line in the tracker if any is questioned: **no `is_active` filter** (deviation 1), **`Admin read failed: <table>` and never the Postgres message** (the constraint that no response carries database text, and §0.2's reason the admin read does not use `databaseOperation()`), and **`z.array(...).parse`** — a row that fails the schema throws, so the panel cannot render a half-truth about a role it cannot name.
 
-- [ ] **Step 3: Run the tests, then the gate.**
+- [x] **Step 3: Run the tests, then the gate.**
 
-Run: `pnpm test admin/unit/provisioning`
-Expected: 7 passed. `withMemberCounts`' `not.toHaveProperty("clientName")` assertion guards against the panel later smuggling the join into the pure function — if it fails because you added `clientName` to `PanelClient`, remove it; `attachClientNames` owns that field.
+Run: `pnpm vitest run --project unit tests/admin/unit/provisioning.test.ts`
+Expected: 7 passed. `withMemberCounts`' `not.toHaveProperty("clientName")` assertion guards against the panel later smuggling the join into the pure function — if it fails because you added `clientName` to `PanelClient`, remove it; `attachClientNames` owns that field. Measured: `7 passed (7)`, and it is the pending-order case that would have failed the draft as written (finding 8).
 
 Run: `pnpm test && pnpm typecheck && pnpm lint && pnpm build`
-Expected: green. `typecheck` is the proof the zod-inferred row types line up with `types/database.ts`; `provisioning.test.ts` imports no database, so it runs in the unit project without `next/headers` mocked.
+Expected: green. `typecheck` is the proof the zod-inferred row types line up with `types/database.ts`; `provisioning.test.ts` imports no database, so it runs in the unit project without `next/headers` mocked. Measured: unit `34 files / 217 tests`, eslint exit 0 silent, build compiled with `○ /dashboard` and `ƒ /connections` unchanged. **That one expectation was overstated** — see finding 9: `.parse()` takes `unknown`, so `tsc` proves the RPC's `Args`/`Returns` contract and nothing about the two table schemas.
 
-- [ ] **Step 4: Commit.**
+- [x] **Step 4: Report the diff and commit on approval.** King reads the code changes before they land.
 
 ```bash
 git add lib/admin/provisioning.ts tests/admin/unit/provisioning.test.ts
