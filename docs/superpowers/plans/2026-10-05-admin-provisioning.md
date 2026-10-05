@@ -2235,7 +2235,7 @@ git commit -m "feat(admin): add the four provisioning verbs over the definer RPC
 - Consumes: `resolveProxyAction` and the existing public Playwright project.
 - Produces: anonymous `/admin` → `/auth/login?next=%2Fadmin`. Task 11's page relies on this being the *only* thing standing between a logged-out visitor and the panel's server render.
 
-- [ ] **Step 1: Add the failing case.** In `tests/identity/unit/routing.test.ts`, inside the describe block that holds the per-path protected cases, add:
+- [x] **Step 1: Add the failing case.** In `tests/identity/unit/routing.test.ts`, inside the describe block that holds the per-path protected cases, add:
 
 ```ts
   it("protects /admin the way it protects /connections", () => {
@@ -2248,16 +2248,19 @@ git commit -m "feat(admin): add the four provisioning verbs over the definer RPC
       next: "/admin/",
     });
     expect(resolveProxyAction("/admin", true)).toEqual({ type: "pass" });
+    // The list is prefix-matched on `${prefix}/`, so a path that merely starts
+    // with the same letters must stay public.
     expect(resolveProxyAction("/administrivia", false)).toEqual({ type: "pass" });
   });
 ```
 
 The last assertion is the one that matters: the list is prefix-matched on `${prefix}/` or exact equality, so `/administrivia` must not be swept up by a loose `startsWith("/admin")`.
 
-Run: `pnpm test identity/unit/routing`
-Expected: this new case fails on `"/admin"` (returns `{ type: "pass" }`).
+Run: `pnpm vitest run --project unit tests/identity/unit/routing.test.ts`
+Expected: this new case fails on `"/admin"` (returns `{ type: "pass" }`). Measured: `1 failed | 7 passed
+(8)`, the diff printing `- "type": "redirect-login"` / `+ "type": "pass"` at the first assertion.
 
-- [ ] **Step 2: Add the prefix.** In `lib/auth/routing.ts`:
+- [x] **Step 2: Add the prefix.** In `lib/auth/routing.ts`:
 
 ```ts
 const PROTECTED_PREFIXES = ["/dashboard", "/connections", "/admin", "/profile"];
@@ -2265,18 +2268,20 @@ const PROTECTED_PREFIXES = ["/dashboard", "/connections", "/admin", "/profile"];
 
 `/admin` sits after `/connections` because both are pages a signed-in user reaches from inside the app, and `/profile` stays last as the account entry. Do not add `/admin` to `lib/navigation/destinations.ts` — §9's fourth doc item records that decision, and `tests/platform/unit/destinations.test.ts:53-60` checks rail → prefix only, so a protected prefix with no rail row passes untouched.
 
-Run: `pnpm test identity/unit/routing tests/platform/unit/destinations`
-Expected: both files green.
+Run: `pnpm vitest run --project unit tests/identity/unit/routing.test.ts tests/platform/unit/destinations.test.ts`
+Expected: both files green. Measured: `2 files / 15 tests` passed — routing 8, destinations 7. The
+destinations file staying green is the point: `tests/platform/unit/destinations.test.ts:53-60` walks
+rail → prefix, never prefix → rail, so a protected prefix with no rail row is invisible to it.
 
-- [ ] **Step 3: Write the browser guard spec.** Create `tests/identity/e2e/admin-guard.spec.ts`, mirroring `tests/identity/e2e/connections-guard.spec.ts` (read that file first and copy its exact imports and assertion style; this is the shape it uses):
+- [x] **Step 3: Write the browser guard spec.** Create `tests/identity/e2e/admin-guard.spec.ts`, mirroring `tests/identity/e2e/connections-guard.spec.ts` (read that file first and copy its exact imports and assertion style; this is the shape it uses):
 
 ```ts
 import { expect, test } from "@playwright/test";
 
-// A protected prefix that is not a rail destination still has to bounce an
-// anonymous visitor before the page module runs — proxy.ts decides on the path,
-// not the route table. Same shape as connections-guard.spec.ts, which this file
-// is a copy of with the path changed.
+// Unlike connections-guard.spec.ts, this destination is deliberately absent from
+// the rail (AccountMenu is its only entry), so nothing else in the test suite
+// would notice a dropped prefix. proxy.ts decides on the path, not the route
+// table, which is why this passes while /admin itself is still 404 for everyone.
 test("an anonymous /admin visit lands on login with the return path", async ({
   page,
 }) => {
@@ -2293,18 +2298,18 @@ test("anonymous /admin never renders provisioning copy", async ({ page }) => {
 
 No `@auth` tag: this runs in the `public` project, which is the CI tier, and it needs no database beyond a running dev server.
 
-- [ ] **Step 4: Run the public e2e tier.**
+- [x] **Step 4: Run the public e2e tier.**
 
 ```bash
 pnpm test:e2e
 ```
 
-Expected: the existing count plus these two, all passed. If the URL assertion fails on ordering of query params, assert `/auth/login` and then `new URL(page.url()).searchParams.get("next")` equals `"/admin"` — the redirect's own encoding is not the invariant.
+Expected: the existing count plus these two, all passed. If the URL assertion fails on ordering of query params, assert `/auth/login` and then `new URL(page.url()).searchParams.get("next")` equals `"/admin"` — the redirect's own encoding is not the invariant. Measured: `9 passed (3.4s)` (7 before), and the encoded-URL assertion held as drafted, so the fallback was not needed. The dev server on :3000 was already running and `reuseExistingServer: !isCI` let Playwright take it rather than starting a second one.
 
-- [ ] **Step 5: Gate and commit.**
+- [x] **Step 5: Gate, report the diff, and commit on approval.** King reads the code changes before they land.
 
 Run: `pnpm test && pnpm typecheck && pnpm lint && pnpm build`
-Expected: green; `/dashboard` still `○`. Adding a protected prefix cannot make a prerendered page dynamic — `proxy.ts` runs at request time, not build time.
+Expected: green; `/dashboard` still `○`. Adding a protected prefix cannot make a prerendered page dynamic — `proxy.ts` runs at request time, not build time. Measured: unit `33 files / 210 tests`, `tsc --noEmit` exit 0, eslint exit 0 silent, build compiled with `○ /dashboard` and `ƒ /connections` unchanged and no `/admin` row (the page is Task 11).
 
 ```bash
 git add lib/auth/routing.ts tests/identity/unit/routing.test.ts tests/identity/e2e/admin-guard.spec.ts
