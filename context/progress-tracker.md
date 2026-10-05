@@ -165,7 +165,29 @@ the build and the first live-RLS integration slice landed (2026-09-24).
 
 ## In Progress
 - **Admin panel: provisioning only** (2026-10-05) — spec `docs/superpowers/specs/2026-10-05-admin-panel-provisioning-design.md`, plan `docs/superpowers/plans/2026-10-05-admin-provisioning.md`, feature spec `context/feature-specs/07-admin.md`. Five `public` definer RPCs called with the user-scoped client; no new table grants. Enters from `AccountMenu`, not the rail.
-  - **Probes run against the local stack (2026-10-05), all three executed, none inherited.** A `security definer` function in `public` **can** read `auth.users` — the temporary probe returned a row, so `admin_directory()` stands and the `auth.admin.listUsers()` fallback is not needed. Nested `private.current_user_role()` resolves the **caller**, not the owner: a `client@a` session received `"client"` from the definer, which is what makes the `42501` guard the enforcement point rather than decoration. The same function, called with no session, was refused by the grant itself (`42501` from the revoke/grant pair, before the body ran) — §3's "write the grants explicitly instead of relying on a commented-out default" is now observed, not assumed. **`max_rows = 1000` is measured, not inherited:** with 1003 rows in `auth.users`, the set-returning probe returned exactly **1000**, so §7's "the directory stops at 1000 accounts" is a real ceiling and deviation 5 is closed as measured. Substrate notes: `psql` is not on this machine's PATH, `supabase db query --file` refuses a multi-statement file (prepared statement), and `.env.test` carries no `TEST_DATABASE_URL`, so the probes ran through the repo's existing `pg` dependency against `postgresql://postgres:postgres@127.0.0.1:54322/postgres`. The 999 synthetic accounts were deleted by their `@probe.local` address and `auth.users` was back at 4 rows; all three probe functions were dropped.
+  - **Substrate shipped (Tasks 3-5, 2026-10-05):** `supabase/migrations/20261005000000_admin_provisioning.sql`
+    — five `security definer` functions in `public` (`admin_directory`, `admin_create_client`,
+    `admin_update_client`, `admin_attach_member`, `admin_detach_member`), each guarding on
+    `private.current_user_role()` and the two writes taking `pg_advisory_xact_lock(800100)` around the
+    last-admin rule; explicit `revoke`/`grant execute to authenticated` (measured: `service_role`
+    keeps EXECUTE anyway, and its call still answers `42501` because the guard reads the caller JWT).
+    Applied to the **local stack only**; hosted needs its own yes. TypeScript side:
+    `MEMBER_ROLES`/`MemberRole` in `types/metrics.ts` (pinned against `users_role_check`'s DDL by
+    `tests/admin/unit/role-set.test.ts`), `lib/admin/{schemas,errors,rpc}.ts`, five `Functions`
+    entries in `types/database.ts`. No `getAdminDb()` anywhere under `lib/admin/`.
+  - **Guard proven against live Postgres, not a mock (Task 6, 2026-10-05):**
+    `tests/admin/integration/provisioning.test.ts` runs 10 cases through `callAdminRpc` with real
+    sessions — `42501` for a client-role `admin_create_client` **with no row written**, `42501` for a
+    staff `admin_directory` (the regression for the unguarded draft that leaked every email),
+    `42501` unauthenticated, lowercased domain + `23505` on the case-variant, attach → promotion
+    nulls the tenant, `45001` refusing both to detach and to demote the last admin with the row
+    intact, `45002` when detach matches no row, partial-update field preservation, and a teardown
+    contract case. Measured split, read out loud as §8 demands: `3 files / 19 passed` with
+    `supabase start` up; **`3 files / 19 skipped`, exit 0** when `TEST_SUPABASE_URL` is absent (what
+    CI does — this tier never runs there, so it is skipped, never "covered"); and `3 files failed`,
+    exit 1 when the URL is set but unreachable, so a dead stack cannot fake a pass either.
+    `hasTestDb` keys on the env name, not container health, which is why `supabase stop` is the wrong
+    instrument for that proof.
 
 ## Recent Work
 

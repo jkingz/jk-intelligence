@@ -71,7 +71,7 @@ unchanged; the mechanism is not what is written below in Tasks 2, 3, and 5.
 
 ### What the plan got wrong, caught by running it
 
-Four findings from executing the steps rather than trusting the drafted code. Items 1-2 are SQL and
+Six findings from executing the steps rather than trusting the drafted code. Items 1-2 are SQL and
 were only visible against a live Postgres; item 4 was only visible against the plan's own test. The
 code blocks above now hold the fixed versions.
 
@@ -97,6 +97,17 @@ code blocks above now hold the fixed versions.
    `BARE_HOST` and threw. Step 4 now strips trailing slashes before the regex (`replace(/\/+$/, "")`),
    which is also the right behaviour: a pasted `https://atlas.example/` should not become a second
    client. Verified: 7 cases green.
+5. **Task 6's drafted test file did not typecheck** (`TS2749`, twice). `AdminRpcError` is destructured
+   from `await import("@/lib/admin/rpc")` inside each case, so the name is a *value* binding only —
+   `(failure as AdminRpcError).code` has no type to resolve. Fixed by adding a type-only import at the
+   top of the file, which is erased at runtime and so cannot defeat the `vi.mock("server-only")`
+   boundary the dynamic import exists to respect.
+6. **Step 4's premise was wrong: stopping the stack does not produce a skip.** `hasTestDb` is
+   `Boolean(process.env.TEST_SUPABASE_URL)`, which reads the env name, not container health — so with
+   `supabase stop` the tier still thinks it has a database and fails on `fetch failed` instead of
+   skipping. That is the better property, and both halves are now measured: an absent
+   `TEST_SUPABASE_URL` gives `19 skipped` and exit 0 (what CI sees), and an unreachable one gives
+   `3 failed / 19 skipped` and exit 1. Neither run can be misread as coverage.
 
 ## File structure
 
@@ -1274,7 +1285,7 @@ Expected: 6 passed. If `does not repeat Postgres' message` fails, the wrapper is
 Run: `pnpm test && pnpm typecheck && pnpm lint && pnpm build`
 Expected: green; `typecheck` now proves the five `Functions` entries compile.
 
-- [ ] **Step 5: Report the diff and commit on approval.**
+- [x] **Step 5: Report the diff and commit on approval.**
 
 ```bash
 git add lib/admin/rpc.ts types/database.ts tests/admin/unit/rpc.test.ts
@@ -1295,7 +1306,7 @@ git commit -m "feat(admin): add the code-preserving RPC boundary and type the fi
 - Consumes: Task 3's five functions on the local stack, Task 5's `callAdminRpc` / `AdminRpcError`, `withSession` / `provisionFixtures` / `adminDb` / `FIXTURE_USERS`.
 - Produces: `FIXTURE_USERS.admin` (the string other suites reach for) and the only evidence in the repo that the definer guard fires.
 
-- [ ] **Step 1: Name the admin fixture instead of repeating its address.** In `tests/fixtures/identity-users.ts`, add the fourth key to `FIXTURE_USERS`:
+- [x] **Step 1: Name the admin fixture instead of repeating its address.** In `tests/fixtures/identity-users.ts`, add the fourth key to `FIXTURE_USERS`:
 
 ```ts
 export const FIXTURE_USERS = {
@@ -1306,17 +1317,19 @@ export const FIXTURE_USERS = {
 };
 ```
 
-Then change `provisionFixtures()`'s inline `ensureAuthUser(db, "admin@rls-test.local")` call to `ensureAuthUser(db, FIXTURE_USERS.admin)` — one address, one owner. `rls-gate.test.ts:80` still passes: it uses the literal, which is now the same string. Do not edit that file in this task.
+Then change `provisionFixtures()`'s inline `ensureAuthUser(db, "admin@rls-test.local")` call to `ensureAuthUser(db, FIXTURE_USERS.admin)` — one address, one owner. `rls-gate.test.ts:80` still passes: it uses the literal, which is now the same string. Do not edit that file in this task. The header comment above `FIXTURE_USERS` said "three auth users"; it now says four.
 
-Run: `pnpm test tenant-isolation`
-Expected: unchanged (5 + 4 passed with the stack up, or both files skipped with the reason printed if `supabase start` is not running).
+Run: `pnpm test:integration` (`pnpm test tenant-isolation` filters the *unit* project, where no tenant-isolation file lives)
+Expected: unchanged — 5 + 4 passed with the stack up. Measured: `rls-gate` 5, `credentials-visibility` 4.
 
-- [ ] **Step 2: Write the integration file.** Create `tests/admin/integration/provisioning.test.ts`. Two rules from `tests/fixtures/README.md:41`: inserts go through the service-role client, every **assertion** goes through the user-scoped one. And because Vitest runs files in parallel against one Postgres, destructive cases create their own scratch auth user inside the file and delete it in `afterEach` — never another suite's fixture rows.
+- [x] **Step 2: Write the integration file.** Create `tests/admin/integration/provisioning.test.ts`. Two rules from `tests/fixtures/README.md:41`: inserts go through the service-role client, every **assertion** goes through the user-scoped one. And because Vitest runs files in parallel against one Postgres, destructive cases create their own scratch auth user inside the file and delete it in `afterEach` — never another suite's fixture rows.
 
 ```ts
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { hasTestDb } from "../../helpers/db";
+import type { AdminRpcError } from "@/lib/admin/rpc";   // finding 5: the dynamic import gives a
+                                                         // value binding only; the cast needs this
 
 // The admin RPCs are the enforcement point, so this file is evidence about
 // Postgres: a non-admin must be refused by the function, not by a handler that
@@ -1397,6 +1410,21 @@ describe.skipIf(!hasTestDb)("admin provisioning RPCs against live Postgres", () 
     expect(data).toBeNull();
   });
 
+  it("refuses the directory read to a staff session, too", async () => {
+    // Regression for the leak the first draft of the migration shipped with:
+    // an unguarded `language sql admin_directory()` handed every account's
+    // email to any staff session (measured, 4 rows). The row count is not the
+    // assertion here — the refusal is.
+    const { AdminRpcError, callAdminRpc } = await rpc();
+    await withSession(FIXTURE_USERS.staffA, async () => {
+      const failure = await callAdminRpc("admin_directory", {}).catch(
+        (error: unknown) => error,
+      );
+      expect(failure).toBeInstanceOf(AdminRpcError);
+      expect((failure as AdminRpcError).code).toBe("42501");
+    });
+  });
+
   it("refuses an unauthenticated caller", async () => {
     const { AdminRpcError, callAdminRpc } = await rpc();
     await withSession(null, async () => {
@@ -1451,8 +1479,7 @@ describe.skipIf(!hasTestDb)("admin provisioning RPCs against live Postgres", () 
       expect(promoted.client_id).toBeNull();
 
       // The row exists now, so a real session sees the member it belongs to.
-      const { callAdminRpc: read } = await rpc();
-      const directory = await read("admin_directory", {});
+      const directory = await callAdminRpc("admin_directory", {});
       expect(directory.map((row) => row.id)).toContain(scratchId);
       expect(directory.find((row) => row.id === scratchId)?.name).toBe(
         "Scratch Member",
@@ -1553,28 +1580,52 @@ describe.skipIf(!hasTestDb)("admin provisioning RPCs against live Postgres", () 
 });
 ```
 
-- [ ] **Step 3: Run the tier against the local stack.**
+- [x] **Step 3: Run the tier against the local stack.**
 
 ```bash
 pnpm exec supabase start
 pnpm test:integration
 ```
 
-Expected: three files, all passing — `rls-gate` (5), `credentials-visibility` (4), `provisioning` (9). A `skipped` count here is not a pass: read the split out loud.
+Expected: three files, all passing — `rls-gate` (5), `credentials-visibility` (4), `provisioning`
+(10). A `skipped` count here is not a pass: read the split out loud. Measured: `3 passed (3) /`
+`19 passed (19)`, with each guard code printed by `callAdminRpc`'s own `console.error` line —
+`42501` ×3, `23505`, `45001` ×2, `45002`. Step 2 ships one case the draft did not have: finding 1's
+consequence is only testable directly, so the file asserts that a staff session is *refused* by
+`admin_directory` rather than checking how many rows it got.
 
-- [ ] **Step 4: Run it again bare, with no stack, to prove the skip is honest.**
+- [x] **Step 4: Prove the skip is honest — and that it is the env name that decides.** This step
+  was drafted as `pnpm exec supabase stop && pnpm test:integration`. Running that would **not** skip
+  anything: `hasTestDb` is `Boolean(process.env.TEST_SUPABASE_URL)`, which reads the env name, not
+  container health, so a stopped stack still claims to have a database and dies on `fetch failed`
+  instead. Measured both ways instead, without stopping anything the next task needs:
 
 ```bash
-pnpm exec supabase stop
-pnpm test:integration
+TEST_SUPABASE_URL= pnpm test:integration                              # the honest skip
+TEST_SUPABASE_URL=http://127.0.0.1:59999 pnpm test:integration; echo $?   # the loud failure
 ```
 
-Expected: the file reports `skipped` with `hasTestDb` false and the run still exits green — and the tracker note must then say skipped, never "covered". Restart the stack for the next task: `pnpm exec supabase start`.
+Measured, both with the stack up:
 
-- [ ] **Step 5: Gate and commit.**
+- no `TEST_SUPABASE_URL` → `Test Files 3 skipped (3) / Tests 19 skipped (19)`, exit 0, and
+  `load-test-env.ts:13` prints the "set TEST_SUPABASE_URL …" warning. This is what CI sees, and the
+  tracker must quote it as *skipped*, never as "covered".
+- an unreachable `TEST_SUPABASE_URL` → `Test Files 3 failed (3)`, exit 1, every case throwing
+  `fetch failed` out of `beforeAll`. So a dead stack cannot masquerade as a pass either: the only
+  quiet outcome is the one that says so out loud.
+
+`supabase stop` is the wrong instrument here — it leaves the env name set, so the tier still believes
+it has a database and errors instead of skipping. That is finding 6 above.
+
+- [x] **Step 5: Report the diff and commit on approval.** King reads the code changes before they
+  land, so the commit below waits for a yes.
 
 Run: `pnpm test && pnpm typecheck && pnpm lint && pnpm build`
-Expected: baseline unit tier green, `○ /dashboard`, no warnings.
+Expected: baseline unit tier green, `○ /dashboard`, no warnings. Measured: unit `30 files / 186`
+tests passed, integration `3 files / 19` passed (`rls-gate` 5, `credentials-visibility` 4,
+`provisioning` 10), `tsc --noEmit` exit 0, eslint exit 0 with no
+output, build compiled with `○ /dashboard` still prerendered and no `/admin` route yet (Task 11
+adds it).
 
 ```bash
 git add tests/fixtures/identity-users.ts tests/admin/integration/provisioning.test.ts
