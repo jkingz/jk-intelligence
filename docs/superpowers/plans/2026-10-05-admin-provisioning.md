@@ -71,9 +71,10 @@ unchanged; the mechanism is not what is written below in Tasks 2, 3, and 5.
 
 ### What the plan got wrong, caught by running it
 
-Six findings from executing the steps rather than trusting the drafted code. Items 1-2 are SQL and
-were only visible against a live Postgres; item 4 was only visible against the plan's own test. The
-code blocks above now hold the fixed versions.
+Seven findings from executing the steps rather than trusting the drafted code. Items 1-2 are SQL and
+were only visible against a live Postgres; item 4 was only visible against the plan's own test; item 7
+was only visible by reading the shipped handler back against the migration. The code blocks above now
+hold the fixed versions.
 
 1. **`admin_directory()` had no guard, and leaked every account's email address.** It was drafted
    `language sql`, which cannot `raise`, so the privilege check simply was not there. Measured
@@ -108,6 +109,16 @@ code blocks above now hold the fixed versions.
    skipping. That is the better property, and both halves are now measured: an absent
    `TEST_SUPABASE_URL` gives `19 skipped` and exit 0 (what CI sees), and an unreachable one gives
    `3 failed / 19 skipped` and exit 1. Neither run can be misread as coverage.
+7. **Task 7's PUT comment claimed an absent `p_client_id` means "leave the column alone". It does
+   not.** `admin_attach_member` declares `p_client_id uuid default null`, and its
+   `on conflict (id) do update set client_id = excluded.client_id` writes the column on every call —
+   so an omitted key and an explicit null are the same statement: this member has no tenant. Only
+   `admin_update_client` has the `coalesce` path that turns absence into "no change", and its comment
+   now says so. No test caught this because the assertions check the args shape, which was already
+   correct; reading the shipped handler against the migration did. Consequence for Task 12: because
+   omission means unassign, `attachMemberBody` accepts `{ role: "client" }` with no `clientId` and
+   produces a client-role row with no tenant — invisible to every read. The dialog must require a
+   client for `client` and `staff`, rather than the schema growing a refine the panel never hits.
 
 ## File structure
 
@@ -1651,7 +1662,7 @@ Every handler is the same five lines in the same order (§4): `requireAdmin()` �
 - Consumes: `requireAdmin()` (`lib/agents/authAgent.ts:76-80`, returns `{ allow: true }` or `{ allow: false, reason: "unauthenticated" | "forbidden" }`), Task 4's schemas and error map, Task 5's `callAdminRpc` + `AdminRpcError`, `RouteContext<"/api/admin/clients/[clientId]">`.
 - Produces: `jsonResponse(body, status)`, `readJsonBody(request)`, `firstIssueMessage(error)`; four endpoints. Task 12's client calls the same paths.
 
-- [ ] **Step 1: Write the shared HTTP leaf.** Create `lib/admin/http.ts`. Four handlers repeating fifteen header lines is how one of them drifts, so the shape lives once — mirroring `app/api/metrics/[clientId]/overview/route.ts:26-30`:
+- [x] **Step 1: Write the shared HTTP leaf.** Create `lib/admin/http.ts`. Four handlers repeating fifteen header lines is how one of them drifts, so the shape lives once — mirroring `app/api/metrics/[clientId]/overview/route.ts:26-30`:
 
 ```ts
 import { z } from "zod";
@@ -1688,7 +1699,7 @@ export function badRequest(message: string): Response {
 }
 ```
 
-- [ ] **Step 2: Write the failing route tests.** Create `tests/admin/unit/clients-route.test.ts`, following the house idiom from `tests/dashboard/unit/overview-route.test.ts` (boundary mocked with `vi.hoisted`, handler called with `new Request(url)` and a `Promise`-shaped params object):
+- [x] **Step 2: Write the failing route tests.** Create `tests/admin/unit/clients-route.test.ts`, following the house idiom from `tests/dashboard/unit/overview-route.test.ts` (boundary mocked with `vi.hoisted`, handler called with `new Request(url)` and a `Promise`-shaped params object):
 
 ```ts
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -1993,12 +2004,14 @@ describe("DELETE /api/admin/members/[userId]", () => {
 });
 ```
 
-- [ ] **Step 3: Run them to verify they fail.**
+- [x] **Step 3: Run them to verify they fail.**
 
-Run: `pnpm test admin/unit/clients-route admin/unit/client-detail-route admin/unit/member-route`
-Expected: module-not-found for the three route modules.
+Run: `pnpm vitest run --project unit tests/admin/unit/{clients-route,client-detail-route,member-route}.test.ts`
+Expected: module-not-found for the three route modules. Measured: `3 failed (3) / no tests`, each
+with `Cannot find package '@/app/api/admin/…/route'` — including for the bracketed paths, which
+resolve fine once the files exist.
 
-- [ ] **Step 4: Write `app/api/admin/clients/route.ts`.**
+- [x] **Step 4: Write `app/api/admin/clients/route.ts`.**
 
 ```ts
 import { requireAdmin } from "@/lib/agents/authAgent";
@@ -2040,7 +2053,7 @@ export async function POST(request: Request) {
 
 `adminErrorMessage` takes an `AdminWriteRpc`, so each handler passes its own function name literally — that is what makes §7's two `23503` messages switchable without reading message text.
 
-- [ ] **Step 5: Write `app/api/admin/clients/[clientId]/route.ts`.**
+- [x] **Step 5: Write `app/api/admin/clients/[clientId]/route.ts`.**
 
 ```ts
 import { z } from "zod";
@@ -2078,9 +2091,10 @@ export async function PATCH(
   try {
     const client = await callAdminRpc("admin_update_client", {
       p_id: clientId.data,
-      // undefined, not null: JSON.stringify drops the key, so Postgres' own
-      // default ("leave that column alone") is what applies. Sending null here
-      // would be a different statement about the row.
+      // undefined, not null: JSON.stringify drops the key, the parameter then takes
+      // its declared default (null), and the body's coalesce turns that into "leave
+      // this column alone". Both p_name and p_is_active use that mechanism, which is
+      // why a partial PATCH needs no second round trip to read the row.
       p_name: parsed.data.name,
       p_is_active: parsed.data.isActive,
     });
@@ -2095,13 +2109,13 @@ export async function PATCH(
 }
 ```
 
-- [ ] **Step 6: Write `app/api/admin/members/[userId]/route.ts`.**
+- [x] **Step 6: Write `app/api/admin/members/[userId]/route.ts`.**
 
 ```ts
 import { z } from "zod";
 
 import { requireAdmin } from "@/lib/agents/authAgent";
-import { adminErrorMessage, adminErrorStatus } from "@/lib/admin/errors";
+import { adminErrorMessage, adminErrorStatus, type AdminWriteRpc } from "@/lib/admin/errors";
 import { badRequest, firstIssueMessage, jsonResponse, readJsonBody } from "@/lib/admin/http";
 import { AdminRpcError, callAdminRpc } from "@/lib/admin/rpc";
 import { attachMemberBody } from "@/lib/admin/schemas";
@@ -2117,9 +2131,12 @@ async function gate(): Promise<Response | null> {
   );
 }
 
-function failed(error: unknown, code: string | undefined): Response {
+// Each verb names its own RPC at the call site: that is how §7's two 23503
+// sentences stay switchable without reading Postgres' message text.
+function rpcFailure(rpc: AdminWriteRpc, error: unknown): Response {
+  const code = error instanceof AdminRpcError ? error.code : undefined;
   return jsonResponse(
-    { error: adminErrorMessage("admin_attach_member", code) },
+    { error: adminErrorMessage(rpc, code) },
     adminErrorStatus(code),
   );
 }
@@ -2149,7 +2166,7 @@ export async function PUT(
     });
     return jsonResponse({ member }, 200);
   } catch (error) {
-    return failed(error, error instanceof AdminRpcError ? error.code : undefined);
+    return rpcFailure("admin_attach_member", error);
   }
 }
 
@@ -2170,26 +2187,32 @@ export async function DELETE(
     });
     return jsonResponse({ member }, 200);
   } catch (error) {
-    const code = error instanceof AdminRpcError ? error.code : undefined;
-    return jsonResponse(
-      { error: adminErrorMessage("admin_detach_member", code) },
-      adminErrorStatus(code),
-    );
+    return rpcFailure("admin_detach_member", error);
   }
 }
 ```
 
 `failed()` and `gate()` are local to this file because both verbs share them; the other two route files each have one verb and keep their five lines inline. Note DELETE's error branch calls `adminErrorMessage` with `admin_detach_member`, not the attach name — that is deviation 2's whole cost, one line each.
 
-- [ ] **Step 7: Run the tests, then the gate.**
+**As shipped, two changes.** First, the drafted `failed(error, code)` took an `error` it never used
+and hardcoded `admin_attach_member`, which is why DELETE had to inline a second copy of the same five
+lines. It is now `rpcFailure(rpc: AdminWriteRpc, error: unknown)`, called with each verb's own name
+literally (`"admin_attach_member"` / `"admin_detach_member"`), so deviation 2 still costs exactly one
+word per call site and the shape exists once. `gate()` is unchanged apart from the local variable
+name. Second, the PUT's comment over `p_client_id` as drafted asserted that an absent key leaves the
+column alone; the DDL says otherwise (finding 7), so the comment now states that attach writes role
+and tenant as one statement. That also tells Task 12 the dialog, not the schema, has to require a
+client for `client` and `staff`.
+
+- [x] **Step 7: Run the tests, then the gate.**
 
 Run: `pnpm test admin`
-Expected: all admin unit files green. `passes only the keys it was given` and `omits the key entirely when the body omitted it` are the two that fail if a handler substitutes `null` for `undefined` — fix the handler, not the assertion.
+Expected: all admin unit files green. `passes only the keys it was given` and `omits the key entirely when the body omitted it` are the two that fail if a handler substitutes `null` for `undefined` — fix the handler, not the assertion. Measured: `7 files / 49 tests` passed on the first run — the 26 cases from Tasks 4-5 plus the 23 drafted here, none of which needed editing.
 
 Run: `pnpm test && pnpm typecheck && pnpm lint && pnpm build`
-Expected: green, `○ /dashboard`. The three new route handlers are dynamic; check `pnpm build` did **not** prerender them (no `○ /api/admin/…` line).
+Expected: green, `○ /dashboard`. The three new route handlers are dynamic; check `pnpm build` did **not** prerender them (no `○ /api/admin/…` line). Measured: unit `33 files / 209 tests`, `tsc --noEmit` exit 0 (which also means `next typegen` produced `RouteContext` entries for all three new paths), eslint exit 0 silent, and the route table shows `ƒ /api/admin/clients`, `ƒ /api/admin/clients/[clientId]`, `ƒ /api/admin/members/[userId]` with `○ /dashboard` still prerendered.
 
-- [ ] **Step 8: Commit.**
+- [x] **Step 8: Report the diff and commit on approval.** King reads the code changes before they land.
 
 ```bash
 git add lib/admin/http.ts "app/api/admin" tests/admin/unit/clients-route.test.ts \

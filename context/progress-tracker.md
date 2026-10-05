@@ -165,6 +165,7 @@ the build and the first live-RLS integration slice landed (2026-09-24).
 
 ## In Progress
 - **Admin panel: provisioning only** (2026-10-05) — spec `docs/superpowers/specs/2026-10-05-admin-panel-provisioning-design.md`, plan `docs/superpowers/plans/2026-10-05-admin-provisioning.md`, feature spec `context/feature-specs/07-admin.md`. Five `public` definer RPCs called with the user-scoped client; no new table grants. Enters from `AccountMenu`, not the rail.
+  - **Probes run against the local stack (2026-10-05), all three executed, none inherited.** A `security definer` function in `public` **can** read `auth.users` — the temporary probe returned a row, so `admin_directory()` stands and the `auth.admin.listUsers()` fallback is not needed. Nested `private.current_user_role()` resolves the **caller**, not the owner: a `client@a` session received `"client"` from the definer, which is what makes the `42501` guard the enforcement point rather than decoration. The same function, called with no session, was refused by the grant itself (`42501` from the revoke/grant pair, before the body ran) — §3's "write the grants explicitly instead of relying on a commented-out default" is now observed, not assumed. **`max_rows = 1000` is measured, not inherited:** with 1003 rows in `auth.users`, the set-returning probe returned exactly **1000**, so §7's "the directory stops at 1000 accounts" is a real ceiling and deviation 5 is closed as measured. Substrate notes: `psql` is not on this machine's PATH, `supabase db query --file` refuses a multi-statement file (prepared statement), and `.env.test` carries no `TEST_DATABASE_URL`, so the probes ran through the repo's existing `pg` dependency against `postgresql://postgres:postgres@127.0.0.1:54322/postgres`. The 999 synthetic accounts were deleted by their `@probe.local` address and `auth.users` was back at 4 rows; all three probe functions were dropped.
   - **Substrate shipped (Tasks 3-5, 2026-10-05):** `supabase/migrations/20261005000000_admin_provisioning.sql`
     — five `security definer` functions in `public` (`admin_directory`, `admin_create_client`,
     `admin_update_client`, `admin_attach_member`, `admin_detach_member`), each guarding on
@@ -188,6 +189,24 @@ the build and the first live-RLS integration slice landed (2026-09-24).
     exit 1 when the URL is set but unreachable, so a dead stack cannot fake a pass either.
     `hasTestDb` keys on the env name, not container health, which is why `supabase stop` is the wrong
     instrument for that proof.
+  - **The four verbs exist (Task 7, 2026-10-05):** `lib/admin/http.ts` holds the response shape
+    (`jsonResponse` with `no-store` + `Vary: Cookie`, `readJsonBody`, `firstIssueMessage`,
+    `badRequest`) and three route files sit on `POST /api/admin/clients`,
+    `PATCH /api/admin/clients/[clientId]`, `PUT`/`DELETE /api/admin/members/[userId]`. Every handler
+    is the same order — `requireAdmin()` → path-param uuid → body → zod → `callAdminRpc` →
+    code→status — so the guard and zod run **before any db touch**, which is what
+    `tests/admin/unit/{clients,client-detail,member}-route.test.ts` assert (23 cases; the two
+    "only the keys I was given" cases are the ones that fail if a handler substitutes `null` for
+    `undefined`). Response bodies carry only `lib/admin/errors.ts` sentences. Unit tier is now
+    **33 files / 209 tests**, typecheck/lint clean, and `pnpm build` marks all three routes `ƒ`
+    (none prerendered) with `/dashboard` still `○`. One comment was wrong before it shipped: it
+    claimed an omitted `p_client_id` leaves the column alone, but `admin_attach_member` defaults that
+    parameter to `null` and its upsert writes the column every call — omission and explicit null are
+    both "no tenant". Only `admin_update_client`'s `coalesce` body gives absence the "no change"
+    meaning, which is why PATCH passes `undefined`. Carry-forward for Task 12: since omission
+    unassigns, the member dialog must require a client for `client`/`staff` roles rather than the
+    schema growing a refine. AGENTS.md's HTTP table gains these rows in
+    Task 13, when the panel that calls them also exists.
 
 ## Recent Work
 
