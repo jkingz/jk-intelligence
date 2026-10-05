@@ -1,11 +1,12 @@
 import "server-only";
 
 import { getAuthSession } from "@/lib/agents/authAgent";
+import type { MemberRole } from "@/types/metrics";
 
 export interface ProfileView {
   email: string | null;
   name: string | null;
-  role: "admin" | "client" | "staff" | null;
+  role: MemberRole | null;
   clientId: string | null;
   providers: string[];
 }

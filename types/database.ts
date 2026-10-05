@@ -1,4 +1,9 @@
-import type { Client, Source, SyncLogInput } from "@/types/metrics";
+import type {
+  Client,
+  MemberRole,
+  Source,
+  SyncLogInput,
+} from "@/types/metrics";
 
 export type Json =
   | string
@@ -82,7 +87,7 @@ export type Database = {
       users: Table<
         {
           id: string;
-          role: "admin" | "client" | "staff";
+          role: MemberRole;
           client_id: string | null;
           created_at: string;
         },
