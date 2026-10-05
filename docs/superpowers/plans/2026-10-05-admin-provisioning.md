@@ -1039,7 +1039,7 @@ Expected: three files pass, every case green. If `role-set.test.ts` fails on the
 Run: `pnpm test && pnpm typecheck && pnpm lint && pnpm build`
 Expected: green; `Tests` counts the 160 baseline plus the three new files' cases, `○ /dashboard`, no warnings. The three modified files are type-level only, so `typecheck` is the real proof they changed nothing behavioural.
 
-- [ ] **Step 11: Report the diff and commit on approval.** King reads the code changes before they
+- [x] **Step 11: Report the diff and commit on approval.** King reads the code changes before they
   become a commit (asked for on 2026-10-05, partway through this plan), so this step is: show
   `git status --short`, the diff of the four modified files, and the five new files — then wait for a
   yes. Once he says so:
@@ -1066,7 +1066,7 @@ git commit -m "feat(admin): add the schema and error-map layer, with one role li
 - Consumes: `createServerSupabaseClient()` (`lib/supabase/server` — confirm the exact export name and path against `lib/db/repository.ts`'s import line before writing), `AdminWriteRpc` from Task 4.
 - Produces: `class AdminRpcError { code?: string; functionName: string }`, `callAdminRpc<TName extends AdminFunctionName>(name: TName, args: AdminRpcArgs<TName>): Promise<AdminRpcResult<TName>>`. Task 6 calls it against real Postgres; Tasks 7 and 9 call it for every read and write.
 
-- [ ] **Step 1: Write the failing test.** Create `tests/admin/unit/rpc.test.ts`:
+- [x] **Step 1: Write the failing test.** Create `tests/admin/unit/rpc.test.ts`:
 
 ```ts
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -1170,7 +1170,7 @@ describe("callAdminRpc", () => {
 Run: `pnpm test admin/unit/rpc`
 Expected: module-not-found for `@/lib/admin/rpc`.
 
-- [ ] **Step 2: Type the five functions in `types/database.ts`.** Replace the `Functions:` block (currently `persist_metrics` only) with:
+- [x] **Step 2: Type the five functions in `types/database.ts`.** Replace the `Functions:` block (currently `persist_metrics` only) with:
 
 ```ts
     Functions: {
@@ -1209,7 +1209,7 @@ Expected: module-not-found for `@/lib/admin/rpc`.
 
 Extend the import on line 1 to `import type { Client, MemberRole, Source, SyncLogInput } from "@/types/metrics";`, and reuse it for the `users` table's `Row` (Task 4, Step 8 already changed `:85`). `admin_directory`'s `email` is `string | null` because `auth.users.email` is nullable, and the projection is `->> 'name'`, which is null for any account that never set one.
 
-- [ ] **Step 3: Write `lib/admin/rpc.ts`.**
+- [x] **Step 3: Write `lib/admin/rpc.ts`.**
 
 ```ts
 import "server-only";
@@ -1266,7 +1266,7 @@ export async function callAdminRpc<TName extends AdminFunctionName>(
 
 Confirm `createServerSupabaseClient`'s real module path and whether it is async by reading the import at the top of `lib/db/repository.ts` and one call site (`canAccessClient` uses `await createServerSupabaseClient()`); mirror it exactly rather than trusting this line. The `args as never` cast is the one place this file is not inferred — `supabase-js`'s `rpc()` generic wants a `Record<string, Json>` shape it cannot derive from a keyed lookup, and `AdminRpcArgs` is the checked type the callers get. If `typecheck` accepts the cast-free version, drop the cast.
 
-- [ ] **Step 4: Run the test, then the gate.**
+- [x] **Step 4: Run the test, then the gate.**
 
 Run: `pnpm test admin/unit/rpc`
 Expected: 6 passed. If `does not repeat Postgres' message` fails, the wrapper is interpolating `error.message` — remove it; the message is for the log, and the log line emits only `{ functionName, code }`.
@@ -1274,7 +1274,7 @@ Expected: 6 passed. If `does not repeat Postgres' message` fails, the wrapper is
 Run: `pnpm test && pnpm typecheck && pnpm lint && pnpm build`
 Expected: green; `typecheck` now proves the five `Functions` entries compile.
 
-- [ ] **Step 5: Commit.**
+- [ ] **Step 5: Report the diff and commit on approval.**
 
 ```bash
 git add lib/admin/rpc.ts types/database.ts tests/admin/unit/rpc.test.ts
