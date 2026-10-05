@@ -1,8 +1,47 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { finishStatusToast, startStatusToast } from "@/lib/toast-status";
 import type { PanelClient } from "@/lib/admin/provisioning";
+import { updateClient } from "../lib/mutations";
+import { ClientDialog } from "./client-dialog";
 
 export function ClientTable({ clients }: { clients: PanelClient[] }) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+  const router = useRouter();
+
+  function toggle(client: PanelClient) {
+    setBusyId(client.id);
+    const toastId = startStatusToast(
+      client.isActive ? "Pause client" : "Resume client",
+    );
+    startTransition(async () => {
+      const result = await updateClient(client.id, { isActive: !client.isActive });
+      setBusyId(null);
+      if (!result.ok) {
+        finishStatusToast(toastId, {
+          status: "error",
+          title: client.isActive ? "Could not pause it" : "Could not resume it",
+          description: result.message,
+        });
+        return;
+      }
+      finishStatusToast(toastId, {
+        status: "success",
+        title: client.isActive ? "Client paused" : "Client resumed",
+        description: `${client.name} is ${client.isActive ? "paused" : "active"}.`,
+      });
+      // The badge keeps its server-side value until this lands, so a refusal
+      // from Postgres never leaves the table claiming a state it did not get.
+      router.refresh();
+    });
+  }
+
   return (
     <div className="relative overflow-x-auto">
       <table className="w-full text-left text-xs">
@@ -47,10 +86,17 @@ export function ClientTable({ clients }: { clients: PanelClient[] }) {
               </td>
               <td className="py-3 px-4 sm:px-5">
                 <div className="flex justify-end gap-2">
-                  <Button variant="ghost" size="sm" disabled>
-                    Rename
-                  </Button>
-                  <Button variant="outline" size="sm" disabled>
+                  <ClientDialog
+                    mode="rename"
+                    clientId={client.id}
+                    name={client.name}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busyId === client.id}
+                    onClick={() => toggle(client)}
+                  >
                     {client.isActive ? "Pause" : "Resume"}
                   </Button>
                 </div>

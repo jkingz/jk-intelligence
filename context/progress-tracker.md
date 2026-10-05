@@ -285,8 +285,48 @@ the build and the first live-RLS integration slice landed (2026-09-24).
   - Task 11's `pending@rls-test.local` auth account is what makes the Attach trigger render; with the
     trigger disabled a pending account has no visible representation, because its list lives inside
     the dialog. Task 12 changes that.
-  - Unit tier **35 files / 221 tests**; with integration **38 / 240**. Typecheck/lint/build clean,
-    `/dashboard` still `○`.
+  - **The writes are wired, and every one of them was clicked (Task 12, 2026-10-06).**
+    `components/features/admin/lib/mutations.ts` is the whole request path — four functions over one
+    `send(method, path, body)`, returning `{ ok: true } | { ok: false; message }`, where `message` is
+    `lib/admin/errors.ts`'s sentence passed through unchanged and the fixed fallback
+    `"The change did not save."` covers a reply that isn't JSON (a proxy's 502 page must not become
+    toast copy). DELETE sends **no body and no `Content-Type`**. `lib/select-items.ts` holds the
+    `UNASSIGNED` sentinel — base-ui keys an option by one non-null value, so "no client" is a string
+    in the DOM and `null` in the body. Both dialogs are real forms now; the client table's Rename
+    opens per row; the member rows **commit on change** (no submit), and `router.refresh()` runs
+    **only on a 2xx**, so a refusal from Postgres never leaves the table claiming a state it did not
+    get — that is what the last-admin case showed in the browser, where the select snapped back to
+    `admin` with `psql` confirming `admins = 1` unchanged. Pinned by
+    `tests/admin/unit/mutations.test.ts` (5 cases; `@auth` stays read-only, so the contract gets the
+    unit tier and the buttons get Chrome).
+  - **Two defects only a browser could show, both now fixed and generalised.** (i) JSX trims the
+    newline between an expression and the text after it, so `{"1 account"}\n has…` rendered
+    `1 account hassigned up without a role.` — the copy is one template literal, and the rule is in
+    `context/code-standards.md`. (ii) Switching an attach member's role to `admin` disabled the
+    client select but left the previous tenant **displayed**, a value the write ignores; the handler
+    clears it to `UNASSIGNED`. A disabled field that shows a stale value is a lie the server never
+    sees, so the reset belongs in the transition, not in the submit.
+  - **`"use client"` on both tables, and per-row field ids.** Task 11 shipped them as pure renders;
+    hooks and `onClick` need the directive. The drafted static `id="client-name"` would bind a
+    `<label htmlFor>` to the first of six rename dialogs, so ids carry the row key
+    (`client-name-${clientId ?? "new"}`). base-ui mounts dialog content lazily — `evaluate_script`
+    found only the open dialog's fields in the DOM — so the collision was never visible, which is
+    exactly the kind of bug a lazy mount hides until a dependency changes it.
+  - **Driven end to end against the local stack, then undone**: create (`SCRATCH.example/` stored as
+    `scratch.example`), rename, pause (**the row stays**, with `Resume` — `admin_directory`'s missing
+    `is_active` filter doing its job), resume, tenant move with both member counts following, attach
+    `pending@rls-test.local`, promote, detach, a **second detach from a stale tab** answering
+    `That account is not provisioned.` with the stale row untouched, a duplicate domain answering
+    `Another client already owns that domain.` **with the dialog open and both drafts intact**, and
+    `client@a.rls-test.local` bounced from `/admin` to `/dashboard?client=254c0249-…` — their own
+    tenant, picked by the read. Scratch client deleted over `psql` (`DELETE 1`), Demo User back on
+    Northstar, `admins = 1`, pending left unprovisioned.
+  - **`/admin` still renders no header, so the sign-out leg runs from `/dashboard`.** The Account
+    menu comes from `dashboard-view.tsx`, not the shell; the panel's own entry-point gap (above)
+    stayed King's call and is Task 13's to record, not this task's to solve.
+  - Unit tier **36 files / 226 tests**; with integration **38 / 240**. Typecheck/lint/build clean,
+    `ƒ /admin` and the three `/api/admin/*` routes, `/dashboard` still `○`. e2e **9 public / 26
+    auth** — the plan's "16 + 5" is stale twice over now; `--list` gives 26 tests in 12 files.
 
 ## Recent Work
 

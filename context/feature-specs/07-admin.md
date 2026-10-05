@@ -67,15 +67,51 @@ source of error copy in this feature: zod → 400, `23505` → 409, `45001` → 
 `error.code` — the shared `databaseOperation()` wrapper erases it, which is why admin writes do
 not use it. Refresh only on 2xx: after a refusal the server data is already correct.
 
+On the client side `components/features/admin/lib/mutations.ts` is the only request path: four
+functions over one `send(method, path, body)`, each resolving
+`{ ok: true } | { ok: false; message }`. `message` is the server's sentence, unchanged — the UI
+holds no second copy of any error string and never paraphrases a code. A reply that is not JSON
+(a proxy's 502 page) gets the fixed `"The change did not save."`, so no foreign body text reaches
+a toast. `DELETE` sends no body and no `Content-Type`.
+
+## The panel
+`components/features/admin/` renders the two regions from `getAdminView()`, and every control is
+the server's, not a local guess:
+
+- **Client rows commit on button click; member rows commit on select change.** No row has a
+  submit button, so no row can hold a half-entered state. Each row keeps its own `busyId`, so one
+  slow write disables one button.
+- **`router.refresh()` runs only on a 2xx.** After a refusal the component re-renders from the
+  data it already had, which is the correct data — Postgres never changed. This is what makes the
+  last-admin case honest: the role select snaps back to `admin` instead of showing a demotion that
+  did not happen.
+- **"Unassigned" is a sentinel in the DOM, `null` in the body.** base-ui keys an option by a single
+  non-null value, so `UNASSIGNED` in `lib/select-items.ts` stands in for "no client" and the two
+  call sites that build a request map it back. Nothing else may use that string.
+- **An admin row's client select is disabled *and* cleared.** A disabled field still showing the
+  previous tenant would display a value the write ignores.
+- **A failed submit keeps the dialog open with the draft intact.** Only success closes it, and
+  opening re-reads the server's name and clears the domain.
+- **Field ids carry the row key** (`client-name-${clientId ?? "new"}`): six rename dialogs on one
+  page means six candidates for one `htmlFor`.
+
 ## States
 Bootstrap is the normal state: one admin from `create-demo-user.mjs --admin`, no other
 `users` rows, clients full of seed data. An unassigned member renders "Unassigned", not an
 error. No control hides itself based on who you are — your own row still offers Detach and
-Postgres answers `45001`.
+Postgres answers `45001`. An empty pending list removes the Attach trigger and the region reads
+"Every account is already provisioned."; the trigger's absence is the only signal that nothing is
+waiting, since the list itself lives inside the dialog.
 
 ## Limits accepted out loud
 Two admins editing one client is last-write-wins (`clients` has no `updated_at`; none added).
 A signed-in non-admin hitting `/admin` is redirected, not shown a 403 page. The directory stops
-at `max_rows = 1000`. Browser specs never write, so nothing asserts that pressing *Create
-client* in a browser round-trips; the unit tier owns the handler, the integration tier owns the
-function.
+at `max_rows = 1000`. A stale tab is a real state: the second detach from a tab that never
+refreshed answers `That account is not provisioned.` and leaves that tab's row exactly as it was —
+the panel reports the refusal rather than pretending the row disappeared.
+
+`@auth` specs stay read-only by rule, so no spec presses these buttons: the unit tier owns the
+request contract (`tests/admin/unit/mutations.test.ts`), the integration tier owns the functions,
+and the round trip — create, rename, pause, move, attach, promote, detach twice, bounce a
+`client` — was driven by hand in Chrome against the local stack and recorded in
+`context/progress-tracker.md`.

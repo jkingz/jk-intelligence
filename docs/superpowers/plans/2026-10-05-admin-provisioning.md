@@ -3538,7 +3538,7 @@ git commit -m "feat(admin): render the provisioning panel inside the app shell"
 - Consumes: the four endpoints from Task 7, `startStatusToast`/`finishStatusToast` (`lib/toast-status.ts:10,17`), base-ui `Select` whose `Root` takes `items`/`value`/`onValueChange`.
 - Produces: `createClient(input)`, `updateClient(id, patch)`, `attachMember(id, body)`, `detachMember(id)` — each returning `{ ok: true } | { ok: false; message: string }`.
 
-- [ ] **Step 1: Write the mutation client.** Create `components/features/admin/lib/mutations.ts`:
+- [x] **Step 1: Write the mutation client.** Create `components/features/admin/lib/mutations.ts`:
 
 ```ts
 type Endpoint =
@@ -3591,7 +3591,15 @@ export function detachMember(userId: string) {
 
 `payload?.error` is the server's §7 string and the only copy the UI shows; `"The change did not save."` is the fallback for a non-JSON reply, and it never interpolates the body.
 
-- [ ] **Step 2: Write the Select data.** Create `components/features/admin/lib/select-items.ts`:
+**Deviation (Step 1).** The drafted `Endpoint` union is gone. Each arm paired a method with a path
+literal (`["POST", "/api/admin/clients", unknown]`), but every caller builds its own interpolated
+path, so `send` was already typed `(Endpoint[0], string, unknown)` and the union constrained only
+the first argument. It is now `type Method = "POST" | "PATCH" | "PUT" | "DELETE"`, which says the
+same thing in four tokens. One comment is new, above the `response.json()` line: without it a reader
+cannot see that the fixed fallback string is deliberate protection against echoing a proxy's HTML
+error page into a toast.
+
+- [x] **Step 2: Write the Select data.** Create `components/features/admin/lib/select-items.ts`:
 
 ```ts
 import { MEMBER_ROLES } from "@/types/metrics";
@@ -3626,7 +3634,7 @@ export function memberInitialRole(member: ProvisionedMember): string {
 
 `Select` needs `items` as a plain record, which is why this is data rather than JSX options. `memberInitialRole` exists only so `member-table` does not re-derive the union — delete it if the component reads `member.role` directly, which it will.
 
-- [ ] **Step 3: Make the client dialog a form.** Rewrite `client-dialog.tsx`:
+- [x] **Step 3: Make the client dialog a form.** Rewrite `client-dialog.tsx`:
 
 ```tsx
 "use client";
@@ -3750,7 +3758,7 @@ export function ClientDialog({
 
 A bare `<form>` with `<label htmlFor>` per `email-auth-form.tsx:98` — no `components/ui/form`, which does not exist and is not added (§5). `maxLength={120}` mirrors the zod bound so the common over-long case is caught in the field and the server's 400 stays a backstop.
 
-- [ ] **Step 4: Wire the client table.** Replace the two disabled buttons with `<ClientDialog mode="rename" clientId={client.id} name={client.name} />` and a live Pause/Resume button:
+- [x] **Step 4: Wire the client table.** Replace the two disabled buttons with `<ClientDialog mode="rename" clientId={client.id} name={client.name} />` and a live Pause/Resume button:
 
 ```tsx
 const [pending, startTransition] = useTransition();
@@ -3793,7 +3801,7 @@ function toggle(client: PanelClient) {
 
 The row keeps showing `Active`/`Paused` from server data until `refresh()` lands — no optimistic flip (§5), so a refusal leaves the badge truthful.
 
-- [ ] **Step 5: Make member rows edit on change.** In `member-table.tsx`, replace the role `Badge` and the disabled Detach with a `Select` per role, a `Select` per client, and a live detach:
+- [x] **Step 5: Make member rows edit on change.** In `member-table.tsx`, replace the role `Badge` and the disabled Detach with a `Select` per role, a `Select` per client, and a live detach:
 
 ```tsx
 <Select
@@ -3847,7 +3855,7 @@ async function patch(member: ProvisionedMember, body: { role: string; clientId?:
 
 `changeRole` sends `clientId: null` for an admin because `users_admin_has_no_tenant` would answer `23514` otherwise — and `admin_attach_member` already forces the null, so this only keeps the row's own select from showing a client it no longer has. Verify the exact `Select` subcomponent names and `onValueChange` signature against `components/ui/select.tsx` and one existing consumer before writing; base-ui's `Select` takes `items` on the `Root`, and an unused `Select` in this repo means the first call site has to read the wrapper.
 
-- [ ] **Step 6: Rewrite the attach dialog as a real form.** Replace `components/features/admin/components/attach-member-dialog.tsx` entirely. Three fields — which account, which role, which client — and the same submit shape as the client dialog:
+- [x] **Step 6: Rewrite the attach dialog as a real form.** Replace `components/features/admin/components/attach-member-dialog.tsx` entirely. Three fields — which account, which role, which client — and the same submit shape as the client dialog:
 
 ```tsx
 "use client";
@@ -4034,10 +4042,10 @@ export function AttachMemberDialog({
 
 `if (accounts.length === 0) return null;` is the last line before the markup rather than a first one because hooks must run unconditionally — the empty case is also already gated by `admin-panel.tsx`, so this only protects against a caller that forgets. `disabled={role === "admin"}` plus the one-line note is the only place the UI states the DDL rule; it does not re-implement it, since the button would still work if `users_admin_has_no_tenant` ever changed and the server would still decide.
 
-- [ ] **Step 7: Pass the clients down.** Change `admin-panel.tsx`'s call site to `<AttachMemberDialog accounts={members.pending} clients={clients} />`. Nothing else in that file changes in this step.
+- [x] **Step 7: Pass the clients down.** Change `admin-panel.tsx`'s call site to `<AttachMemberDialog accounts={members.pending} clients={clients} />`. Nothing else in that file changes in this step.
 
 
-- [ ] **Step 8: Test the mutation results in the unit tier.** `@auth` stays read-only (§8), so nothing in a browser presses these buttons; the pure request/response contract still gets pinned. Create `tests/admin/unit/mutations.test.ts`:
+- [x] **Step 8: Test the mutation results in the unit tier.** `@auth` stays read-only (§8), so nothing in a browser presses these buttons; the pure request/response contract still gets pinned. Create `tests/admin/unit/mutations.test.ts`:
 
 ```ts
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -4101,7 +4109,33 @@ describe("admin mutations", () => {
 Run: `pnpm test admin`
 Expected: every admin unit file green. If the unit project refuses to import a `"use client"` module, add `components/features/admin/lib/mutations.ts` to the same alias set the other client-adjacent lib tests use — check how `tests/dashboard/unit/*` imports anything under `components/features/dashboard/lib` before inventing a config change.
 
-- [ ] **Step 9: Drive it in the browser, then stop.** Writes make this the task where the panel must actually be clicked, against the local stack (Task 11 Step 10's overrides; never hosted):
+`pnpm test admin`: 10 files / 65 tests green. The refusal the second sentence guards against did not
+happen, so no config changed — the unit project already consumes `"use client"` libs through the
+`@` alias (`tests/identity/unit/profile.test.ts:23` imports `components/features/user-profile/lib`
+the same way). The five cases ship verbatim.
+
+**Deviations (Steps 3-7).**
+- **`client-table.tsx` and `member-table.tsx` needed `"use client"`.** The plan's Step 4/5 snippets
+  add `useState`, `useTransition` and `onClick`, none of which survive in a server component; Task 11
+  shipped both files without the directive because they were pure renders. Both now carry it.
+- **Per-row field ids in the rename dialog.** The drafted `id="client-name"` is fine in one create
+  dialog and wrong in six rename dialogs on one page — `label htmlFor` would bind to the first row's
+  input. `client-dialog.tsx` derives `client-name-${clientId ?? "new"}` instead. `evaluate_script`
+  afterwards showed base-ui mounts dialog content lazily (only the open dialog's fields are in the
+  DOM, `dangling: []`), so this is correctness insurance rather than a bug a user could see.
+- **Every `onValueChange` guards a null.** The drafted `onValueChange={(next) => setUserId(next)}`
+  does not typecheck: base-ui's handler is `(value: Value | null, details) => void`
+  (`node_modules/@base-ui/react/esm/select/root/SelectRoot.d.ts:51` region), and `dashboard-header.tsx:53-79`
+  — the precedent the plan cites — already guards. Each of the three member/attach selects opens with
+  `if (!next) return;`.
+- **Step 7's "Nothing else in that file changes in this step" is false.** `MemberTable` renders a
+  client `Select` per row (Step 5), so `admin-panel.tsx`'s call site became
+  `<MemberTable members={members.provisioned} clients={clients} />` in the same step.
+- **`UNASSIGNED` is a sentinel, not a nullable value.** base-ui holds one item value and cannot key an
+  option by `null`, so the "no client" option is `"__unassigned__"` in the DOM and mapped back to
+  `null` in the two places that build a request body. Documented on the constant.
+
+- [x] **Step 9: Drive it in the browser, then stop.** Writes make this the task where the panel must actually be clicked, against the local stack (Task 11 Step 10's overrides; never hosted):
 
 ```bash
 pnpm dev -p 3000
@@ -4109,10 +4143,59 @@ pnpm dev -p 3000
 
 Create a client → it appears with its domain lowercased. Rename it. Pause it — and confirm it **stays in the table** with `Paused` (deviation 1's whole reason for existing). Resume it. Attach a pending account, then demote it and confirm the last-admin refusal toast leaves the badge untouched. Detach a scratch member twice from two tabs and read `That account is not provisioned.` on the second. Sign out and back in as a `client`, open `/admin`, and land on `/dashboard`.
 
+Driven in Chrome against the local stack, signed in as `admin@rls-test.local`, every leg clicked by
+hand because `@auth` stays read-only:
+
+- **Create** with `SCRATCH.example/` and a name → the row lands as `scratch.example`, so the server's
+  normalization is what the table shows, not what was typed. **Rename** to "Scratch Studio" → the
+  cell changed and the toast read `Scratch Studio.` **Pause** → the row **stayed**, badge `Paused`,
+  button flipped to `Resume` — deviation 1 confirmed from the UI, not only from the SQL. **Resume**
+  restored it.
+- **Commit-on-change**: the demo member's client Select moved Northstar → Scratch on a single change
+  event, and both member counts followed on the refresh (Northstar 2→1, Scratch 0→1) — the write and
+  the read agree without a submit button.
+- **Last-admin refusal**: switching the admin's own role to `client` produced `Change declined` /
+  `Assign another admin before removing this one.`, the select snapped back to `admin` on its own
+  (no `router.refresh()` on a non-2xx), and `psql` confirmed `role = admin` with `admins = 1`.
+- **Attach**: the dialog's admin branch disabled the client Select and showed `An admin belongs to no
+  client.`; `pending@rls-test.local` was then attached as `client` of Scratch Studio, which emptied
+  the pending list — the Attach trigger disappeared and the region read `Every account is already
+  provisioned.` Promoting that account to `admin` took Scratch from 2 to 1 member, and its client
+  Select went disabled.
+- **Two tabs, one detach**: detached in tab 3 (toast `Account detached`), then pressed the same
+  Detach in tab 4, still holding the stale row → `Could not detach it` /
+  `That account is not provisioned.`, and the stale row stayed put. That is §7's real-sentence path
+  reached through an actual stale session rather than a mock.
+- **Duplicate domain**: creating a second client on `northstar.example` gave `Could not create the
+  client` / `Another client already owns that domain.` **with the dialog still open and both drafts
+  intact** — Step 3's "failure keeps the form" branch.
+- **Client-role bounce**: signed out and back in as `client@a.rls-test.local`, opened `/admin`, and
+  landed on `/dashboard?client=254c0249-…` — RLS Client A, their own tenant, chosen by the read
+  rather than by a redirect with a hard-coded target. `/admin` renders no header (the AccountMenu
+  lives in the dashboard's own shell), so the sign-out leg runs from `/dashboard`; that gap is
+  Task 13's, not this task's.
+- **Two bugs only the browser showed.** (i) `{"1 account"} hassigned up…` — JSX trims the newline
+  between an expression and the text after it, so the pluralization branch rendered `1 account has`
+  glued to the next sentence; the copy is now one template literal. (ii) With role switched to
+  `admin`, the now-disabled client Select still displayed `Scratch Studio`, a value the write would
+  ignore; `onValueChange` clears it to `UNASSIGNED` on that transition. Neither is visible in a
+  unit test, and both are recorded in `context/code-standards.md`.
+- **Stack restored**: Demo User moved back to Northstar Studio, `scratch.example` deleted over the
+  local `psql` connection (`DELETE 1`), `pending@rls-test.local` left unprovisioned (its auth account
+  stays, which is what keeps the Attach trigger honest in later runs), `admins = 1`, five clients.
+
 - [ ] **Step 10: Gate and commit.**
 
 Run: `pnpm test && pnpm typecheck && pnpm lint && pnpm build && pnpm test:e2e && pnpm test:e2e:auth`
 Expected: green throughout, `ƒ /admin` and `○ /dashboard`, and `@auth` still 16 + 5 passed with the local stack up.
+
+Green throughout, with the local stack up and `pnpm dev -p 3000` running under Task 11 Step 10's
+overrides: **36 files / 226 tests** (`pnpm test`), `typecheck` and `lint` silent, `pnpm build`
+printing `ƒ /admin`, the three `/api/admin/*` routes `ƒ`, and `○ /dashboard` still prerendered,
+**9 passed** public and **26 passed** auth. The "16 + 5" in the Expected line is stale the same way
+Task 11's was: `playwright test --project auth --list` reports **26 tests in 12 files**, because the
+admin layout spec multiplies across viewports. 226 unit + 14 integration = the 240 `pnpm test:all`
+records.
 
 ```bash
 git add components/features/admin tests/admin/unit/mutations.test.ts

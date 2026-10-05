@@ -56,6 +56,7 @@ const row: any = await fetchGSC()
 - Group wrapper-free DOM nodes with a Fragment Ref (`useRef<FragmentInstance>` + `<Fragment ref>`), not an extra `<div>`. `InView` (`components/ui/in-view.tsx`) uses this to observe its first-level children with one `IntersectionObserver` via `observeUsing` / `unobserveUsing`. Prefer it over `motion`'s `whileInView` for reveal-on-scroll; keep `motion` for scroll-linked values (`useScroll` / `useTransform`).
 - Extract non-reactive callbacks out of effects with `useEffectEvent` instead of adding them to the dependency array. `InView` uses it so an inline `onChange` does not re-subscribe the observer.
 - `next-themes@0.4.6` is patched via `pnpm.patchedDependencies` (`patches/next-themes@0.4.6.patch`) so its FOUC-prevention `<script>` is not re-rendered on the client. React 19 warns "Encountered a script tag while rendering React component" for the unpatched build. The patch early-returns `null` when `window` is defined; the script still ships in SSR HTML and runs before hydration. To change: re-run `pnpm patch next-themes@0.4.6` + `pnpm patch-commit`, never edit `node_modules` directly.
+- **JSX trims the whitespace a newline leaves between an expression and the text after it**, so `{"1 account"}\n has signed up…` renders `1 account hassigned up…`. Build a mixed sentence as one template literal inside a single expression — `` {`${n} ${n === 1 ? "account has" : "accounts have"} signed up`} `` — and read the rendered copy in a browser before calling a pluralization branch done. Found in the admin attach dialog, where only the `n === 1` path was ever on screen.
 
 ## Security Headers
 
@@ -194,6 +195,8 @@ const [gsc, ga4, semrush] = await Promise.allSettled([
   tokens, no `console.log` of request headers.**
 - Client-facing form/action status is a single bottom-right toast lifecycle (`@/lib/toast-status`): `startStatusToast` for processing → `finishStatusToast` flips to success/error. Do not build inline status banners — processing, success, and error all render in the toaster viewport.
 - Interactive submit paths guard against duplicate submissions with a `SlidingWindowLimiter` (`lib/rate-limit.ts`) *and* the component's `pending`/`disabled` state — never rely on button disabling alone.
+- A client-side mutation shows **the server's sentence, unchanged** (`components/features/admin/lib/mutations.ts` is the template): the component keeps no second copy of any error string and never paraphrases a code. A reply that is not JSON gets one fixed local fallback, so proxy HTML never becomes toast copy. Revalidate (`router.refresh()`) only on a 2xx — after a refusal the data already on screen is the correct data, and refreshing would be a cosmetic lie.
+- Per-row commit-on-change controls (a `Select` or a button inside a table row) gate with a `busyId` on that row instead of a `SlidingWindowLimiter`: the in-flight write already disables its own control, and the limiter's spam case — a user hammering one submit — cannot occur. Two different rows writing concurrently is the intended behaviour.
 
 ## File Organization
 

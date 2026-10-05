@@ -48,7 +48,10 @@ export function AdminPanel({ view }: { view: AdminView }) {
             <CardTitle>Members</CardTitle>
             {members.pending.length > 0 && (
               <CardAction>
-                <AttachMemberDialog accounts={members.pending} />
+                <AttachMemberDialog
+                  accounts={members.pending}
+                  clients={clients}
+                />
               </CardAction>
             )}
           </CardHeader>
@@ -58,7 +61,7 @@ export function AdminPanel({ view }: { view: AdminView }) {
             </CardContent>
           ) : (
             <CardContent className="px-0">
-              <MemberTable members={members.provisioned} />
+              <MemberTable members={members.provisioned} clients={clients} />
             </CardContent>
           )}
         </Card>
