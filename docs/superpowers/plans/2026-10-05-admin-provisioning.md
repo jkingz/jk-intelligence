@@ -2696,7 +2696,7 @@ git commit -m "feat(admin): add the admin read path and the directory-to-members
 - Consumes: nothing new.
 - Produces: an operator-runnable admin, the same account §8's fixture names, and `ADMIN_EMAIL`/`ADMIN_PASSWORD` as the pair `tests/helpers/load-e2e-env.ts:13` will hand Task 11's `@auth` specs.
 
-- [ ] **Step 1: Write the failing env-hygiene test.** Create `tests/identity/unit/admin-creds.test.ts` — this is §0.3's correction pinned so a future edit cannot re-add the leak:
+- [x] **Step 1: Write the failing env-hygiene test.** Create `tests/identity/unit/admin-creds.test.ts` — this is §0.3's correction pinned so a future edit cannot re-add the leak:
 
 ```ts
 import { readFileSync } from "node:fs";
@@ -2734,17 +2734,31 @@ describe("admin credentials stay server-side", () => {
 
 Run: `pnpm test identity/unit/admin-creds`
 Expected: all four cases fail — no `ADMIN_EMAIL` in `.env.example`, no `--admin` in the script.
+Measured: 4 failed, then 4 passed after Steps 2-3. **The drafted last case does not compile**:
+`/raw_user_meta_data.*role/s` is `TS1501 — This regular expression flag is only available when
+targeting 'es2018' or later`, because `tsconfig.json:3` sets `"target": "ES2017"` (the `lib: esnext`
+on the next line does not rescue it — the compiler checks flags against `target`). Shipped as
+`/raw_user_meta_data[\s\S]*role`, which matches the same thing. The third case also asserts
+`/>=\s*1000/` and `/Refusing to create an admin/` rather than the drafted
+`/users\.length\s*>=?\s*1000/`, because the guard reads `(existing?.users.length ?? 0) >= 1000`
+after the `?? 0`, and pinning the sentence the operator actually sees is the point.
 
-- [ ] **Step 2: Add the env names.** In `.env.example`, directly under the `DEMO_CLIENT_ID=` line, add (names only, no values — `RULES.md` §16):
+- [x] **Step 2: Add the env names.** In `.env.example`, directly under the `DEMO_CLIENT_ID=` line, add (names only, no values — `RULES.md` §16):
 
 ```
-# Bootstrap the control-plane admin: `node scripts/create-demo-user.mjs --admin`.
+# Bootstrap the control-plane admin: `pnpm db:demo-user -- --admin`.
 # Same shape as the demo pair; never NEXT_PUBLIC_ — these reach the client bundle.
 ADMIN_EMAIL=
 ADMIN_PASSWORD=
 ```
 
-- [ ] **Step 3: Add the flag to the script.** At the top of `scripts/create-demo-user.mjs`, replace the four env reads and their guard with:
+`package.json` is untouched, which is what this step's condition asked for: `db:demo-user` is
+`node … scripts/create-demo-user.mjs` with no argv of its own, so `pnpm db:demo-user -- --admin`
+reaches the script. The drafted `node scripts/create-demo-user.mjs --admin` still works and is what
+Step 4 runs; the `.env.example` line names the pnpm form because that is how the demo pair is
+documented two lines above it.
+
+- [x] **Step 3: Add the flag to the script.** At the top of `scripts/create-demo-user.mjs`, replace the four env reads and their guard with:
 
 ```js
 const asAdmin = process.argv.includes("--admin");
@@ -2820,7 +2834,12 @@ console.log(
 );
 ```
 
-- [ ] **Step 4: Run the test, then provision against the local stack.**
+The file's header comment now names both modes and both env pairs, since the first line used to
+promise only the demo account. Checked against the DDL rather than trusted: `users_admin_has_no_tenant`
+is real (`20260917000000_seo_poc.sql:26`, `check (role <> 'admin' or client_id is null)`), so the
+`client_id: null` write is the constraint's own shape, not a guess.
+
+- [x] **Step 4: Run the test, then provision against the local stack.**
 
 Run: `pnpm test identity/unit/admin-creds`
 Expected: four passed.
@@ -2840,10 +2859,47 @@ pnpm exec supabase db query --sql "select count(*) from public.users where role 
 
 Note the count before and after; `provisionFixtures` already creates `admin@rls-test.local`, so "one admin" is only true if the fixture ran — record the number you saw, do not assert a shape you did not observe. **Never run this without the inline `NEXT_PUBLIC_SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` overrides** — bare, the script reads `.env` and creates an admin on hosted production.
 
-- [ ] **Step 5: Gate and commit.**
+Measured (Docker had to be resumed and `pnpm exec supabase start` re-run first; the stack persisted
+its volumes, so the fixture rows were already there): admins **1 → 2**, `Created auth user da0fe3bf…
+(operator@rls-test.local)` then `Linked as an admin with no client (users_admin_has_no_tenant)`, and
+the re-run printed `Updated auth user da0fe3bf…` with the count still 2 — idempotent, no second row.
+`select id, role, client_id from public.users where role = 'admin'` returned both rows with
+`client_id` null, which is the constraint's shape and not a coincidence. The non-admin path was
+re-checked the same way (`DEMO_EMAIL=probe@…` with the same inline overrides) and still printed
+`Linked to client "Northstar Studio" (northstar.example)`, so wrapping the `clients` select in
+`if (!asAdmin)` did not break the original behaviour.
+
+**And the step as written breaks the integration tier it sits next to.** With a second admin row on
+the local stack, `pnpm test:integration` gives `2 failed / 17 passed`, reproducibly:
+
+- `refuses to detach the last admin` fails at its own precondition, `tests/admin/integration/provisioning.test.ts:170`
+  — `expect((before.data ?? []).length).toBe(1)` → `expected 2 to be 1`. It asserts global state
+  rather than state it owns.
+- `refuses to demote the last admin through attach` (`:184`) fails *after* writing: it takes
+  `before.data![0]` with no order by, and with two admins the RPC is right to allow the demotion, so
+  the call **succeeds** and the assertion reads `expected undefined to be '45001'`. The extra
+  `operator@rls-test.local` row was left as `staff` with a tenant by that test — a suite mutating a
+  row it does not own, which is what Task 6's own rule is for ("destructive cases create their own
+  scratch auth user inside the file and delete it in `afterEach` — never another suite's fixture
+  rows"). Both cases pass again with one admin (4 consecutive green runs, 19/19).
+
+The bootstrap account was therefore deleted from the local stack after the verification
+(`users` row then `auth.users`, via the direct `54322` connection — not through `.env`), leaving the
+four fixture identities and one admin. Carry-forward for Task 11, which needs an admin to sign in as:
+**the last-admin cases and a second admin cannot share a stack.** Either scope those two cases to
+`FIXTURE_USERS.admin`'s id (they can look it up, and then a second admin stops being a precondition
+violation), or run the `@auth` specs against a stack where the integration tier is not run. The first
+option is small and removes a real landmine; it edits a shipped Task 6 file, so it is King's call, not
+a quiet side-fix.
+
+- [x] **Step 5: Gate and commit.**
 
 Run: `pnpm test && pnpm typecheck && pnpm lint && pnpm build`
 Expected: green.
+Measured: unit **35 files / 221 tests** passed, typecheck and lint clean (after the ES2017 regex-flag
+fix above), build green with `/dashboard` still `○` and the three `/api/admin/*` routes still `ƒ`.
+Integration re-checked at 19/19 once the bootstrap row was removed. Commit waits for King's read of
+the diff.
 
 ```bash
 git add scripts/create-demo-user.mjs .env.example tests/identity/unit/admin-creds.test.ts

@@ -224,6 +224,38 @@ the build and the first live-RLS integration slice landed (2026-09-24).
     typecheck clean, `/dashboard` still `○`. Caveat recorded as plan finding 9: green `tsc` here does
     **not** prove the zod row schemas match `types/database.ts` — `.parse()` swallows the inferred
     type, so the first live read (Task 11) is the evidence for the column names.
+  - **The bootstrap admin exists, and it cannot share a stack with the last-admin cases (Task 10,
+    2026-10-06):** `scripts/create-demo-user.mjs --admin` swaps the env pair to
+    `ADMIN_EMAIL`/`ADMIN_PASSWORD`, skips the `clients` select entirely (an admin has no tenant, per
+    `users_admin_has_no_tenant` — `20260917000000_seo_poc.sql:26`, read before quoting it), writes
+    `role: "admin", client_id: null`, and names the account "Admin" in `user_metadata`. The footgun
+    the plan pointed at was real and is now guarded: the script lists one page of 1000 auth accounts
+    to find a match, so an address past page one reads as absent, and absent means **create** — a
+    second admin, silently. It now exits with `Refusing to create an admin: …` instead. `listUsers`'
+    error is checked too; it was swallowed before. `.env.example` gains the two names and nothing
+    else (`db:demo-user` passes argv through, so no new `package.json` entry). Pinned by
+    `tests/identity/unit/admin-creds.test.ts` (4 cases), whose drafted last case would not compile —
+    `tsconfig.json` targets ES2017, so a `dotAll` regex flag is `TS1501`; written as `[\s\S]`.
+  - **Measured against the local stack, and then undone:** Docker had to be resumed and
+    `pnpm exec supabase start` re-run (volumes survived; fixtures already present). Admins went 1 → 2,
+    re-running printed `Updated auth user` with the count still 2, and both admin rows came back with
+    `client_id` null. Every count here ran through `psql` against
+    `postgresql://postgres:postgres@127.0.0.1:54322/postgres` — **Task 2's "psql is not on this
+    machine's PATH" note is wrong, or the machine changed**; it is on PATH and usable. The demo path
+    was re-checked with the same inline overrides and still linked to
+
+    "Northstar Studio", so the `if (!asAdmin)` wrap cost nothing. **But with a second admin row,
+    `pnpm test:integration` reproducibly gives 2 failed / 17 passed**: the detach case asserts the
+    global precondition `admins == 1`, and the attach case takes `before.data![0]` with no order by,
+    so with two admins the RPC is right to allow the demotion — the call **succeeds**, the assertion
+    fails on `expected undefined to be '45001'`, and the suite has by then mutated a row it does not
+    own. The bootstrap account was deleted from the local stack afterwards (the `users` row, then
+    `auth.users`); 19/19 is green again. Carry-forward for Task
+
+    11: it needs an admin to sign in as, so either those two cases scope to `FIXTURE_USERS.admin`'s
+    id, or the `@auth` specs run on a stack that never runs the integration tier. First option is
+    small and removes a landmine but edits a shipped Task 6 file, so it is King's call.
+  - Unit tier is now **35 files / 221 tests**, typecheck/lint/build clean, `/dashboard` still `○`.
 
 ## Recent Work
 
