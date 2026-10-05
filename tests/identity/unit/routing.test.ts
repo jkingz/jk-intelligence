@@ -50,4 +50,19 @@ describe("resolveProxyAction", () => {
     expect(resolveProxyAction("/profile", true)).toEqual({ type: "pass" });
     expect(resolveProxyAction("/connections", true)).toEqual({ type: "pass" });
   });
+
+  it("protects /admin the way it protects /connections", () => {
+    expect(resolveProxyAction("/admin", false)).toEqual({
+      type: "redirect-login",
+      next: "/admin",
+    });
+    expect(resolveProxyAction("/admin/", false)).toEqual({
+      type: "redirect-login",
+      next: "/admin/",
+    });
+    expect(resolveProxyAction("/admin", true)).toEqual({ type: "pass" });
+    // The list is prefix-matched on `${prefix}/`, so a path that merely starts
+    // with the same letters must stay public.
+    expect(resolveProxyAction("/administrivia", false)).toEqual({ type: "pass" });
+  });
 });
