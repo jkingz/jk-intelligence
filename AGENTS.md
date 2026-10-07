@@ -41,6 +41,7 @@ proxy.ts (session refresh via updateSession)
     → lib/db/repository         — RLS-backed tenant gate, then metric reads
   → components/features/*       — dashboard reads /api/dashboard/boot client-side
   → app/(app)/connections/page.tsx — server render; awaits listConnections() directly, no API hop
+  → app/(app)/admin/page.tsx    — server render; requireAdmin() then getAdminView(), writes go over /api/admin/*
 ```
 
 ## Agents (`lib/agents/`)
@@ -65,6 +66,12 @@ proxy.ts (session refresh via updateSession)
   cleared the gate.
 - Roles `admin | client | staff` come from the `users` row via `security definer` helpers
   (`private.current_user_role()`, `private.current_user_client_id()`) — never from JWT claims.
+- Admin **writes** (`lib/admin/rpc.ts` → the five `public` definer RPCs) go through the user-scoped
+  client, never table grants and never `getAdminDb()`: `admin_directory()` alone reads `auth.users`,
+  and the role guard is the first statement in each function because a definer body bypasses RLS.
+  Zero new table grants; `42501` from that guard is the enforcement point, and
+  `pg_advisory_xact_lock(800100)` plus codes `45001`/`45002` are what make the last admin
+  unremovable. `lib/admin/` has no React and no `cookies()` — the four verbs call it.
 
 ```ts
 // lib/db/repository.ts — the gate
@@ -103,6 +110,10 @@ faked PostgREST.
 | `/api/exports/[clientId]/csv` | GET | session + gate | streams via `lib/exports/server.ts` |
 | `/api/exports/[clientId]/pdf` | GET | session + gate | pdf-lib + vendored Noto Sans TTFs |
 | `/connections` (page) | GET | session + RLS | server page; reads `api_credentials` per tenant, no cache |
+| `/admin` (page) | GET | session + `requireAdmin()` | server page in the `app/(app)/` group; renders clients + members; redirects a non-admin to `/dashboard` |
+| `/api/admin/clients` | POST | session + `requireAdmin()` | `admin_create_client()` definer RPC; user-scoped client |
+| `/api/admin/clients/[clientId]` | PATCH | session + `requireAdmin()` | `admin_update_client()`; name and/or `is_active`, never domain |
+| `/api/admin/members/[userId]` | PUT / DELETE | session + `requireAdmin()` | `admin_attach_member()` / `admin_detach_member()`; the last admin cannot be removed |
 | `/api/revalidate/dashboard` | POST | `CRON_SECRET` bearer | the only path that revalidates `DASHBOARD_OVERVIEW_TAG` |
 | `/api/cron/sync` | GET | `CRON_SECRET` bearer | enqueues one job per active client; Vercel cron `0 2 * * *` |
 
@@ -141,6 +152,10 @@ only through `POST /api/revalidate/dashboard` (`revalidateTag(tag, profile)`), n
 awaits the cookie-bound read, and `databaseOperation()`'s catch-all converts Next's prerender bailout
 into `Error("Database operation failed")`, so without the declaration `pnpm build` fails. The
 underlying defect in the shared `lib/db` error wrapper stays open deliberately, for a later change.
+`/admin` carries the same declaration for the same reason — `getAdminView()` is cookie-bound — so it
+builds as `ƒ` while `/dashboard` remains `○`: the shell still reads no session, which is exactly why
+the rail cannot mark a row active on an admin page. The panel's writes are client-side `fetch` calls
+to `/api/admin/*` followed by `router.refresh()`, and the refresh runs only on a 2xx.
 `is_stale` is a stored column the UI only reads — `markMetricsStale()` exists but nothing calls it,
 so the stale banner can never fire yet.
 
@@ -172,6 +187,7 @@ business logic.
 | `tenant-isolation` | `canAccessClient` / `listAccessibleClients`, `listConnections` + `lib/connections/status`, and the RLS policies behind all three |
 | `dashboard` | `/api/dashboard/boot`, both `/api/metrics/*` routes, `lib/dashboard/*`, `lib/cache/*` tag ownership, `/dashboard` and the `app/(app)/` shell + rail it shares (`tests/dashboard/e2e/rail.spec.ts`) |
 | `export` | `/api/exports/[clientId]/{csv,pdf}`, `lib/exports/*`, the export menu |
+| `admin` | `lib/admin/*`, `components/features/admin`, the three `/api/admin/*` routes, `app/(app)/admin/`, and `tests/admin/integration/provisioning.test.ts` — the anonymous `/admin` redirect spec is the one exception: `tests/identity/e2e/admin-guard.spec.ts` sits in `identity` because the rule it protects is `lib/auth/routing`'s |
 | `sync` | `/api/cron/sync`, `/api/revalidate/dashboard`, `lib/queue/*` |
 | `landing` | `/`, `/privacy`, `/terms`, `components/features/landing/*` |
 | `platform` | cross-cutting primitives with no owning feature — `lib/rate-limit.ts`, `lib/navigation/destinations.ts`, the connections catalog |

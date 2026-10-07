@@ -18,7 +18,7 @@
 
 - `app/api` — route handlers: auth check, input validation, ownership gate, read/delegate.
 - `lib/agents` — `authAgent` only (identity + role). sync/transform/cache/insights agents are unbuilt spec.
-- `lib/auth` — `cron.ts` (timing-safe bearer check for cron/revalidate) and `routing.ts` (the `proxy.ts` decision table for `/dashboard` + `/connections` + `/profile`, and open-redirect-safe `next`). Both tested.
+- `lib/auth` — `cron.ts` (timing-safe bearer check for cron/revalidate) and `routing.ts` (the `proxy.ts` decision table for `/dashboard` + `/connections` + `/profile` + `/admin`, and open-redirect-safe `next`). Both tested.
 - `lib/navigation` — `destinations.ts`: the rail's `APP_DESTINATIONS` list and `activeDestination()`. Icons are string keys so the module stays importable from a node-tier test; the key → Lucide mapping lives with the rail component. Every href it lists is in `PROTECTED_PREFIXES`, asserted by `tests/platform/unit/destinations.test.ts`.
 - `lib/queue` — BullMQ queue definition (`seo-sync`) + worker entrypoint. Retry policy and circuit breaker are target-state, not code.
 - `lib/cache` — `invalidate.ts` owns the dashboard tag; `notify.ts` lets the worker ask the app to revalidate.
@@ -28,14 +28,21 @@
   RLS-visible `api_credentials` rows. It derives no ownership; an `clientId` outside the client list
   contributes nothing.
 - `lib/dashboard` — read-model assembly (`overview.ts`, `keywords.ts`) shared by the boot and metrics routes, so both return identical shapes.
+- `lib/admin` — the provisioning slice, and no React. `schemas.ts` (zod bodies), `errors.ts` (the only
+  source of admin error copy: Postgres code → status + sentence), `rpc.ts` (`callAdminRpc`, which keeps
+  `error.code` — the reason admin writes do not run through `databaseOperation()`), `http.ts` (the shared
+  response shape), `provisioning.ts` (`getAdminView()`: two RLS-backed selects plus the `admin_directory`
+  RPC, joined in TypeScript). It never touches `getAdminDb()`.
 - `lib/exports` — server-side CSV/PDF assembly, dataset builder, `quota.ts` (per-user export budget), `fonts/` for PDF unicode.
 - `lib/rate-limit.ts` — `SlidingWindowLimiter`; throttles auth actions client-side and backs the export quota server-side.
 - `components` — `components/ui/*` (shadcn, protected) + `components/features/*` (the `app-shell`
   rail, dashboard widgets, metric cards, stale banners, auth forms, export menu, connection status
-  rows). No admin panel yet.
+  rows, and `admin/` — the provisioning panel, its two tables and two dialogs).
 - `types` — `database.ts` is handwritten; generated types are an open item.
 - `supabase/migrations` — `20260917000000_seo_poc.sql`, `20260920000000_add_staff_role.sql`,
-  `20260920000001_rls_hardening.sql`, `20260925000000_connections_read.sql`.
+  `20260920000001_rls_hardening.sql`, `20260925000000_connections_read.sql`,
+  `20261005000000_admin_provisioning.sql` (five `public` `security definer` functions; applied to the
+  local stack, **not** to the hosted project).
 
 ## Storage Model
 
@@ -69,13 +76,19 @@ Verified against `supabase/migrations/*` — not from the original spec.
 - Tenant gate: `canAccessClient(clientId)` and `listAccessibleClients()` (`lib/db/repository.ts`) read `clients` **as the signed-in user**, so Postgres RLS (`clients_select_authenticated`) decides visibility instead of a TypeScript copy of the rule. `listConnections()` chains the same cookie-bound client over `clients` then `api_credentials` (`api_credentials_select_tenant_or_admin`) and adds no rule of its own.
 - Metric reads (`metrics_snapshots`, `current_metrics`, `keyword_rankings`) still run on the service-role client so `unstable_cache` stays request-independent, but only for a `client_id` that already passed the RLS gate. `getAdminDb()` is reserved for cron/worker paths (queueing every active client, `persist_metrics`, sync logs).
 - Clients can never access another client's rows: the id set they can name is RLS-derived, and the same policies filter a direct PostgREST read.
-- `requireAdmin()` (`lib/agents/authAgent.ts`) is the role gate, but **no route calls it yet** — there are no admin-only endpoints. There is no `middleware.ts`; the root `proxy.ts` only refreshes the session cookie. When an admin route is added, it must use `requireAdmin()`, not a fresh role check.
+- `requireAdmin()` (`lib/agents/authAgent.ts`) is the role gate, and `/admin` plus the three `/api/admin/*` handlers call it — the first route family that needed it. There is no `middleware.ts`; the root `proxy.ts` only refreshes the session cookie and redirects an anonymous visitor off `/admin`, which is the outer of two gates: the page and each handler re-ask `requireAdmin()`, and the RPC's own `42501` guard is the one that actually binds. An admin route must use `requireAdmin()`, never a fresh role check.
 - Both secret-guarded routes (`cron/sync`, `revalidate/dashboard`) go through `verifyCronSecret()`: 503 when `CRON_SECRET` is unset, 401 on a bearer mismatch. Configurable-but-unset is treated as unavailable, never as "open".
 - API credentials: `api_credentials` stores a `vault:<uuid>` reference, never key material, so nothing lands in `.env` or the browser. `20260925000000_connections_read.sql` replaced the closed `using (false)` policy with `api_credentials_select_tenant_or_admin` (the same admin-or-own-tenant predicate as `clients`), which is what lets `/connections` read a tenant's status rows. Resolving the reference and calling the sources is still part of the unbuilt sync agent.
 
 ## HTTP API — implemented
 
-Seven route handlers exist. Every one of them: validate the `{clientId}` path param → resolve identity → pass the RLS-backed tenant gate → read or delegate. Precedence is 400 malformed id → 401 unauthenticated → 403 not this caller's client → 503 database failure; the two export routes add 429 (`Retry-After`) once the sliding-window quota is spent. Only path/query validation runs before that 503 handler — the identity read and the tenant gate are awaited inside its `try`, so a Supabase outage or missing config is a JSON 503, never an unhandled 500 and never a misleading 401. Tenant gates go through `listAccessibleClients()` / `canAccessClient()`, never a TypeScript re-derivation.
+Seven tenant-scoped route handlers exist. Every one of them: validate the `{clientId}` path param → resolve identity → pass the RLS-backed tenant gate → read or delegate. Precedence is 400 malformed id → 401 unauthenticated → 403 not this caller's client → 503 database failure; the two export routes add 429 (`Retry-After`) once the sliding-window quota is spent. Only path/query validation runs before that 503 handler — the identity read and the tenant gate are awaited inside its `try`, so a Supabase outage or missing config is a JSON 503, never an unhandled 500 and never a misleading 401. Tenant gates go through `listAccessibleClients()` / `canAccessClient()`, never a TypeScript re-derivation.
+
+The three `/api/admin/*` handlers (`lib/admin/http.ts` owns their shape) replace that order with
+`requireAdmin()` → path-param uuid → body → zod → `callAdminRpc` → code→status, so the role guard and
+validation run **before any table is touched**, and their error bodies come only from
+`lib/admin/errors.ts`. They are writes, so they do not use `databaseOperation()` — that wrapper erases
+the Postgres `code`, which is the whole payload of the error map.
 
 - `GET /api/dashboard/boot` — the dashboard's single boot request: `{ profile, clients, selection: { clientId, days, payload: { overview, history } } }` for the URL's `?client=&days=`, falling back to the first accessible client and `DASHBOARD_RANGES[0]`. `no-store` + `Vary: Cookie`.
 - `GET /api/metrics/{clientId}/overview` — `{ overview, history }` from `current_metrics` + `keyword_rankings` via `unstable_cache`; `?days=` must be a `DASHBOARD_RANGES` member or it silently falls back to the default. `s-maxage=300, stale-while-revalidate=60`.

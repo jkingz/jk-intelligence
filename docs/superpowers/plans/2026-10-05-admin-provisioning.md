@@ -4219,7 +4219,7 @@ Five files now describe a system that exists and one that does not. `RULES.md` �
 - Consumes: every task above, and the observed gate output from Step 5.
 - Produces: a tree in which `AGENTS.md` and the code agree, which is the artifact the user's portfolio work is actually judged on.
 
-- [ ] **Step 1: `AGENTS.md`, four edits.**
+- [x] **Step 1: `AGENTS.md`, four edits.**
   - Request-path diagram: add `  → app/(app)/admin/page.tsx — server component; requireAdmin() then getAdminView(), writes go over /api/admin/*`.
   - HTTP surface table, four rows, copying `/connections`' shape for the page row:
 
@@ -4233,7 +4233,7 @@ Five files now describe a system that exists and one that does not. `RULES.md` �
   - "Pages and caching": delete the sentence `There is **no** admin panel page` and state the new fact — `app/(app)/admin/` exists, is `ƒ`, and the shell still reads no session so `/dashboard` stays `○`. Add one line to the tenant-isolation paragraph: *admin writes go through `public` definer RPCs called with the user-scoped client, never table grants and never `getAdminDb()`; the guard is the first statement in each function.*
   - Test-folder table: add an `admin` row owning `lib/admin/*`, `components/features/admin`, `/api/admin/*`, `app/(app)/admin/`, and `tests/admin/integration/provisioning.test.ts` — and note the guard spec that lives in `identity` because `lib/auth/routing` does.
 
-- [ ] **Step 2: Rewrite the app-shell non-goal.** Replace `context/feature-specs/08-app-shell.md:21-23` ("Role-gated destinations… The admin panel adds its row and the filter together.") with:
+- [x] **Step 2: Rewrite the app-shell non-goal.** Replace `context/feature-specs/08-app-shell.md:21-23` ("Role-gated destinations… The admin panel adds its row and the filter together.") with:
 
 ```markdown
 - Role-gated destinations. A `visibleDestinations(role)` filter still has zero callers: the rail
@@ -4246,13 +4246,13 @@ Five files now describe a system that exists and one that does not. `RULES.md` �
   filter worth having, and it is still the edit this file forbids.
 ```
 
-- [ ] **Step 3: Downgrade target-state step 12** (deviation 6). Replace it with:
+- [x] **Step 3: Downgrade target-state step 12** (deviation 6). Replace it with:
 
 ```
 12. ⚠️ Admin panel: provisioning shipped 2026-10-05 (`/admin`, five definer RPCs). Sync logs, credential writes and a manual sync trigger are still absent — nothing consumes the `seo-sync` queue.
 ```
 
-- [ ] **Step 4: Move the tracker entry to Completed.** Delete the In Progress bullet from Task 1 and append to `## Recent Work` (or `## Completed`, matching the file's existing convention — read which one the `/connections` entry sits under and follow it):
+- [x] **Step 4: Move the tracker entry to Completed.** Delete the In Progress bullet from Task 1 and append to `## Recent Work` (or `## Completed`, matching the file's existing convention — read which one the `/connections` entry sits under and follow it):
 
 ```markdown
 - **Admin panel: provisioning** (2026-10-05) — `/admin` inside the app shell, entered from `AccountMenu`.
@@ -4270,7 +4270,7 @@ Five files now describe a system that exists and one that does not. `RULES.md` �
 
 Quote what the commands printed. Do not transcribe a number from this plan.
 
-- [ ] **Step 5: Final gate, in one block, and record it.**
+- [x] **Step 5: Final gate, in one block, and record it.**
 
 ```bash
 pnpm exec supabase start
@@ -4281,6 +4281,44 @@ pnpm test:e2e:auth      # with Task 11 Step 10's local-stack overrides in the sh
 ```
 
 Expected: unit tier ≥ `26` files and `160` baseline tests plus the new admin files, all passed; `tsc --noEmit` silent; lint silent; build route table shows `ƒ /admin` and `○ /dashboard`; integration `3` files green (`18` tests: 5 + 4 + 9) with the local stack up; `test:e2e` `7` passed; `test:e2e:auth` `21` passed. Copy the real numbers into the tracker.
+
+Run 2026-10-06 with the local stack up and `pnpm dev -p 3000` under Task 11 Step 10's overrides. Every
+line below is what the commands printed, not what this paragraph predicted — the predictions are stale
+in the same direction as Task 11's were:
+
+```
+pnpm test              Test Files  36 passed (36)   Tests  226 passed (226)
+pnpm typecheck         ✓ Types generated successfully   (tsc --noEmit silent)
+pnpm lint              (no output)
+pnpm build             ✓ Compiled successfully   ƒ /admin  ƒ /api/admin/clients
+                                                          ƒ /api/admin/clients/[clientId]
+                                                          ƒ /api/admin/members/[userId]
+                       ○ /dashboard
+pnpm test:integration  Test Files   3 passed  (3)    Tests   19 passed (19)
+pnpm test:e2e             9 passed (3.4s)
+pnpm test:e2e:auth       26 passed (17.4s)
+pnpm test:all          Test Files  39 passed (39)   Tests  245 passed (245)
+```
+
+**Deviations (Steps 1-4).**
+- **Step 1's third edit targeted a sentence that no longer exists.** "There is **no** admin panel page"
+  was removed by Task 11, which rewrote that paragraph when the page shipped. The duty is still done:
+  the caching paragraph now states that `/admin` carries `force-dynamic` for the same cookie-bound
+  reason as `/connections`, that the shell reads no session which is *why* the rail cannot mark a row
+  active there, and that panel writes are `fetch` → `router.refresh()` only on a 2xx.
+- **`context/architecture-context.md` needed four edits, not the conditional one.** Its "only if it
+  states there is no admin write path" guard was satisfied three times over: "No admin panel yet",
+  "`requireAdmin()` … **no route calls it yet**", and "Seven route handlers exist". All three are now
+  false against the code, so the file also gained `lib/admin` in the module list, the new migration in
+  the migrations list, `/admin` in the routing-table line, and a paragraph distinguishing the admin
+  handlers' order (guard → uuid → body → zod → RPC → code→status) from the tenant-scoped reads'.
+- **`docs/target-state.md` step 12 is `⚠️`, not `✅`,** and dated 2026-10-06 (the day the work landed)
+  rather than the draft's 2026-10-05 (the spec's date).
+- **Step 4 went to `## Recent Work`,** which is where the `/connections` feature entry lives — the
+  convention the step asked to be read rather than assumed. `## In Progress` keeps a three-line pointer
+  and names the two decisions the slice left open, now numbered 10 and 11 under `## Open Questions`;
+  `## Current Phase` and `## Current Goal` both changed, since they are the state of record and were
+  still describing 2026-09-25.
 
 - [ ] **Step 6: Commit.**
 

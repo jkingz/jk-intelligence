@@ -5,15 +5,20 @@ Update this file after every meaningful implementation change.
 ## Current Phase
 Hardening the built surface: read paths and tenant isolation are done **and proven against a live
 Postgres for both gated tables** (integration tier, 9 tests, 2026-09-25); `api_credentials` is now
-*read* (status only, at `/connections`); the **sync pipeline is the next unit** and is blocked on a
-worker-hosting decision (see Open Questions 2).
+*read* (status only, at `/connections`); the admin panel writes **provisioning only** — clients and
+members, through five `public` definer RPCs, with no credential writes and no sync trigger (2026-10-06);
+the **sync pipeline is still the next unit** and is blocked on a worker-hosting decision (see Open
+Questions 2).
 
 ## Current Goal
-Nothing in flight. Last change gave every authenticated page one shell (`app/(app)/` + a destination
-rail) and added the read-only `/connections` status page (2026-09-25 — see Completed); before that
-the build's dynamic-`readFile` tracing warning went away and the auth routes were pinned to the dark
-palette (2026-09-25 — see Recent Work), and before that the landing page's claims were made to match
-the build and the first live-RLS integration slice landed (2026-09-24).
+Nothing in flight. Last change opened the admin provisioning panel (`/admin`, five definer RPCs, the
+four HTTP verbs and their commit-on-change rows) on the local stack only — hosted still needs its own
+yes (2026-10-06 — see Recent Work). Before that, every authenticated page got one shell
+(`app/(app)/` + a destination rail) and the read-only `/connections` status page landed (2026-09-25 —
+see Completed); before that the build's dynamic-`readFile` tracing warning went away and the auth
+routes were pinned to the dark palette (2026-09-25 — see Recent Work), and before that the landing
+page's claims were made to match the build and the first live-RLS integration slice landed
+(2026-09-24).
 
 > Entries above this line are a log, not a status. `## Current Phase`, `## In Progress`,
 > `## Open Questions` and the *implemented surface* columns in `AGENTS.md` /
@@ -164,171 +169,66 @@ the build and the first live-RLS integration slice landed (2026-09-24).
   - **What the demo cards prove, and don't.** Local data now covers 3 demo clients, 4 placeholder `api_credentials` rows and 2 fixture rows, but **no local `users` row is linked to the three demo clients** (`scripts/create-demo-user.mjs:39-42` binds one client-role user to one client), so `/connections` shows the demo cards only for an **admin** session; a client-role user sees only its own `rls-test` tenant.
 
 ## In Progress
-- **Admin panel: provisioning only** (2026-10-05) — spec `docs/superpowers/specs/2026-10-05-admin-panel-provisioning-design.md`, plan `docs/superpowers/plans/2026-10-05-admin-provisioning.md`, feature spec `context/feature-specs/07-admin.md`. Five `public` definer RPCs called with the user-scoped client; no new table grants. Enters from `AccountMenu`, not the rail.
-  - **Probes run against the local stack (2026-10-05), all three executed, none inherited.** A `security definer` function in `public` **can** read `auth.users` — the temporary probe returned a row, so `admin_directory()` stands and the `auth.admin.listUsers()` fallback is not needed. Nested `private.current_user_role()` resolves the **caller**, not the owner: a `client@a` session received `"client"` from the definer, which is what makes the `42501` guard the enforcement point rather than decoration. The same function, called with no session, was refused by the grant itself (`42501` from the revoke/grant pair, before the body ran) — §3's "write the grants explicitly instead of relying on a commented-out default" is now observed, not assumed. **`max_rows = 1000` is measured, not inherited:** with 1003 rows in `auth.users`, the set-returning probe returned exactly **1000**, so §7's "the directory stops at 1000 accounts" is a real ceiling and deviation 5 is closed as measured. Substrate notes: `psql` is not on this machine's PATH, `supabase db query --file` refuses a multi-statement file (prepared statement), and `.env.test` carries no `TEST_DATABASE_URL`, so the probes ran through the repo's existing `pg` dependency against `postgresql://postgres:postgres@127.0.0.1:54322/postgres`. The 999 synthetic accounts were deleted by their `@probe.local` address and `auth.users` was back at 4 rows; all three probe functions were dropped.
-  - **Substrate shipped (Tasks 3-5, 2026-10-05):** `supabase/migrations/20261005000000_admin_provisioning.sql`
-    — five `security definer` functions in `public` (`admin_directory`, `admin_create_client`,
-    `admin_update_client`, `admin_attach_member`, `admin_detach_member`), each guarding on
-    `private.current_user_role()` and the two writes taking `pg_advisory_xact_lock(800100)` around the
-    last-admin rule; explicit `revoke`/`grant execute to authenticated` (measured: `service_role`
-    keeps EXECUTE anyway, and its call still answers `42501` because the guard reads the caller JWT).
-    Applied to the **local stack only**; hosted needs its own yes. TypeScript side:
-    `MEMBER_ROLES`/`MemberRole` in `types/metrics.ts` (pinned against `users_role_check`'s DDL by
-    `tests/admin/unit/role-set.test.ts`), `lib/admin/{schemas,errors,rpc}.ts`, five `Functions`
-    entries in `types/database.ts`. No `getAdminDb()` anywhere under `lib/admin/`.
-  - **Guard proven against live Postgres, not a mock (Task 6, 2026-10-05):**
-    `tests/admin/integration/provisioning.test.ts` runs 10 cases through `callAdminRpc` with real
-    sessions — `42501` for a client-role `admin_create_client` **with no row written**, `42501` for a
-    staff `admin_directory` (the regression for the unguarded draft that leaked every email),
-    `42501` unauthenticated, lowercased domain + `23505` on the case-variant, attach → promotion
-    nulls the tenant, `45001` refusing both to detach and to demote the last admin with the row
-    intact, `45002` when detach matches no row, partial-update field preservation, and a teardown
-    contract case. Measured split, read out loud as §8 demands: `3 files / 19 passed` with
-    `supabase start` up; **`3 files / 19 skipped`, exit 0** when `TEST_SUPABASE_URL` is absent (what
-    CI does — this tier never runs there, so it is skipped, never "covered"); and `3 files failed`,
-    exit 1 when the URL is set but unreachable, so a dead stack cannot fake a pass either.
-    `hasTestDb` keys on the env name, not container health, which is why `supabase stop` is the wrong
-    instrument for that proof.
-  - **The four verbs exist (Task 7, 2026-10-05):** `lib/admin/http.ts` holds the response shape
-    (`jsonResponse` with `no-store` + `Vary: Cookie`, `readJsonBody`, `firstIssueMessage`,
-    `badRequest`) and three route files sit on `POST /api/admin/clients`,
-    `PATCH /api/admin/clients/[clientId]`, `PUT`/`DELETE /api/admin/members/[userId]`. Every handler
-    is the same order — `requireAdmin()` → path-param uuid → body → zod → `callAdminRpc` →
-    code→status — so the guard and zod run **before any db touch**, which is what
-    `tests/admin/unit/{clients,client-detail,member}-route.test.ts` assert (23 cases; the two
-    "only the keys I was given" cases are the ones that fail if a handler substitutes `null` for
-    `undefined`). Response bodies carry only `lib/admin/errors.ts` sentences. Unit tier is now
-    **33 files / 209 tests**, typecheck/lint clean, and `pnpm build` marks all three routes `ƒ`
-    (none prerendered) with `/dashboard` still `○`. One comment was wrong before it shipped: it
-    claimed an omitted `p_client_id` leaves the column alone, but `admin_attach_member` defaults that
-    parameter to `null` and its upsert writes the column every call — omission and explicit null are
-    both "no tenant". Only `admin_update_client`'s `coalesce` body gives absence the "no change"
-    meaning, which is why PATCH passes `undefined`. Carry-forward for Task 12: since omission
-    unassigns, the member dialog must require a client for `client`/`staff` roles rather than the
-    schema growing a refine. AGENTS.md's HTTP table gains these rows in
-    Task 13, when the panel that calls them also exists.
-  - **The read exists, and it merges rather than queries (Task 9, 2026-10-05):**
-    `lib/admin/provisioning.ts` runs three reads — `clients` and `users` through the cookie-bound
-    client (RLS decides), `admin_directory` through `callAdminRpc` — and does the join in TypeScript:
-    `buildMemberViews()` splits the directory into provisioned/pending by `users` row presence,
-    `withMemberCounts()` groups in one pass, `attachClientNames()` resolves the tenant label. The two
-    pure functions take rows and return rows, so the merge is tested without a database
-    (`tests/admin/unit/provisioning.test.ts`, 7 cases). Load-bearing: **no `is_active` filter** on the
-    `clients` select, because a panel that hides deactivated clients makes Pause irreversible;
-    failures throw `Admin read failed: <table>` and never Postgres' message; `z.array(...).parse`
-    means an unnamed role throws instead of rendering a half-truth; and email/display name come only
-    from the directory, with `unlisted: true` for a member the 1000-row cap hid. Verified against the
-    DDL rather than assumed: `users_select_self_or_admin`
-    (`supabase/migrations/20260917000000_seo_poc.sql:162-167`) gives an admin every `users` row, which
-    is the whole reason this read works at all. Unit tier is now **34 files / 217 tests**, lint and
-    typecheck clean, `/dashboard` still `○`. Caveat recorded as plan finding 9: green `tsc` here does
-    **not** prove the zod row schemas match `types/database.ts` — `.parse()` swallows the inferred
-    type, so the first live read (Task 11) is the evidence for the column names.
-  - **The bootstrap admin exists, and it cannot share a stack with the last-admin cases (Task 10,
-    2026-10-06):** `scripts/create-demo-user.mjs --admin` swaps the env pair to
-    `ADMIN_EMAIL`/`ADMIN_PASSWORD`, skips the `clients` select entirely (an admin has no tenant, per
-    `users_admin_has_no_tenant` — `20260917000000_seo_poc.sql:26`, read before quoting it), writes
-    `role: "admin", client_id: null`, and names the account "Admin" in `user_metadata`. The footgun
-    the plan pointed at was real and is now guarded: the script lists one page of 1000 auth accounts
-    to find a match, so an address past page one reads as absent, and absent means **create** — a
-    second admin, silently. It now exits with `Refusing to create an admin: …` instead. `listUsers`'
-    error is checked too; it was swallowed before. `.env.example` gains the two names and nothing
-    else (`db:demo-user` passes argv through, so no new `package.json` entry). Pinned by
-    `tests/identity/unit/admin-creds.test.ts` (4 cases), whose drafted last case would not compile —
-    `tsconfig.json` targets ES2017, so a `dotAll` regex flag is `TS1501`; written as `[\s\S]`.
-  - **Measured against the local stack, and then undone:** Docker had to be resumed and
-    `pnpm exec supabase start` re-run (volumes survived; fixtures already present). Admins went 1 → 2,
-    re-running printed `Updated auth user` with the count still 2, and both admin rows came back with
-    `client_id` null. Every count here ran through `psql` against
-    `postgresql://postgres:postgres@127.0.0.1:54322/postgres` — **Task 2's "psql is not on this
-    machine's PATH" note is wrong, or the machine changed**; it is on PATH and usable. The demo path
-    was re-checked with the same inline overrides and still linked to
-
-    "Northstar Studio", so the `if (!asAdmin)` wrap cost nothing. **But with a second admin row,
-    `pnpm test:integration` reproducibly gives 2 failed / 17 passed**: the detach case asserts the
-    global precondition `admins == 1`, and the attach case takes `before.data![0]` with no order by,
-    so with two admins the RPC is right to allow the demotion — the call **succeeds**, the assertion
-    fails on `expected undefined to be '45001'`, and the suite has by then mutated a row it does not
-    own. The bootstrap account was deleted from the local stack afterwards (the `users` row, then
-    `auth.users`); 19/19 is green again. Carry-forward for Task
-
-    11: it needs an admin to sign in as, so either those two cases scope to `FIXTURE_USERS.admin`'s
-    id, or the `@auth` specs run on a stack that never runs the integration tier. First option is
-    small and removes a landmine but edits a shipped Task 6 file, so it is King's call.
-  - **The page renders, read-only (Task 11, 2026-10-06).** `app/(app)/admin/page.tsx` —
-    `force-dynamic` for the same load-bearing reason `/connections` has it, `requireAdmin()` then
-    `redirect("/dashboard")` — over `components/features/admin/`: the panel, two raw `<table>`s in
-    the shipped `bg-surface`/`font-mono text-[11px]` vocabulary, and two dialog stubs whose triggers
-    are `disabled` until Task 12. `AccountMenu` gains one conditional item. `pnpm build`: **`ƒ /admin`**,
-    `○ /dashboard` unchanged.
-  - **The `@auth` tier can run against the local stack now — it never could before.** The blocker was
-    the CSP, not the env: dev's `connect-src` never admitted `http://127.0.0.1:54321`, so the browser
-    refused the token request and all 16 specs died inside `logIn`. Widened for dev only, at King's
-    call; production's directive is untouched. Two more prerequisites after that: `pnpm db:seed --
-    --days 90` (the stack's rows stopped at 2026-09-25, outside the default 7-day window) and
-    `pnpm db:demo-user` with `DEMO_EMAIL=demo@rls-test.local`, because the fixture tenant
-    `client@a.rls-test.local` has no metric rows and the dashboard's `EmptyShell` then renders no
-    header at all. **So `@auth`'s demo user is no longer `FIXTURE_USERS.clientA`** — the fixture
-    tenants stay as the integration tier expects them, and the e2e tier got its own data-bearing
-    local account. Result: `pnpm test:e2e:auth` **26 passed** (9 public + 17 auth, 8 of them new);
-    `pnpm test:all` **38 files / 240 tests**, which is the evidence the new rows disturb neither the
-    RLS cases nor the last-admin ones.
-  - **Open item — a design gap, not a bug: the panel's only entry point can be absent.**
-    `AccountMenu` is rendered by exactly one file, `app/(app)/dashboard/dashboard-view.tsx:236`, and
-    `components/features/dashboard/components/dashboard.tsx:86` (`EmptyShell`) renders **no header**
-    in its two no-data states. A new admin on a project whose first accessible client has no synced
-    rows therefore sees no route to `/admin` — the provisioning panel is unreachable precisely when
-    provisioning is what is needed. §4 chose the menu because it already carried the role, and never
-    asked whether the menu is always on screen. Candidates: a role-gated fourth rail destination (the
-    row `08-app-shell.md` just retired), a link inside `EmptyShell`, or a header of the panel's own.
-    King's call, and it should land before Task 12 wires dialogs to a button nobody can press.
-  - Task 11's `pending@rls-test.local` auth account is what makes the Attach trigger render; with the
-    trigger disabled a pending account has no visible representation, because its list lives inside
-    the dialog. Task 12 changes that.
-  - **The writes are wired, and every one of them was clicked (Task 12, 2026-10-06).**
-    `components/features/admin/lib/mutations.ts` is the whole request path — four functions over one
-    `send(method, path, body)`, returning `{ ok: true } | { ok: false; message }`, where `message` is
-    `lib/admin/errors.ts`'s sentence passed through unchanged and the fixed fallback
-    `"The change did not save."` covers a reply that isn't JSON (a proxy's 502 page must not become
-    toast copy). DELETE sends **no body and no `Content-Type`**. `lib/select-items.ts` holds the
-    `UNASSIGNED` sentinel — base-ui keys an option by one non-null value, so "no client" is a string
-    in the DOM and `null` in the body. Both dialogs are real forms now; the client table's Rename
-    opens per row; the member rows **commit on change** (no submit), and `router.refresh()` runs
-    **only on a 2xx**, so a refusal from Postgres never leaves the table claiming a state it did not
-    get — that is what the last-admin case showed in the browser, where the select snapped back to
-    `admin` with `psql` confirming `admins = 1` unchanged. Pinned by
-    `tests/admin/unit/mutations.test.ts` (5 cases; `@auth` stays read-only, so the contract gets the
-    unit tier and the buttons get Chrome).
-  - **Two defects only a browser could show, both now fixed and generalised.** (i) JSX trims the
-    newline between an expression and the text after it, so `{"1 account"}\n has…` rendered
-    `1 account hassigned up without a role.` — the copy is one template literal, and the rule is in
-    `context/code-standards.md`. (ii) Switching an attach member's role to `admin` disabled the
-    client select but left the previous tenant **displayed**, a value the write ignores; the handler
-    clears it to `UNASSIGNED`. A disabled field that shows a stale value is a lie the server never
-    sees, so the reset belongs in the transition, not in the submit.
-  - **`"use client"` on both tables, and per-row field ids.** Task 11 shipped them as pure renders;
-    hooks and `onClick` need the directive. The drafted static `id="client-name"` would bind a
-    `<label htmlFor>` to the first of six rename dialogs, so ids carry the row key
-    (`client-name-${clientId ?? "new"}`). base-ui mounts dialog content lazily — `evaluate_script`
-    found only the open dialog's fields in the DOM — so the collision was never visible, which is
-    exactly the kind of bug a lazy mount hides until a dependency changes it.
-  - **Driven end to end against the local stack, then undone**: create (`SCRATCH.example/` stored as
-    `scratch.example`), rename, pause (**the row stays**, with `Resume` — `admin_directory`'s missing
-    `is_active` filter doing its job), resume, tenant move with both member counts following, attach
-    `pending@rls-test.local`, promote, detach, a **second detach from a stale tab** answering
-    `That account is not provisioned.` with the stale row untouched, a duplicate domain answering
-    `Another client already owns that domain.` **with the dialog open and both drafts intact**, and
-    `client@a.rls-test.local` bounced from `/admin` to `/dashboard?client=254c0249-…` — their own
-    tenant, picked by the read. Scratch client deleted over `psql` (`DELETE 1`), Demo User back on
-    Northstar, `admins = 1`, pending left unprovisioned.
-  - **`/admin` still renders no header, so the sign-out leg runs from `/dashboard`.** The Account
-    menu comes from `dashboard-view.tsx`, not the shell; the panel's own entry-point gap (above)
-    stayed King's call and is Task 13's to record, not this task's to solve.
-  - Unit tier **36 files / 226 tests**; with integration **38 / 240**. Typecheck/lint/build clean,
-    `ƒ /admin` and the three `/api/admin/*` routes, `/dashboard` still `○`. e2e **9 public / 26
-    auth** — the plan's "16 + 5" is stale twice over now; `--list` gives 26 tests in 12 files.
+- Nothing in flight. The admin provisioning slice landed 2026-10-06 — see the entry at the top of
+  Recent Work. Two decisions it left behind are recorded under Open Questions 10 and 11, and the
+  migration still needs its own yes before it reaches the hosted project.
 
 ## Recent Work
+
+- **Admin panel: provisioning** — spec `docs/superpowers/specs/2026-10-05-admin-panel-provisioning-design.md`,
+  plan `docs/superpowers/plans/2026-10-05-admin-provisioning.md` (13 tasks), feature spec
+  `context/feature-specs/07-admin.md`. `/admin` renders inside the `app/(app)/` shell and is entered
+  from `AccountMenu`, not the rail. Five `public` `security definer` RPCs (`admin_directory`,
+  `admin_create_client`, `admin_update_client`, `admin_attach_member`, `admin_detach_member`) called
+  with the **user-scoped** client; zero new table grants; `pg_advisory_xact_lock(800100)` and reserved
+  codes `45001`/`45002` guard the last admin. Migration `20261005000000_admin_provisioning.sql` applied
+  to the **local stack only** — hosted is a separate yes, still unasked.
+  - **Gate, run 2026-10-06 against the local stack with `pnpm dev -p 3000` under the `TEST_*`
+    overrides:** `pnpm test` **36 files / 226 passed**; `pnpm test:integration` **3 files / 19
+    passed**; `pnpm test:all` **39 files / 245 passed**; `pnpm typecheck` and `pnpm lint` silent;
+    `pnpm build` printed `ƒ /admin`, `ƒ /api/admin/clients`, `ƒ /api/admin/clients/[clientId]`,
+    `ƒ /api/admin/members/[userId]` and `○ /dashboard`; Playwright **9 passed** public, **26 passed**
+    auth. With no `TEST_SUPABASE_URL` the same tier answers **19 skipped** and exits 0 — which is what
+    CI sees, so this tier is skipped there and never "covered".
+  - **The three probes, run rather than inherited.** A `security definer` function in `public` **can**
+    read `auth.users`, so `admin_directory()` stands and no `auth.admin.listUsers()` fallback is needed.
+    The nested `private.current_user_role()` resolves the **caller**, not the owner — a `client@a`
+    session received `"client"` from the definer, which is what makes the `42501` guard the enforcement
+    point rather than decoration — and the same function called with no session was refused by the
+    grant itself, before the body ran. `max_rows = 1000` is **measured**: with 1003 rows in `auth.users`
+    the set-returning probe returned exactly 1000, so the directory's ceiling is real and the panel
+    renders `unlisted: true` rather than a truncated list.
+  - **The guard was proven against live Postgres, not a mock**: `42501` for a client-role
+    `admin_create_client` **with no row written**, `42501` for a staff `admin_directory` (the regression
+    for the unguarded draft that would have leaked every email), `45001` refusing both to detach and to
+    demote the last admin with the row intact, `45002` when detach matches no row, lowercased domain and
+    `23505` on the case-variant, and partial-update field preservation.
+  - **What the panel does, in one line each:** `getAdminView()` merges two RLS-backed selects with the
+    directory RPC in TypeScript and deliberately applies **no `is_active` filter** (a panel that hides
+    deactivated clients makes Pause irreversible); every email and display name comes from the
+    directory, because `public.users` stores neither; error bodies are only `lib/admin/errors.ts`
+    sentences; the client re-renders from the server only after a 2xx, so a refusal cannot leave the
+    table claiming a state it did not get; `UNASSIGNED` is the sentinel base-ui needs to address "no
+    client", and it becomes `null` at exactly two call sites.
+  - **Driven by hand in Chrome, because `@auth` stays read-only by decision**: create (typed
+    `SCRATCH.example/`, stored `scratch.example`), rename, pause (**the row stays**, with `Resume`),
+    resume, a tenant move with both member counts following, attach → promote → detach, a **second
+    detach from a stale tab** answering `That account is not provisioned.`, a duplicate domain
+    answering `Another client already owns that domain.` with the dialog still open and both drafts
+    intact, and `client@a.rls-test.local` bounced from `/admin` onto their own `/dashboard`. Two defects
+    only the browser showed — JSX trimming a newline inside a pluralized sentence, and a disabled select
+    still displaying a tenant the write ignores — are fixed and turned into rules in
+    `context/code-standards.md`.
+  - **What this does not prove:** no browser spec presses these buttons, so the round trip above is
+    evidence of a session, not of a regression guard. `tests/admin/unit/mutations.test.ts` pins the
+    request/response contract, `tests/admin/integration/provisioning.test.ts` pins the functions, and
+    the `45001` toast is §11.3's stance, not a test.
+  - Left open as King's calls, both recorded under Open Questions: the panel's only entry point can be
+    absent (`AccountMenu` renders in the dashboard's loaded header only), and the bootstrap admin
+    collides with the integration tier's last-admin precondition on one stack.
+  - Stack state after the work: the local `auth.users` holds the four fixtures plus
+    `demo@rls-test.local` and an inert `pending@rls-test.local` (no `users` row — that is what keeps the
+    Attach trigger honest), `admins = 1`, five clients, no `scratch.example`.
 
 - `/connections` opened on hosted (2026-09-30) — a database-state change with **no code diff**. The
   branch shipped the read path but left the policy swap local-only, so the page could not serve a
@@ -689,6 +589,23 @@ the build and the first live-RLS integration slice landed (2026-09-24).
      `s-maxage=300, stale-while-revalidate=60` so CDN == `CACHE_TTL_MS` == `unstable_cache
      revalidate`, the unit tests pin the header, and `architecture-context.md` records the
      invariant and its resolution.
+  10. **The admin panel's only entry point can be absent.** `AccountMenu` is rendered by exactly one
+     file, `app/(app)/dashboard/dashboard-view.tsx`, and `components/features/dashboard/components/
+     dashboard.tsx`'s `EmptyShell` renders **no header** in its two no-data states. A new admin on a
+     project whose first accessible client has no synced rows therefore sees no route to `/admin` —
+     the panel is unreachable precisely when provisioning is what is needed. §4 of the spec chose the
+     menu because it already carried the role, and never asked whether the menu is always on screen.
+     Candidates: a role-gated fourth rail destination (the row `08-app-shell.md` retired), a link
+     inside `EmptyShell`, or a header of the panel's own. Design gap, not a bug: the gate itself is
+     sound. Opened 2026-10-06, still King's call.
+  11. **One stack cannot host both the bootstrap admin and the last-admin cases.**
+     `tests/admin/integration/provisioning.test.ts` asserts the global precondition `admins == 1`, and
+     its attach case takes `before.data![0]` with no `order by` — so a second admin row (which is what
+     `pnpm db:demo-user -- --admin` creates) makes the demotion **succeed** and the assertion fail, after
+     the suite has mutated a row it does not own. Measured: 2 failed / 17 passed with two admins, 19/19
+     with one. Either those two cases scope to `FIXTURE_USERS.admin`'s id, or `@auth` runs on a stack
+     that never runs the integration tier. The first removes a landmine but edits a shipped Task 6 file.
+     Opened 2026-10-06, still King's call.
 - ~~RLS policies are still unproven against a live database.~~ **Proven 2026-09-24** by
   `tests/tenant-isolation/integration/rls-gate.test.ts`: client/staff/admin/anon visibility all
   exercised against a real local Postgres (Docker + `supabase start`), not a faked PostgREST. The
