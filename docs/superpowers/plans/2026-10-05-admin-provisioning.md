@@ -4335,7 +4335,7 @@ with the surface docs they describe: 6 files, 173 insertions, 184 deletions, no 
 PR, and applying the migration to the hosted project are three separate yeses from the user
 (`RULES.md` §7, §16). Report the gate tallies and the one line the hosted migration would need.
 
-**Overridden by the user on 2026-10-06: "commit and push this so we can create a PR."** The gate
+**Overridden by the user on 2026-10-08: "commit and push this so we can create a PR."** The gate
 tallies were reported first (Step 5's transcript), then `fbb013b` was pushed to
 `feat/app-shell-connections`, `feat/admin-provisioning` was created at that same commit and pushed,
 and **draft PR #21** (`feat/admin-provisioning` → `main`) was opened — draft per
@@ -4344,11 +4344,19 @@ before pushing and none was needed: `git diff --stat HEAD...origin/main` printed
 two extra commits are the merge commits of PR #19 and #20 and no content diverged.
 `gh pr view` reports `MERGEABLE`.
 
-**The third yes is still unspent.** `20261005000000_admin_provisioning.sql` has not been applied to
-the hosted project, measured rather than assumed: a read-only `pg_proc` query against
-`SUPABASE_DB_URL` on 2026-10-06 returns `[]` for `admin_%`, and `public.schema_migrations` stops at
-`20260925000000_connections_read.sql`. So `/admin` renders only against the local stack until that
-apply runs, and merging PR #21 does not change this.
+**The third yes was spent on 2026-10-08,** when King asked for an admin he could manual-test with (the
+date above is this session's continuation day, not the probe's). Measured on hosted before the apply:
+a read-only `pg_proc` query against `SUPABASE_DB_URL` returned `[]` for `admin_%` and
+`public.schema_migrations` stopped at `20260925000000_connections_read.sql`, so `/admin` could not
+render there — while `dummydump01@gmail.com` was **already** `role = 'admin'` with `client_id = null`,
+which is to say the missing capability was the SQL, not the account. A dry check found exactly one
+pending migration, then `pnpm db:migrate` (against the project `.env` names; no `.env.local` exists)
+printed `apply 20261005000000_admin_provisioning.sql` / `Applied 1 migration(s).` Read back on hosted:
+5 functions with `prosecdef = true`, `EXECUTE` for `authenticated`, and an anonymous
+`POST /rest/v1/rpc/admin_directory` answering **401 / `42501` permission denied for function
+admin_directory**. So `/admin` now works against hosted data from any checkout that carries this code —
+`main` does not yet, which leaves merging PR #21 as the last step to make it reachable on the deployed
+site.
 
 ---
 

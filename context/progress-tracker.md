@@ -12,8 +12,9 @@ Questions 2).
 
 ## Current Goal
 Nothing in flight. Last change opened the admin provisioning panel (`/admin`, five definer RPCs, the
-four HTTP verbs and their commit-on-change rows) on the local stack only — hosted still needs its own
-yes (2026-10-06 — see Recent Work). Before that, every authenticated page got one shell
+four HTTP verbs and their commit-on-change rows, 2026-10-06) and put its migration on the hosted
+project (2026-10-08), so the panel now serves against hosted data rather than only the local stack
+(see Recent Work). Before that, every authenticated page got one shell
 (`app/(app)/` + a destination rail) and the read-only `/connections` status page landed (2026-09-25 —
 see Completed); before that the build's dynamic-`readFile` tracing warning went away and the auth
 routes were pinned to the dark palette (2026-09-25 — see Recent Work), and before that the landing
@@ -169,9 +170,9 @@ page's claims were made to match the build and the first live-RLS integration sl
   - **What the demo cards prove, and don't.** Local data now covers 3 demo clients, 4 placeholder `api_credentials` rows and 2 fixture rows, but **no local `users` row is linked to the three demo clients** (`scripts/create-demo-user.mjs:39-42` binds one client-role user to one client), so `/connections` shows the demo cards only for an **admin** session; a client-role user sees only its own `rls-test` tenant.
 
 ## In Progress
-- Nothing in flight. The admin provisioning slice landed 2026-10-06 — see the entry at the top of
-  Recent Work. Two decisions it left behind are recorded under Open Questions 10 and 11, and the
-  migration still needs its own yes before it reaches the hosted project.
+- Nothing in flight. The admin provisioning slice landed 2026-10-06 and its migration reached the
+  hosted project 2026-10-08 — see the entry at the top of Recent Work. Two decisions it left behind
+  are recorded under Open Questions 10 and 11.
 
 ## Recent Work
 
@@ -182,7 +183,30 @@ page's claims were made to match the build and the first live-RLS integration sl
   `admin_create_client`, `admin_update_client`, `admin_attach_member`, `admin_detach_member`) called
   with the **user-scoped** client; zero new table grants; `pg_advisory_xact_lock(800100)` and reserved
   codes `45001`/`45002` guard the last admin. Migration `20261005000000_admin_provisioning.sql` applied
-  to the **local stack only** — hosted is a separate yes, still unasked.
+  to the local stack 2026-10-05 **and to the hosted project 2026-10-08**, at King's call.
+  - **Hosted apply, 2026-10-08, and what was read back.** `pnpm db:migrate` was pointed at the project
+    `.env` names (no `.env.local` exists, so `.env` is the only override in play) after a dry check that
+    exactly one migration was pending. It printed `skip` × 4 then `apply 20261005000000_admin_provisioning.sql`
+    / `Applied 1 migration(s).` Read back against hosted `pg_proc`: **5** `admin_%` functions, every one
+    with `prosecdef = true`, `acl` granting `EXECUTE` to `authenticated` (and `service_role`, which the
+    migration's header already admits it cannot revoke) and nothing to `anon`/`PUBLIC`. An anonymous
+    `POST /rest/v1/rpc/admin_directory` answers **401 with Postgres code `42501`** — `permission denied
+    for function admin_directory` — so the grant layer refuses before the body runs, on hosted exactly as
+    measured locally. `public.schema_migrations` now carries the version with `applied_at`
+    2026-10-08T12:13Z. Undoing it is five `drop function` statements plus the ledger row.
+  - **The guard answers on hosted with a real non-admin session, and wrote nothing doing it.** Signing in
+    as the hosted `client` account and calling `POST /rest/v1/rpc/admin_directory` returns **403 /
+    `42501` "admin privilege required"** — the function's own `raise`, not the grant layer — and the same
+    session calling `admin_create_client('Guard Probe', 'guard-probe.invalid')` returns the same 403. A
+    service-role read afterwards still shows **3** clients and no `guard-probe` row, so the refusal is
+    enforcement and not a log line. The positive path (an admin session actually reading the directory and
+    writing a client) has no automated proof and is what the manual test below is for.
+  - **Hosted state that makes the panel usable:** `dummydump01@gmail.com` is already `role = 'admin'`
+    with `client_id = null` (and is the **only** admin, so the `45001` last-admin rule will refuse any
+    attempt to demote or detach it); `demo@seoreporting.app` is `role = 'client'` on Northstar Studio,
+    which is the account to test the `/admin` → `/dashboard` bounce with. Three active clients and 963
+    `metrics_snapshots` rows exist, so the panel has real tenants to manage. The `@auth`/integration
+    fixtures (`*.rls-test.local`) are local-stack accounts and do not exist on hosted.
   - **Gate, run 2026-10-06 against the local stack with `pnpm dev -p 3000` under the `TEST_*`
     overrides:** `pnpm test` **36 files / 226 passed**; `pnpm test:integration` **3 files / 19
     passed**; `pnpm test:all` **39 files / 245 passed**; `pnpm typecheck` and `pnpm lint` silent;

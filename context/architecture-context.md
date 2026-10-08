@@ -42,7 +42,8 @@
 - `supabase/migrations` — `20260917000000_seo_poc.sql`, `20260920000000_add_staff_role.sql`,
   `20260920000001_rls_hardening.sql`, `20260925000000_connections_read.sql`,
   `20261005000000_admin_provisioning.sql` (five `public` `security definer` functions; applied to the
-  local stack, **not** to the hosted project).
+  local stack 2026-10-05 **and** to the hosted project 2026-10-08, where an anonymous RPC call answers
+  `42501`).
 
 ## Storage Model
 
