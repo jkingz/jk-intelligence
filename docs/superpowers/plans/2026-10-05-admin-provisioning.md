@@ -4320,7 +4320,7 @@ pnpm test:all          Test Files  39 passed (39)   Tests  245 passed (245)
   `## Current Phase` and `## Current Goal` both changed, since they are the state of record and were
   still describing 2026-09-25.
 
-- [ ] **Step 6: Commit.**
+- [x] **Step 6: Commit.**
 
 ```bash
 git add AGENTS.md context/feature-specs/08-app-shell.md docs/target-state.md \
@@ -4328,7 +4328,27 @@ git add AGENTS.md context/feature-specs/08-app-shell.md docs/target-state.md \
 git commit -m "docs: record the admin provisioning slice in the files that describe the surface"
 ```
 
-- [ ] **Step 7: Stop. Do not push.** The branch is `feat/app-shell-connections`; pushing, opening a PR, and applying the migration to the hosted project are three separate yeses from the user (`RULES.md` §7, §16). Report the gate tallies and the one line the hosted migration would need.
+Ran as `fbb013b` with this plan file added to the list, so the ticks and the Deviations block travel
+with the surface docs they describe: 6 files, 173 insertions, 184 deletions, no code.
+
+- [x] **Step 7: Stop. Do not push.** The branch is `feat/app-shell-connections`; pushing, opening a
+PR, and applying the migration to the hosted project are three separate yeses from the user
+(`RULES.md` §7, §16). Report the gate tallies and the one line the hosted migration would need.
+
+**Overridden by the user on 2026-10-06: "commit and push this so we can create a PR."** The gate
+tallies were reported first (Step 5's transcript), then `fbb013b` was pushed to
+`feat/app-shell-connections`, `feat/admin-provisioning` was created at that same commit and pushed,
+and **draft PR #21** (`feat/admin-provisioning` → `main`) was opened — draft per
+`context/pm-conventions.md` ("Draft until green"), because `pm-conventions.md:24` wants a rebase
+before pushing and none was needed: `git diff --stat HEAD...origin/main` printed nothing, so `main`'s
+two extra commits are the merge commits of PR #19 and #20 and no content diverged.
+`gh pr view` reports `MERGEABLE`.
+
+**The third yes is still unspent.** `20261005000000_admin_provisioning.sql` has not been applied to
+the hosted project, measured rather than assumed: a read-only `pg_proc` query against
+`SUPABASE_DB_URL` on 2026-10-06 returns `[]` for `admin_%`, and `public.schema_migrations` stops at
+`20260925000000_connections_read.sql`. So `/admin` renders only against the local stack until that
+apply runs, and merging PR #21 does not change this.
 
 ---
 
