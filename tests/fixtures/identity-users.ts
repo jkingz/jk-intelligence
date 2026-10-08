@@ -2,7 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { hasTestDb } from "../helpers/db";
 
 // Fixtures for the tenant-isolation integration tier (test-suite spec §6):
-// three auth users across two clients, provisioned idempotently via the
+// four auth users across two clients, provisioned idempotently via the
 // service-role admin API — the mechanism already proven in
 // scripts/create-demo-user.mjs.
 
@@ -14,6 +14,7 @@ export const FIXTURE_USERS = {
   clientA: "client@a.rls-test.local",
   clientB: "client@b.rls-test.local",
   staffA: "staff@a.rls-test.local",
+  admin: "admin@rls-test.local",
 };
 
 export function requireTestDb(): void {
@@ -120,12 +121,7 @@ export async function provisionFixtures(): Promise<TestClients> {
   await ensureLink(db, await ensureAuthUser(db, FIXTURE_USERS.clientA), "client", a);
   await ensureLink(db, await ensureAuthUser(db, FIXTURE_USERS.clientB), "client", b);
   await ensureLink(db, await ensureAuthUser(db, FIXTURE_USERS.staffA), "staff", a);
-  await ensureLink(
-    db,
-    await ensureAuthUser(db, "admin@rls-test.local"),
-    "admin",
-    null,
-  );
+  await ensureLink(db, await ensureAuthUser(db, FIXTURE_USERS.admin), "admin", null);
 
   await ensureCredential(db, a);
   await ensureCredential(db, b);

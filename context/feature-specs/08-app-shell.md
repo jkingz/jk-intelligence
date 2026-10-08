@@ -18,9 +18,14 @@ and navigation instead of each re-declaring a header.
 ## Non-goals
 - Collapsing/expanding. `ui-context.md` listed "(collapsible)"; dropped, because a
   collapsed-by-default rail makes every destination one click from undiscoverable.
-- Role-gated destinations. With no `/admin` route there is no difference to render, and a
-  `visibleDestinations(role)` filter would be an abstraction with one hypothetical caller.
-  The admin panel adds its row and the filter together.
+- Role-gated destinations. A `visibleDestinations(role)` filter still has zero callers: the rail
+  renders three destinations for everyone, and `/admin` reached `AccountMenu` instead of the rail.
+  What changed since this was written: `/admin` is now a real page the shell wraps, and
+  `activeDestination("/admin")` returns `null`, so the rail renders beside it with **no row
+  marked active**. That is a state, not an oversight — the shell cannot read a session without
+  making `/dashboard` dynamic, and marking the Dashboard row active on an admin page would be a
+  lie the rail tells on purpose. Reading the session here is the one edit that would make the
+  filter worth having, and it is still the edit this file forbids.
 - Moving the client selector or `AccountMenu` into the shell. Both need the session; the
   selector is dashboard scope today.
 - Any change to `?client` / `?days` / `?tab=` URL state or the `<Activity>` tab panels.

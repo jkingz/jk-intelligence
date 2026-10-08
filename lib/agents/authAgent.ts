@@ -2,10 +2,11 @@ import "server-only";
 
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { MEMBER_ROLES } from "@/types/metrics";
 
 const authUserSchema = z.object({
   id: z.string().uuid(),
-  role: z.enum(["admin", "client", "staff"]),
+  role: z.enum(MEMBER_ROLES),
   clientId: z.string().uuid().nullable(),
 });
 

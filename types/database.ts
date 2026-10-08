@@ -1,4 +1,9 @@
-import type { Client, Source, SyncLogInput } from "@/types/metrics";
+import type {
+  Client,
+  MemberRole,
+  Source,
+  SyncLogInput,
+} from "@/types/metrics";
 
 export type Json =
   | string
@@ -82,7 +87,7 @@ export type Database = {
       users: Table<
         {
           id: string;
-          role: "admin" | "client" | "staff";
+          role: MemberRole;
           client_id: string | null;
           created_at: string;
         },
@@ -100,6 +105,49 @@ export type Database = {
           p_run_id: string;
         };
         Returns: undefined;
+      };
+      admin_directory: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          id: string;
+          email: string | null;
+          name: string | null;
+          created_at: string;
+        }[];
+      };
+      admin_create_client: {
+        Args: { p_name: string; p_domain: string };
+        Returns: Client & { created_at: string };
+      };
+      admin_update_client: {
+        Args: {
+          p_id: string;
+          p_name?: string | null;
+          p_is_active?: boolean | null;
+        };
+        Returns: Client & { created_at: string };
+      };
+      admin_attach_member: {
+        Args: {
+          p_user_id: string;
+          p_role: MemberRole;
+          p_client_id?: string | null;
+        };
+        Returns: {
+          id: string;
+          role: MemberRole;
+          client_id: string | null;
+          created_at: string;
+        };
+      };
+      admin_detach_member: {
+        Args: { p_user_id: string };
+        Returns: {
+          id: string;
+          role: MemberRole;
+          client_id: string | null;
+          created_at: string;
+        };
       };
     };
     Enums: { [_ in never]: never };

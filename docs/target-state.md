@@ -331,7 +331,7 @@ Kept as the dependency order for the unbuilt parts. Marked against the code as o
 9. ⚠️ Metrics read route — `/api/metrics/{clientId}/overview` and `/keywords` exist; the planned `/api/metrics/{clientId}` and `/history` do not.
 10. ✅ Dashboard UI — metric cards, trends, keyword table, date range.
 11. ⚠️ Stale banner + last_updated — the UI renders from `is_stale`, so the banner can never fire while step 8 has no writer.
-12. ⬜ Admin panel — no `components/features/admin`; clients and credentials are provisioned by SQL/seed scripts.
+12. ⚠️ Admin panel: provisioning shipped 2026-10-06 (`/admin`, `components/features/admin`, five `public` definer RPCs). Sync logs, credential writes and a manual sync trigger are still absent — nothing consumes the `seo-sync` queue.
 13. ⬜ AI insight generation (Claude API).
 14. ✅ CSV/PDF export behind a sliding-window quota (`lib/exports/quota.ts`).
 

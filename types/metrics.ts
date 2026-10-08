@@ -36,3 +36,12 @@ export type SyncLogInput = {
   message: string;
   job_id?: string;
 };
+
+/**
+ * The one role list. `users_role_check` (20260920000000_add_staff_role.sql) is what
+ * Postgres actually enforces; this is the copy TypeScript agrees with, and
+ * `tests/admin/unit/role-set.test.ts` reads the DDL to keep the two from drifting.
+ */
+export const MEMBER_ROLES = ["admin", "client", "staff"] as const;
+
+export type MemberRole = (typeof MEMBER_ROLES)[number];
