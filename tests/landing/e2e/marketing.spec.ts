@@ -8,6 +8,21 @@ test("landing renders the headline and the feature grid", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("both hero and trust-band CTAs reach the demo sign-in", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("link", { name: "Get started", exact: true })).toHaveAttribute(
+    "href",
+    "/auth/login",
+  );
+  await expect(page.getByRole("link", { name: "Get started free" })).toHaveAttribute(
+    "href",
+    "/auth/login",
+  );
+  // The sentence is the only thing telling a visitor a demo exists, and it must
+  // not depend on DEMO_EMAIL (CI has none) the way the login page's card does.
+  await expect(page.getByText(/No account needed/)).toBeVisible();
+});
+
 test("footer reaches both legal pages", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Privacy Policy" }).click();
