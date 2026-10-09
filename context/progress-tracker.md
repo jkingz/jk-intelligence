@@ -13,13 +13,12 @@ committed**); the **sync pipeline is still the next unit** and is blocked on a w
 decision (see Open Questions 2).
 
 ## Current Goal
-One thing is in flight, and it is only a git decision: the app shell's navigation pass
+One thing is in flight, and it is a review, not a build: the app shell's navigation pass
 (2026-10-09) — the rail collapses to icons, the destinations move into an off-canvas drawer below
 768px, and the profile menu left the dashboard header for the rail's footer, fed by a new
-`GET /api/auth/me` so `/dashboard` stays prerendered — is written, verified and **uncommitted** on
-`feat/rail-collapse-nav-user`, branched off `origin/main` and pushed nowhere. See In Progress.
-Two uncommitted scopes now share that working tree: the landing CTA → demo sign-in change
-(2026-10-09, see Recent Work) touches no shell file, so it commits separately from the rail work.
+`GET /api/auth/me` so `/dashboard` stays prerendered — and the landing CTA → demo sign-in change are
+committed (`c6e340d`, `bd1e84a`) on `feat/rail-collapse-nav-user`, branched off `origin/main`, and
+opened as **PR #23** against `main`. Merge is King's call and ungiven. See In Progress.
 Before it, the admin provisioning panel landed (2026-10-06) and its migration reached the hosted
 project (2026-10-08). Before that, every authenticated page got one shell
 (`app/(app)/` + a destination rail) and the read-only `/connections` status page landed (2026-09-25 —
@@ -177,10 +176,11 @@ page's claims were made to match the build and the first live-RLS integration sl
   - **What the demo cards prove, and don't.** Local data now covers 3 demo clients, 4 placeholder `api_credentials` rows and 2 fixture rows, but **no local `users` row is linked to the three demo clients** (`scripts/create-demo-user.mjs:39-42` binds one client-role user to one client), so `/connections` shows the demo cards only for an **admin** session; a client-role user sees only its own `rls-test` tenant.
 
 ## In Progress
-- **Code done, git decision pending.** The app shell navigation pass (2026-10-09 — see the top of
-  Recent Work) is written, gate-green and browser-verified, but sits **uncommitted** on
-  `feat/rail-collapse-nav-user` (branched off `origin/main`, no remote, no push, no PR — King's
-  call, and each of those needs its own yes).
+- **Pushed, PR open.** The app shell navigation pass and the landing CTA change (both 2026-10-09 —
+  see the top of Recent Work) are committed as `c6e340d` and `bd1e84a`, pushed to
+  `origin/feat/rail-collapse-nav-user`, and submitted as **PR #23** against `main`
+  (https://github.com/jkingz/jk-intelligence/pull/23). Merging is King's call and has **not** been
+  given. This tracker edit is the only uncommitted change on the branch.
 - **One thing this pass could not run here.** Six `@auth` admin specs (`tests/admin/e2e/layout.spec.ts`
   ×4, `tests/admin/e2e/panel.spec.ts` ×2) stop at
   `ADMIN_EMAIL / ADMIN_PASSWORD are not in the environment` — `.env` defines only the demo pair, and
@@ -210,7 +210,7 @@ page's claims were made to match the build and the first live-RLS integration sl
 
 - **App shell: collapsible rail, phone drawer, and the account block moved into the rail**
   (2026-10-09) — feature spec `context/feature-specs/08-app-shell.md` rewritten; branch
-  `feat/rail-collapse-nav-user` off `origin/main`, **uncommitted**. King asked for a collapsible,
+  `feat/rail-collapse-nav-user` off `origin/main`, pushed as PR #23. King asked for a collapsible,
   mobile-friendly side nav and for the profile menu to leave the top navbar for a shadcn-style
   `nav-user` row.
   - **The rail is now the shadcn `Sidebar` primitive** (`components/ui/sidebar.tsx`, `sheet.tsx`,
