@@ -47,6 +47,16 @@
   --color-state-warning: var(--state-warning);
   --color-state-neutral: var(--state-neutral);
 
+  /* components/ui/sidebar.tsx ships these names but no values — neither
+     shadcn/tailwind.css nor this file defined them, so they would have
+     compiled to no utility at all. Mapped onto the existing app tokens. */
+  --color-sidebar: var(--bg-surface);
+  --color-sidebar-foreground: var(--text-primary);
+  --color-sidebar-border: var(--border-default);
+  --color-sidebar-accent: var(--accent-primary-dim);
+  --color-sidebar-accent-foreground: var(--text-primary);
+  --color-sidebar-ring: var(--accent-primary);
+
   --color-landing-bg: var(--landing-bg);
   --color-landing-surface: var(--landing-surface);
   --color-landing-surface-2: var(--landing-surface-2);

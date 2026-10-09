@@ -57,13 +57,16 @@ export function LandingHero() {
 
             <div className="mt-8 motion-safe:animate-landing-fade-in flex justify-center">
               <Link
-                href="/auth/sign-up"
+                href="/auth/login"
                 className="inline-flex items-center justify-center gap-2 rounded-full bg-landing-accent px-6 py-3 text-sm font-medium text-white transition-all duration-150 ease-out hover:bg-landing-sky hover:text-landing-bg active:scale-[0.97]"
               >
                 Get started
                 <ArrowRight className="size-4" aria-hidden="true" />
               </Link>
             </div>
+            <p className="mt-3 text-xs text-landing-faint">
+              No account needed — the sign-in page opens the demo dashboard in one click.
+            </p>
           </div>
         </Reveal>
 

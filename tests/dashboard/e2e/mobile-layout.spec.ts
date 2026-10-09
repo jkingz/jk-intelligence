@@ -31,7 +31,7 @@ test("@auth client picker never covers a header action", async ({ page }) => {
     const edge = (await picker(page).boundingBox()) ?? { x: 0, width: 0 };
     const rightOfPicker = edge.x + edge.width;
 
-    for (const name of ["Export data", "Toggle theme", "Account menu"]) {
+    for (const name of ["Export data", "Toggle theme"]) {
       const action = page.getByRole("button", { name });
       await expect(action).toBeVisible();
       const box = await action.boundingBox();

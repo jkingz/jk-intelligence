@@ -25,13 +25,13 @@ for (const viewport of [
     test("the rail renders with nothing marked active", async ({ page }) => {
       await logIn(page, "admin");
       await page.goto("/admin");
-      // Both Sections landmarks stay in the DOM; `:visible` is what separates the
-      // rail from the below-lg strip, so the count is of landmarks, not links.
-      const sections = page.locator("nav[aria-label='Sections']:visible");
-      await expect(sections).toHaveCount(1);
-      await expect(
-        sections.getByRole("link", { name: "Dashboard" }),
-      ).toBeVisible();
+      // Below the rail breakpoint there is no rail in the document: the same
+      // destinations live in a drawer, and the landmark only exists once it is open.
+      await page.locator("button[data-sidebar=trigger]:visible").click();
+      const sections = page.locator(
+        "[data-slot=sidebar][data-mobile=true] nav[aria-label='Sections']",
+      );
+      await expect(sections.getByRole("link", { name: "Dashboard" })).toBeVisible();
       // activeDestination("/admin") is null: no href claims it, so no link carries
       // the active state. That is the point, and why Task 8 added no destination row.
       await expect(sections.locator("[aria-current]")).toHaveCount(0);

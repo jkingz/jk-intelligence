@@ -6,6 +6,8 @@ Dark/light mode supported. Default: dark. Toggle via `data-theme` attribute on `
 
 All colors defined as CSS custom properties in `globals.css`, mapped to Tailwind via `@theme inline`. Components use tokens only — no hardcoded hex or raw Tailwind color classes like `zinc-*` or `slate-*`.
 
+`components/ui/sidebar.tsx` ships `bg-sidebar`, `text-sidebar-foreground`, `border-sidebar-border`, `bg-sidebar-accent` and `ring-sidebar-ring` with no values of their own, so `@theme inline` aliases all six onto existing app tokens (`--bg-surface`, `--text-primary`, `--border-default`, `--accent-primary-dim`). Without the mapping these classes compile to no utility at all and the rail renders transparent — check that block before adding another primitive that brings its own token names. One gap is left on purpose: the primitive's unused `rounded` menu-button variant interpolates the *raw* `var(--sidebar-border)` / `var(--sidebar-accent)`, which nothing defines, so if that variant is ever adopted those need their own `:root` values.
+
 ### Dark Mode Tokens
 
 | Role | CSS Variable | Hex |
@@ -114,6 +116,9 @@ DropdownMenuContent: w-60 (primitive default p-1)
 - Label horizontal padding matches item padding so the name/email align with the menu item icons.
 - Always place a `DropdownMenuSeparator` between the account block and its action items — never let the header sit flush against the first item.
 - Name and email are different sizes (`text-sm` / `text-xs`); never render both at one size.
+- The rail's account menu is the one exception to `align="end"`: inside the phone drawer the trigger
+  already sits at the viewport's right edge, so that menu uses `align="start" side="top"`. Keep the
+  spacing rhythm; only the anchoring changes.
 
 ---
 
@@ -183,18 +188,36 @@ colours, and note `--accent-primary-dim` is a red tint — it is the brand accen
 
 ## Layout Patterns
 
-- **Dashboard:** full-viewport, left destination rail (persistent at `lg+`, a horizontal
-  strip below), page header inside the content column, main content area. Authoritative shell
-  spec: `context/feature-specs/08-app-shell.md`.
-- **Sidebar (`AppNav`):** `bg-surface border-r border-default` at `lg+`, `w-60`, sticky at
-  full viewport height. Destinations come from `lib/navigation/destinations.ts`; the shell
-  reads no session so `/dashboard` stays prerendered. Below `lg` the same list renders as a
-  `relative overflow-x-auto` strip — the `relative` is what keeps `sr-only` descendants from
-  sizing the document. Not collapsible.
-- **Admin panel:** *(not built — no `/admin` route and no admin-only API; target-state layout kept
-  here so the eventual shell matches the dashboard.)*
+- **Dashboard:** full-viewport, left destination rail (persistent and icon-collapsible on `md+`,
+  an off-canvas drawer below), page header inside the content column, main content area.
+  Authoritative shell spec: `context/feature-specs/08-app-shell.md`.
+- **Sidebar (`AppNav`):** the shadcn `Sidebar` primitive with `collapsible="icon"` — 15rem
+  (`--sidebar-width` is overridden from the primitive's 16rem to keep the documented `w-60`)
+  expanded, 3rem icons, `bg-sidebar border-r border-default`. Destinations come from
+  `lib/navigation/destinations.ts`; the shell reads no session so `/dashboard` stays prerendered,
+  and the account block fetches its own identity from `/api/auth/me`. Below 768px the same list
+  renders in a `Sheet` drawer (18rem) opened by the hamburger in `MobileNav`, and every link
+  closes it. The horizontal strip is gone.
+- **Sidebar header / footer:** header is one row — the 2rem brand tile plus the wordmark on the
+  left, `SidebarTrigger` on the right. The label carries `group-data-[collapsible=icon]:hidden`
+  (8px padding either side of a 2rem tile is exactly the collapsed width, so the label hides rather
+  than the row reflowing) and the row switches to `flex-col` when collapsed, because 2rem of
+  content width fits one element per line. `SidebarTrigger` is `hidden md:flex`; below that
+  breakpoint the trigger lives in `MobileNav`. Footer is `NavUser` alone.
+  `NavUser` follows shadcn's nav-user anatomy with two deviations: three text lines — the role on
+  top as its own span (`text-[10px] uppercase tracking-wide text-primary`, brand red, no chip),
+  then the name, then the email at `text-xs` — so the `size="lg"` button carries
+  `h-auto py-2` to escape the variant's fixed `h-12`; and the trailing affordance is
+  `ChevronRight`, not `ChevronDown`, because the menu opens sideways off the rail edge. The
+  `tooltip` carries the name so the collapsed rail still says who you are.
+- **Admin panel:** `components/features/admin` inside the same shell; `/admin` is not a destination,
+  so the rail renders beside it with no active row.
 - **Modals:** centered overlay, `rounded-3xl`, `bg-elevated`, backdrop blur.
-- **Navbar:** `bg-surface border-b border-default`, client selector + sync status + trigger sync + export menu + theme toggle + account menu. No brand mark — the rail owns it at `lg+`; `/dashboard`'s footer repeats it at every width, while `/connections` and `/profile` render none (`context/feature-specs/08-app-shell.md`).
+- **Dashboard header:** `bg-surface border-b border-default`, client selector + sync status +
+  trigger sync + export menu + theme toggle. It no longer carries the account menu — that moved to
+  the rail's footer. No brand mark: the rail owns it on `md+`, and `MobileNav` (sticky `h-12`,
+  `bg-surface border-b border-default`, `md:hidden`) repeats the tile and wordmark below that, so
+  `/connections` and `/profile` are branded at every width.
 - **Data tables:** `bg-surface`, alternating `bg-subtle` rows, sticky header.
 
 ---
@@ -239,7 +262,7 @@ Landing palette — always dark, independent of `data-theme`. Active tokens: `la
 - Used solely on the landing page (hero glow, metric-card cards, icon chips); the app surfaces keep the structured tokens above.
 - Entrance animations, uploadthing-style: `animate-landing-fade-in` (opacity), `animate-landing-fade-down` (opacity + −y), `animate-landing-scale-in` (opacity + scale) — gated `motion-safe:` so `prefers-reduced-motion` receives final state. Delays via inline `animation-delay` for the metric grid.
 - Hero backdrop: two decorative `radial-gradient` glows (sky top-center, mint lower-left) — `aria-hidden` + `pointer-events-none`; layout unaffected.
-- No CTA buttons and no footer on the landing page (removed per request); single header text link to `/auth/login`.
+- Two primary CTAs — `Get started` in the hero, `Get started free` in the trust band — both target `/auth/login`, never `/auth/sign-up`: the demo needs no account, and the login page's `DemoAccess` card opens a dashboard in one click. The hero carries a `text-landing-faint` line under the button saying so, in the same register as the "Sample figures" caption. No credential appears on the landing page: `/` is prerendered, so anything env-fed is baked at build time and simply absent in CI. `SiteHeader`/`SiteFooter` keep their own `Sign in` / `Sign up` text links, and `LandingFooter` closes the page.
 - `SiteHeader` / `SiteFooter` (`components/features/landing/`) are shared page chrome with a `tone` prop: `"landing"` (landing palette) or `"default"` (app tokens). Auth pages wrap in `AuthPageShell` (header + centered `AuthCard` + footer, app tokens + full-height layout) — also on forgot/reset pages.
 - Auth pages use one `AuthFlow` client component (`email-password-auth`): the sign-in and sign-up forms share a card and flip in place with a motion crossfade (`AnimatePresence mode="wait"`), fields stay email + password, `Continue with Google` / `Continue with Apple` (outline) sit below the divider under the fields — both render `disabled` with a “coming soon” caption while the providers are unconfigured (`SOCIAL_AUTH_READY` in `auth-flow.tsx`). Login/sign-up pages are chrome-less (`AuthPageShell chrome={false}`) — no site header/footer; a "Back to home" link (left, aligned with "Forgot your password?" on the right) heads back to `/`. Forgot/reset pages keep the header/footer chrome.
 

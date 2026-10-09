@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 
 // Unlike connections-guard.spec.ts, this destination is deliberately absent from
-// the rail (AccountMenu is its only entry), so nothing else in the test suite
-// would notice a dropped prefix. proxy.ts decides on the path, not the route
+// the rail (the rail's account block is its only entry), so nothing else in the test
+// suite would notice a dropped prefix. proxy.ts decides on the path, not the route
 // table, which is why this passes while /admin itself is still 404 for everyone.
 test("an anonymous /admin visit lands on login with the return path", async ({
   page,

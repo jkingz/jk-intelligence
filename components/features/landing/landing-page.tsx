@@ -147,7 +147,7 @@ export function LandingPage() {
                   API, so page speed never depends on someone else&apos;s uptime.
                 </p>
                 <Link
-                  href="/auth/sign-up"
+                  href="/auth/login"
                   className="mt-8 inline-flex items-center gap-2 rounded-full bg-landing-accent px-6 py-3 text-sm font-medium text-white transition-all duration-150 ease-out hover:bg-landing-sky hover:text-landing-bg active:scale-[0.97]"
                 >
                   Get started free

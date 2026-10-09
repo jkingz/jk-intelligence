@@ -37,7 +37,7 @@ export default function DashboardSkeleton() {
     >
       <span className="sr-only">Loading dashboard</span>
 
-      <header className="border-b border-default bg-surface sticky top-0 z-30">
+      <header className="border-b border-default bg-surface sticky top-12 md:top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 sm:gap-6 min-w-0">
             <Block className="h-8 w-36 sm:w-56" />
