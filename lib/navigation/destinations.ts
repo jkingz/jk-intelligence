@@ -3,7 +3,7 @@
  * module stays importable from a node-tier unit test; `app-nav.tsx` owns the
  * key -> Lucide mapping.
  */
-export const DESTINATION_ICONS = ["dashboard", "connections", "profile"] as const;
+export const DESTINATION_ICONS = ["dashboard", "connections"] as const;
 
 export type DestinationIcon = (typeof DESTINATION_ICONS)[number];
 
@@ -16,7 +16,6 @@ export interface AppDestination {
 export const APP_DESTINATIONS: readonly AppDestination[] = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
   { href: "/connections", label: "Connections", icon: "connections" },
-  { href: "/profile", label: "Profile", icon: "profile" },
 ];
 
 /** The destination whose href claims `pathname`, longest href winning. */

@@ -1,4 +1,3 @@
-export { AccountMenu } from "./components/account-menu";
 export { EditProfileForm } from "./components/edit-profile-form";
 export { ProfileCard } from "./components/profile-card";
 export { ProfileDialog } from "./components/profile-dialog";

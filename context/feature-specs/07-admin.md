@@ -20,12 +20,17 @@ admin can name the tenant it attaches to.
 - No invitations or join codes. No email transport, no token lifecycle.
 - No left-rail row. `/admin` is a protected prefix, not a destination, so
   `activeDestination("/admin")` returns `null` and the rail renders with nothing active. The
-  entry point is the Admin item in `AccountMenu`, shown only when `profile.role === "admin"`.
-  **Known gap, open as of 2026-10-06:** `AccountMenu` is rendered only by the dashboard's loaded
-  header, and `dashboard.tsx`'s `EmptyShell` (no client assigned, or no overview for the selected
-  client) renders no header — so an admin whose first accessible client has no synced rows sees no
-  route here at all. The gate is sound (`/admin` answers the role server-side); only the visible
-  door is missing.
+  entry point is the Admin item in the rail's account block (`NavUser`), shown only when
+  `profile.role === "admin"`.
+  **Gap closed 2026-10-09:** this item used to live in `AccountMenu`, which the dashboard's loaded
+  header rendered and `dashboard.tsx`'s `EmptyShell` (no client assigned, or no overview for the
+  selected client) did not — so an admin whose first accessible client had no synced rows saw no
+  route here at all. The account block moved into the app shell, which every authenticated page
+  renders, so the door is now open even on an empty dashboard. The gate was always sound
+  (`/admin` answers the role server-side); only the visible door was missing. `AccountMenu` is
+  deleted.
+  Below the rail breakpoint the item is reached by opening the drawer, and choosing it closes the
+  drawer before navigating.
 - No hard delete on a client. `api_credentials.client_id … on delete cascade` and
   `users.client_id … on delete set null` mean deleting a client destroys its credentials and
   un-homes its members. Deactivate instead.

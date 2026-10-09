@@ -16,7 +16,6 @@ import { DashboardClient, DashboardOverview } from "@/types/dashboard";
 import { cn } from "@/lib/utils";
 
 interface DashboardHeaderProps {
-  accountMenu?: React.ReactNode;
   exportMenu?: React.ReactNode;
   clients: DashboardClient[];
   selectedClient: DashboardClient;
@@ -30,7 +29,6 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({
-  accountMenu,
   exportMenu,
   clients,
   selectedClient,
@@ -45,7 +43,7 @@ export function DashboardHeader({
   const clientItems = clients.map((client) => ({ value: client.id, label: client.name }));
 
   return (
-    <header className="border-b border-default bg-surface sticky top-0 z-30">
+    <header className="border-b border-default bg-surface sticky top-12 md:top-0 z-30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 sm:gap-6 min-w-0">
           <div className="flex items-center gap-2 min-w-0">
@@ -102,7 +100,6 @@ export function DashboardHeader({
           <Suspense fallback={<span className="h-8 w-8" aria-hidden="true" />}>
             <ThemeToggle theme={theme} onToggle={onToggleTheme} />
           </Suspense>
-          {accountMenu}
         </div>
       </div>
     </header>

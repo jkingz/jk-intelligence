@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 
 import { Dashboard, DashboardSkeleton } from "@/components/features/dashboard";
 import { ExportMenu } from "@/components/features/data-export";
-import { AccountMenu } from "@/components/features/user-profile/components/account-menu";
 import { withDashboardParams } from "@/lib/dashboard/url-state";
 import type { ProfileView } from "@/components/features/user-profile/lib/profile";
 import {
@@ -158,9 +157,19 @@ export function DashboardView() {
         client: clientId,
         days: targetDays,
       })}`;
+    // A payload that lands after the user has already left writes the old page's
+    // address over the new one: `replaceState` is raw, so nothing else stops it.
+    const syncSelectionUrl = () => {
+      if (window.location.pathname === "/dashboard") {
+        // Carrying the existing state is not cosmetic: `{}` erases the entry the
+        // router stamped, and the next `<Link>` click then has no history to push
+        // onto, so the navigation is dropped.
+        window.history.replaceState(window.history.state, "", selectionUrl());
+      }
+    };
     if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
       setSelection({ client: targetClient, days: targetDays, payload: cached.payload });
-      window.history.replaceState({}, "", selectionUrl());
+      syncSelectionUrl();
       setError(null);
       // The boot payload lands here, so this — not `loadOverview` — is the path
       // that first sees a client; prefetching it keeps range switches instant.
@@ -173,7 +182,7 @@ export function DashboardView() {
         const payload = await getPayload(clientId, targetDays, controller.signal);
         if (controller.signal.aborted) return;
         setSelection({ client: targetClient, days: targetDays, payload });
-        window.history.replaceState({}, "", selectionUrl());
+        syncSelectionUrl();
         setError(null);
         prefetchClientRanges(clientId, targetDays);
       } catch {
@@ -233,7 +242,6 @@ export function DashboardView() {
 
   return (
     <Dashboard
-      accountMenu={<AccountMenu profile={profile} />}
       exportMenu={<ExportMenu client={selection.client} days={selection.days} />}
       clients={clients}
       selectedClient={selection.client}

@@ -18,6 +18,9 @@ describe("activeDestination", () => {
   it("returns null for a path outside the rail", () => {
     expect(activeDestination("/")).toBeNull();
     expect(activeDestination("/dashboardx")).toBeNull();
+    // /profile is guarded and reachable, but reached from the account block rather
+    // than the rail, so the page renders with no row marked active.
+    expect(activeDestination("/profile")).toBeNull();
   });
 
   it("keeps the registry flat so no href can shadow another", () => {
@@ -34,11 +37,12 @@ describe("activeDestination", () => {
 });
 
 describe("APP_DESTINATIONS", () => {
-  it("renders dashboard, connections and profile in that order", () => {
+  it("renders dashboard and connections in that order", () => {
+    // `/profile` is deliberately absent: the account block in the rail's footer
+    // already offers Profile, and a second way to the same page is noise.
     expect(APP_DESTINATIONS.map((d) => d.href)).toEqual([
       "/dashboard",
       "/connections",
-      "/profile",
     ]);
   });
 

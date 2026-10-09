@@ -7,14 +7,21 @@ Hardening the built surface: read paths and tenant isolation are done **and prov
 Postgres for both gated tables** (integration tier, 9 tests, 2026-09-25); `api_credentials` is now
 *read* (status only, at `/connections`); the admin panel writes **provisioning only** — clients and
 members, through five `public` definer RPCs, with no credential writes and no sync trigger (2026-10-06);
-the **sync pipeline is still the next unit** and is blocked on a worker-hosting decision (see Open
-Questions 2).
+the shell around every authenticated page was rebuilt on the shadcn sidebar primitive — collapsible
+icon rail, phone drawer, and the account block moved into the rail's footer (2026-10-09, **not yet
+committed**); the **sync pipeline is still the next unit** and is blocked on a worker-hosting
+decision (see Open Questions 2).
 
 ## Current Goal
-Nothing in flight. Last change opened the admin provisioning panel (`/admin`, five definer RPCs, the
-four HTTP verbs and their commit-on-change rows, 2026-10-06) and put its migration on the hosted
-project (2026-10-08), so the panel now serves against hosted data rather than only the local stack
-(see Recent Work). Before that, every authenticated page got one shell
+One thing is in flight, and it is only a git decision: the app shell's navigation pass
+(2026-10-09) — the rail collapses to icons, the destinations move into an off-canvas drawer below
+768px, and the profile menu left the dashboard header for the rail's footer, fed by a new
+`GET /api/auth/me` so `/dashboard` stays prerendered — is written, verified and **uncommitted** on
+`feat/rail-collapse-nav-user`, branched off `origin/main` and pushed nowhere. See In Progress.
+Two uncommitted scopes now share that working tree: the landing CTA → demo sign-in change
+(2026-10-09, see Recent Work) touches no shell file, so it commits separately from the rail work.
+Before it, the admin provisioning panel landed (2026-10-06) and its migration reached the hosted
+project (2026-10-08). Before that, every authenticated page got one shell
 (`app/(app)/` + a destination rail) and the read-only `/connections` status page landed (2026-09-25 —
 see Completed); before that the build's dynamic-`readFile` tracing warning went away and the auth
 routes were pinned to the dark palette (2026-09-25 — see Recent Work), and before that the landing
@@ -170,11 +177,136 @@ page's claims were made to match the build and the first live-RLS integration sl
   - **What the demo cards prove, and don't.** Local data now covers 3 demo clients, 4 placeholder `api_credentials` rows and 2 fixture rows, but **no local `users` row is linked to the three demo clients** (`scripts/create-demo-user.mjs:39-42` binds one client-role user to one client), so `/connections` shows the demo cards only for an **admin** session; a client-role user sees only its own `rls-test` tenant.
 
 ## In Progress
-- Nothing in flight. The admin provisioning slice landed 2026-10-06 and its migration reached the
-  hosted project 2026-10-08 — see the entry at the top of Recent Work. Two decisions it left behind
-  are recorded under Open Questions 10 and 11.
+- **Code done, git decision pending.** The app shell navigation pass (2026-10-09 — see the top of
+  Recent Work) is written, gate-green and browser-verified, but sits **uncommitted** on
+  `feat/rail-collapse-nav-user` (branched off `origin/main`, no remote, no push, no PR — King's
+  call, and each of those needs its own yes).
+- **One thing this pass could not run here.** Six `@auth` admin specs (`tests/admin/e2e/layout.spec.ts`
+  ×4, `tests/admin/e2e/panel.spec.ts` ×2) stop at
+  `ADMIN_EMAIL / ADMIN_PASSWORD are not in the environment` — `.env` defines only the demo pair, and
+  `tests/helpers/log-in.ts` throws before it reaches the browser. They failed the same way before this
+  change, so nothing regressed, but it means the admin-facing shell assertions — including the
+  `layout.spec.ts` drawer fix made in this same pass — are **unexecuted**. Creating the second admin
+  also collides with Open Question 11.
+- The admin provisioning slice landed 2026-10-06 and its migration reached the hosted project
+  2026-10-08. Open Question 10 (the admin door could be absent) closed with the shell work; Open
+  Question 11 is still King's call.
 
 ## Recent Work
+
+- **Landing: the CTA now reaches the demo** (2026-10-09) — King asked that `Get started` send
+  visitors to sign-in and that the page tell them a demo account exists. Both primary CTAs
+  (`landing-hero.tsx`, and the trust-band `Get started free` in `landing-page.tsx`) point at
+  `/auth/login` instead of `/auth/sign-up`, and the hero gained one `text-landing-faint` line:
+  *"No account needed — the sign-in page opens the demo dashboard in one click."* The credential
+  itself stays off the landing page deliberately: `/` is prerendered `○`, CI builds it with no
+  `DEMO_EMAIL` (grep of `.github/workflows/ci.yml` finds none, so an env-fed hint would render
+  nothing there), and the login page's existing `DemoAccess` card is the one-click entry — it
+  shows the email and never the password, which is what `tests/identity/unit/demo-creds.test.ts`
+  guards. Verified: `pnpm exec playwright test --project=public tests/landing/e2e/marketing.spec.ts`
+  → `3 passed`, having first failed on the old `href="/auth/sign-up"`. `ui-context.md`'s landing
+  bullet claimed the page had no CTAs and no footer; both were already false, so it now describes
+  what renders.
+
+- **App shell: collapsible rail, phone drawer, and the account block moved into the rail**
+  (2026-10-09) — feature spec `context/feature-specs/08-app-shell.md` rewritten; branch
+  `feat/rail-collapse-nav-user` off `origin/main`, **uncommitted**. King asked for a collapsible,
+  mobile-friendly side nav and for the profile menu to leave the top navbar for a shadcn-style
+  `nav-user` row.
+  - **The rail is now the shadcn `Sidebar` primitive** (`components/ui/sidebar.tsx`, `sheet.tsx`,
+    `tooltip.tsx`, `skeleton.tsx`, `separator.tsx` via CLI, plus `hooks/use-mobile.ts`), added not
+    edited, so `components/ui/*` stays untouched. Two things about this stack are load-bearing and
+    were not obvious: the CLI runs the **base-nova** style (Base UI 1.8.0, not Radix), so
+    composition is `render={<Link/>}` + `useRender`, and `cn` resolves from `"cn"`; and the
+    primitive ships `bg-sidebar` / `text-sidebar-foreground` / `ring-sidebar-ring` **with no
+    values**, so `@theme inline` in `app/globals.css` now aliases all six onto existing app tokens.
+    Without that mapping the classes compile to no utility and the rail is transparent.
+    `--sidebar-width` is overridden to 15rem because the primitive's 16rem is wider than the
+    documented `w-60`; the 3rem icon width already matched.
+  - **`/dashboard` stayed `○`, and that decided the architecture.** The shell may not read a
+    session or a cookie, so identity arrives over the wire: a new `GET /api/auth/me`
+    (`{ profile }` from `getProfileView()`, 401 / 503, `no-store` + `Vary: Cookie`) that
+    `NavUser` fetches client-side. Collapse state likewise lives in `localStorage`
+    (`app-shell:sidebar-open`) behind `useSyncExternalStore` with
+    `getServerSnapshot() === true` — not the primitive's cookie, which a server would have to read
+    back. Cost, accepted out loud: a collapsed user sees the expanded rail for one frame.
+    `useSyncExternalStore` is also what kept this lint-clean; `setState` in an effect trips
+    `react-hooks/set-state-in-effect`.
+  - **Below 768px** the destinations live in a `Sheet` drawer opened from `MobileNav`, a sticky
+    `h-12 md:hidden` bar that also puts the brand mark back on `/connections` and `/profile`,
+    which showed none. `AccountMenu` is deleted and the dashboard header lost its account slot.
+  - **Two real bugs surfaced, one pre-existing.** (1) The dashboard wrote its selection with a raw
+    `window.history.replaceState({}, "", url)`; the `{}` erases the state Next stamped on the
+    entry, and the **next `<Link>` click is then dropped entirely** — no `pushState` is recorded at
+    all. Traced with a `replaceState`/`pushState` wrapper, fixed by passing `window.history.state`
+    (`app/(app)/dashboard/dashboard-view.tsx`, both call sites). Reproduced on `origin/main`'s rail
+    too, so it predates this work; the `?tab=` write in the same file was tested and self-heals, so
+    it was left alone. (2) The drawer stayed open over the page it navigated to — a modal over the
+    next page. Every destination link and every account action now closes it.
+    Two more were mine and are fixed: the account menu overflowed a 390px viewport from inside the
+    drawer (`align="start" side="top"` there), and `ProfileDialog` opened *behind* the drawer and
+    then vanished with it, because closing the drawer unmounts the subtree that owns it — on phones
+    the Profile row navigates to `/profile` instead.
+  - **Two e2e flakes, diagnosed rather than retried away.** The trigger is inside a prerendered
+    page, so a click before hydration is swallowed and the rail never collapses —
+    `logIn()` returns when the URL settles, which on a cold dev compile is earlier.
+    `tests/helpers/wait-for-account-row.ts` is the witness (`aria-haspopup="menu"` appears when
+    `/api/auth/me` answers, which cannot happen pre-hydration); `rail.spec.ts` awaits it in
+    `beforeEach` and `open-account-menu.ts` reuses it. Separately, the dev toolbar mounts a
+    `nextjs-portal` in the bottom-left corner — exactly where the rail's own trigger sits — and
+    intermittently intercepts the pointer. The rail specs now activate that native button with
+    keyboard Enter, which is dev-artifact-proof and asserts the collapse is keyboard operable.
+    `devIndicators: false` was not used: that would change every developer's toolbar to please a
+    spec.
+  - **Specs.** `tests/dashboard/e2e/rail.spec.ts` rewritten (six tests: destinations +
+    `aria-current`, active row survives `?client&days&tab`, collapse to 48px and back, collapsed
+    survives a reload, drawer navigation + `toBeHidden()`, no sideways scroll at 320/390/414).
+    New `tests/identity/e2e/nav-user.spec.ts` (the row names the signed-in account; the menu offers
+    Profile and Log out — `@auth` is read-only, so Log out is never pressed) and
+    `tests/identity/unit/me-route.test.ts` (4). `tests/admin/e2e/panel.spec.ts` no longer hunts for
+    a client with synced metrics: the block lives in the shell, so the Admin item exists on any
+    page. `tests/dashboard/e2e/mobile-layout.spec.ts` dropped `"Account menu"` from the header
+    action list. `tests/admin/e2e/layout.spec.ts`'s "rail renders with nothing active" had to open
+    the drawer — at 320/390 there is no rail in the document at all, so the old
+    `nav[aria-label='Sections']:visible` count-1 assertion is false now.
+  - **Verified.** `pnpm test` → `Test Files 37 passed (37)` / `Tests 230 passed (230)` ·
+    `pnpm typecheck` → silent · `pnpm lint` → silent · `pnpm build` →
+    `┌ ○ /`, `├ ○ /dashboard`, `├ ƒ /api/auth/me`, `├ ƒ /admin`, `├ ƒ /connections` ·
+    `pnpm test:e2e` → `9 passed` · `pnpm test:e2e:auth` → `24 passed / 6 failed`, and all six are
+    `ADMIN_EMAIL / ADMIN_PASSWORD are not in the environment` thrown by `logIn` before any
+    navigation — pre-existing, not a regression, and it means the admin-facing shell specs (and the
+    `layout.spec.ts` fix above) ran **zero** times here. Also checked by hand in Chrome against a
+    production build: 240px ↔ 48px, labels clipped when collapsed, avatar initial + name + email +
+    chevron in the footer, hamburger bar and 293px drawer at 390px, `/profile` reachable from the
+    drawer, no sideways scroll at 320/390/414.
+  - **Four refinements after manual testing (same day).** (1) `SidebarTrigger` moved out of the
+    footer and into the header, right of the wordmark — the collapse control now sits where the
+    rail's own edge is. The collapsed header has 2rem of content width, one element per row, so the
+    row flips to `flex-col` there and the trigger drops below the brand tile. (2) The account row's
+    `ChevronDown` became `ChevronRight`: the menu opens sideways off the rail edge, and a down
+    chevron promised a panel below it. (3) The row gained the `profile.role` as its own span —
+    first drafted under the email, then moved **above** the name on review, at `text-[10px]
+    uppercase tracking-wide text-primary` (brand red, no chip) — which pushed it past the
+    `size="lg"` variant's fixed `h-12`, so the
+    button carries `h-auto py-2`; `size-8!` still wins in the collapsed rail, where only the avatar
+    survives. (4) `Profile` was deleted from `APP_DESTINATIONS`: the account block *is* the profile
+    entry, so the rail now lists Dashboard and Connections for everyone. `/profile` remains in
+    `PROTECTED_PREFIXES` and keeps its page; it simply renders with no active row, the same state
+    `/admin` has always had. `tests/platform/unit/destinations.test.ts` flipped to the two-item
+    list and asserts `activeDestination("/profile")` is `null`; `rail.spec.ts` asserts the Profile
+    link is *absent*; `nav-user.spec.ts` asserts the row carries the role.
+  - **Verified (refinements).** `pnpm typecheck` and `pnpm lint` → silent · `pnpm test` →
+    `Test Files 37 passed (37)` / `Tests 230 passed (230)` ·
+    `pnpm exec playwright test --project=auth rail.spec.ts nav-user.spec.ts` → `17 passed`.
+    Row geometry read from the DOM rather than from a screenshot: expanded `223px × 71.7px`,
+    collapsed `32px × 32px` `overflow:hidden` under `data-collapsible="icon"`. After the role moved
+    above the name, the same probe reads the row's spans `client` (10px, `rgb(255,59,48)` =
+    `--accent-primary`) → `Demo User` (14px) → `demo@seoreporting.app` (12px). One scare resolved:
+    an earlier footer screenshot showed a large **N**
+    over the avatar, and it is the `nextjs-portal` dev toolbar's logomark painted over the
+    bottom-left corner of the viewport — the same artifact that intercepted the pointer earlier in
+    this entry. Not in a production build, and the avatar renders its `D`.
+
 
 - **Admin panel: provisioning** — spec `docs/superpowers/specs/2026-10-05-admin-panel-provisioning-design.md`,
   plan `docs/superpowers/plans/2026-10-05-admin-provisioning.md` (13 tasks), feature spec
@@ -613,15 +745,16 @@ page's claims were made to match the build and the first live-RLS integration sl
      `s-maxage=300, stale-while-revalidate=60` so CDN == `CACHE_TTL_MS` == `unstable_cache
      revalidate`, the unit tests pin the header, and `architecture-context.md` records the
      invariant and its resolution.
-  10. **The admin panel's only entry point can be absent.** `AccountMenu` is rendered by exactly one
-     file, `app/(app)/dashboard/dashboard-view.tsx`, and `components/features/dashboard/components/
-     dashboard.tsx`'s `EmptyShell` renders **no header** in its two no-data states. A new admin on a
-     project whose first accessible client has no synced rows therefore sees no route to `/admin` —
-     the panel is unreachable precisely when provisioning is what is needed. §4 of the spec chose the
-     menu because it already carried the role, and never asked whether the menu is always on screen.
-     Candidates: a role-gated fourth rail destination (the row `08-app-shell.md` retired), a link
-     inside `EmptyShell`, or a header of the panel's own. Design gap, not a bug: the gate itself is
-     sound. Opened 2026-10-06, still King's call.
+  10. ~~**The admin panel's only entry point can be absent.**~~ **Closed 2026-10-09.** `AccountMenu`
+     was rendered by exactly one file, `app/(app)/dashboard/dashboard-view.tsx`, and
+     `components/features/dashboard/components/dashboard.tsx`'s `EmptyShell` renders **no header** in
+     its two no-data states — so a new admin whose first accessible client had no synced rows saw no
+     route to `/admin`, precisely when provisioning is what is needed. §4 of the spec chose the menu
+     because it already carried the role, and never asked whether the menu is always on screen. The
+     account block moved into the app shell instead of adding a role-gated rail row: `NavUser` renders
+     on every authenticated page including the empty states, so the door is always there, and the rail
+     still renders three destinations for everyone (`/api/auth/me`, client-side, keeps the shell itself
+     session-free). `AccountMenu` is deleted.
   11. **One stack cannot host both the bootstrap admin and the last-admin cases.**
      `tests/admin/integration/provisioning.test.ts` asserts the global precondition `admins == 1`, and
      its attach case takes `before.data![0]` with no `order by` — so a second admin row (which is what

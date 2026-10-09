@@ -104,6 +104,7 @@ faked PostgREST.
 
 | Route | Method | Auth | Notes |
 | --- | --- | --- | --- |
+| `/api/auth/me` | GET | session | `ProfileView` for the rail's account block; 401 with no session, 503 on a read failure, `no-store` + `Vary: Cookie`. Exists because the shell stays session-free, so identity has to arrive over the wire |
 | `/api/dashboard/boot` | GET | session | one payload for the whole dashboard boot: profile + accessible clients + selection |
 | `/api/metrics/[clientId]/overview` | GET | session + gate | `?days=` (default 7), `unstable_cache` |
 | `/api/metrics/[clientId]/keywords` | GET | session + gate | `?source=gsc\|ga4\|semrush`, rank history |
@@ -138,12 +139,19 @@ Planned and absent: `POST /api/sync/trigger`, `GET /api/metrics/{clientId}`,
 `/terms`, plus `app/auth/callback/route.ts` (PKCE exchange). `/dashboard`, `/profile`,
 `/connections` and `/admin` live in the `app/(app)/` route group — the group folder adds no URL
 segment — under one server-component shell (`app/(app)/layout.tsx` →
-`components/features/app-shell`) whose rail renders its links from `lib/navigation/destinations.ts`;
-the shell reads no session, so it cannot make a page dynamic. `/admin` is not a destination:
-`activeDestination("/admin")` is `null`, the rail renders three links with none active, and the only
-visible entry is the role-gated item in `AccountMenu` — which the dashboard's `EmptyShell` states do
-not render, a gap tracked in `context/feature-specs/07-admin.md`. No `sitemap.ts`/`robots.ts`, and no
-LLM/Claude dependency.
+`components/features/app-shell`): a `collapsible="icon"` rail on `md+` (15rem ↔ 3rem, preference in
+`localStorage`, not the primitive's cookie) and a `Sheet` drawer below it opened from a `md:hidden`
+top bar that also carries the brand mark. Rail links come from `lib/navigation/destinations.ts` and
+close the drawer on click; the rail's footer holds `NavUser`, the only piece of identity in the
+shell, which fetches `/api/auth/me` after hydration. The shell itself reads no session, no cookie,
+so it cannot make a page dynamic — which is also why `/api/auth/me` exists. `/admin` is not a
+destination: `activeDestination("/admin")` is `null`, the rail renders its two links with none active,
+and the entry is the role-gated Admin item in `NavUser`. `/profile` is in the same state — its rail
+row was deleted as a duplicate of that block, which carries Profile and Edit profile. Because
+`NavUser` sits in the shell and
+not in the dashboard header, the admin door is now open on the `EmptyShell` states too — the gap
+`context/feature-specs/07-admin.md` tracked is closed, and `AccountMenu` is deleted.
+No `sitemap.ts`/`robots.ts`, and no LLM/Claude dependency.
 
 `lib/cache/invalidate.ts` owns `DASHBOARD_OVERVIEW_TAG = "dashboard-overview"`; revalidation happens
 only through `POST /api/revalidate/dashboard` (`revalidateTag(tag, profile)`), never from the worker.
@@ -183,9 +191,9 @@ business logic.
 
 | test folder | owns |
 | --- | --- |
-| `identity` | `lib/agents/authAgent`, `lib/auth/{cron,routing}`, `lib/supabase/*`, `proxy.ts`, the `/auth/*` pages, `components/features/{user-profile,email-password-auth}/lib` |
+| `identity` | `lib/agents/authAgent`, `lib/auth/{cron,routing}`, `lib/supabase/*`, `proxy.ts`, the `/auth/*` pages, `components/features/{user-profile,email-password-auth}/lib`, `/api/auth/me`, and the rail's account block (`components/features/app-shell/components/nav-user.tsx`) — the invariant it protects is identity and sign-out, not rail chrome |
 | `tenant-isolation` | `canAccessClient` / `listAccessibleClients`, `listConnections` + `lib/connections/status`, and the RLS policies behind all three |
-| `dashboard` | `/api/dashboard/boot`, both `/api/metrics/*` routes, `lib/dashboard/*`, `lib/cache/*` tag ownership, `/dashboard` and the `app/(app)/` shell + rail it shares (`tests/dashboard/e2e/rail.spec.ts`) |
+| `dashboard` | `/api/dashboard/boot`, both `/api/metrics/*` routes, `lib/dashboard/*`, `lib/cache/*` tag ownership, `/dashboard` and the `app/(app)/` shell it shares: the rail, its collapse/drawer behaviour and `MobileNav` (`tests/dashboard/e2e/rail.spec.ts`) |
 | `export` | `/api/exports/[clientId]/{csv,pdf}`, `lib/exports/*`, the export menu |
 | `admin` | `lib/admin/*`, `components/features/admin`, the three `/api/admin/*` routes, `app/(app)/admin/`, and `tests/admin/integration/provisioning.test.ts` — the anonymous `/admin` redirect spec is the one exception: `tests/identity/e2e/admin-guard.spec.ts` sits in `identity` because the rule it protects is `lib/auth/routing`'s |
 | `sync` | `/api/cron/sync`, `/api/revalidate/dashboard`, `lib/queue/*` |
