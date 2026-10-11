@@ -37,6 +37,7 @@ This file describes only code that exists. Design intent for what is **not** bui
 ```
 proxy.ts (session refresh via updateSession)
   → app/api route handler
+    → lib/api/guard.ts          — 401/403/503 shape + the gates, shared by the nine session-gated route files
     → lib/agents/authAgent      — identity + role
     → lib/db/repository         — RLS-backed tenant gate, then metric reads
   → components/features/*       — dashboard reads /api/dashboard/boot client-side
@@ -61,6 +62,12 @@ proxy.ts (session refresh via updateSession)
 - `listConnections()` composes those two reads for `/connections` (`clients`, then
   `api_credentials`) and adds no ownership rule of its own.
 - No route or helper may re-implement "is this the caller's client?" in TypeScript.
+- `lib/api/guard.ts` holds the response shape only — `NO_STORE`, `json`/`badRequest`/`unauthorized`/
+  `forbidden`/`databaseFailure`, and the gates `gateNullable`/`gateSession`/`gateAdmin` (typed
+  `Gate<null>`; `requireAdmin()` returns no user)/`gateClientAccess`/`resolveAccessibleClient` — and
+  is a thin caller of the two RLS probes (`gateClientAccess` → `canAccessClient`,
+  `resolveAccessibleClient` → `listAccessibleClients`); it owns no ownership rule. `lib/admin/http.ts`,
+  which used to own the admin trio's shape, is deleted.
 - Metric/keyword reads deliberately use the service-role client (`getAdminDb()`, RLS bypassed)
   because they run inside `unstable_cache`; they are reachable only with a `client_id` that already
   cleared the gate.
@@ -102,14 +109,18 @@ faked PostgREST.
 
 ## HTTP surface (what actually exists)
 
+Ten handlers in nine session-gated route files (`find app/api -name route.ts` → 11 files; the two
+bearer routes are the exception) share one response-shape and gate module, `lib/api/guard.ts` — see
+Tenant isolation above.
+
 | Route | Method | Auth | Notes |
 | --- | --- | --- | --- |
-| `/api/auth/me` | GET | session | `ProfileView` for the rail's account block; 401 with no session, 503 on a read failure, `no-store` + `Vary: Cookie`. Exists because the shell stays session-free, so identity has to arrive over the wire |
+| `/api/auth/me` | GET | session | `ProfileView` for the rail's account block; 401 with no session, 503 on a read failure, `no-store` + `Vary: Cookie` via `NO_STORE`. Exists because the shell stays session-free, so identity has to arrive over the wire |
 | `/api/dashboard/boot` | GET | session | one payload for the whole dashboard boot: profile + accessible clients + selection |
 | `/api/metrics/[clientId]/overview` | GET | session + gate | `?days=` (default 7), `unstable_cache` |
 | `/api/metrics/[clientId]/keywords` | GET | session + gate | `?source=gsc\|ga4\|semrush`, rank history |
-| `/api/exports/[clientId]/csv` | GET | session + gate | streams via `lib/exports/server.ts` |
-| `/api/exports/[clientId]/pdf` | GET | session + gate | pdf-lib + vendored Noto Sans TTFs |
+| `/api/exports/[clientId]/csv` | GET | session + gate | streams via `lib/exports/server.ts`, attachment headers spread `NO_STORE` |
+| `/api/exports/[clientId]/pdf` | GET | session + gate | pdf-lib + vendored Noto Sans TTFs, attachment headers spread `NO_STORE` |
 | `/connections` (page) | GET | session + RLS | server page; reads `api_credentials` per tenant, no cache |
 | `/admin` (page) | GET | session + `requireAdmin()` | server page in the `app/(app)/` group; renders clients + members; redirects a non-admin to `/dashboard` |
 | `/api/admin/clients` | POST | session + `requireAdmin()` | `admin_create_client()` definer RPC; user-scoped client |
@@ -163,7 +174,11 @@ underlying defect in the shared `lib/db` error wrapper stays open deliberately, 
 `/admin` carries the same declaration for the same reason — `getAdminView()` is cookie-bound — so it
 builds as `ƒ` while `/dashboard` remains `○`: the shell still reads no session, which is exactly why
 the rail cannot mark a row active on an admin page. The panel's writes are client-side `fetch` calls
-to `/api/admin/*` followed by `router.refresh()`, and the refresh runs only on a 2xx.
+to `/api/admin/*` followed by `router.refresh()`, and the refresh runs only on a 2xx. Those routes'
+denials, 503s and success envelopes (`json({ client })` / `json({ member })`) come from
+`lib/api/guard.ts` (`lib/admin/http.ts` is deleted); the two export routes are the place a
+session-gated handler still builds its own success `Response`, taking only the `NO_STORE` headers from
+the guard.
 `is_stale` is a stored column the UI only reads — `markMetricsStale()` exists but nothing calls it,
 so the stale banner can never fire yet.
 
@@ -198,7 +213,7 @@ business logic.
 | `admin` | `lib/admin/*`, `components/features/admin`, the three `/api/admin/*` routes, `app/(app)/admin/`, and `tests/admin/integration/provisioning.test.ts` — the anonymous `/admin` redirect spec is the one exception: `tests/identity/e2e/admin-guard.spec.ts` sits in `identity` because the rule it protects is `lib/auth/routing`'s |
 | `sync` | `/api/cron/sync`, `/api/revalidate/dashboard`, `lib/queue/*` |
 | `landing` | `/`, `/privacy`, `/terms`, `components/features/landing/*` |
-| `platform` | cross-cutting primitives with no owning feature — `lib/rate-limit.ts`, `lib/navigation/destinations.ts`, the connections catalog |
+| `platform` | cross-cutting primitives with no owning feature — `lib/api/guard.ts`, `lib/rate-limit.ts`, `lib/navigation/destinations.ts`, the connections catalog |
 
 A test goes in the feature that owns the *invariant the test protects*, not the file it imports.
 `lib/rate-limit.ts` has consumers in three features, so it belongs to none of them.
