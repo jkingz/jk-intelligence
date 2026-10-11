@@ -205,6 +205,19 @@ page's claims were made to match the build and the first live-RLS integration sl
 
 ## Recent Work
 
+- **Guard follow-up: the fixed cache headers win over `extra`** (2026-10-12) — review finding on
+  unit 2. `json()` spread `extra` last, so any route could have replaced `Cache-Control` / `Vary`
+  and the shared helper no longer owned its cache policy. No caller passed `extra` in `app/` (only
+  `guard.test.ts` did, with `Retry-After`), so this is the contract, not a live leak. `json()` now
+  builds a `Headers` and `set`s `Content-Type` plus every `NO_STORE` entry after the caller's, so a
+  lowercase `cache-control` replaces instead of appending (`new Headers({...})` would have combined
+  the two into `public, s-maxage=60, no-store`). `NO_STORE` stays a spreadable object — the two
+  attachment routes still spread it into their own `ResponseInit`. Test first:
+  `tests/platform/unit/guard.test.ts` "keeps the cache pair even when a caller tries to replace it"
+  failed with `expected 'public, s-maxage=60' to be 'no-store'` before the change. Verified:
+  `pnpm test` → `38 passed (38)` / `249 passed (249)` (248 before, +1 test), `pnpm typecheck`
+  silent, `pnpm lint` no output, `pnpm build` green.
+
 - **API hardening, unit 2: one gate behind the nine session-gated route files** (2026-10-11) —
   plan `docs/superpowers/plans/2026-10-11-api-guard.md`, built on `fix/metrics-cache-posture`
   beside unit 1 (one PR, per King). `lib/api/guard.ts` now owns the response shape (`NO_STORE`,

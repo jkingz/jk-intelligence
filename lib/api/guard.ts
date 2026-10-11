@@ -17,12 +17,17 @@ export const NO_STORE = {
   Vary: "Cookie",
 } as const;
 
-/** `extra` exists for the one header that is not a cache decision: `Retry-After`. */
+/**
+ * `extra` exists for the one header that is not a cache decision: `Retry-After`.
+ * It cannot replace the cache pair — the fixed headers are set afterwards, and
+ * with `set` rather than a spread, so a lowercase `cache-control` in `extra`
+ * would otherwise append to `no-store` instead of overriding it.
+ */
 export function json(body: unknown, status: number, extra?: Record<string, string>): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json", ...NO_STORE, ...extra },
-  });
+  const headers = new Headers(extra);
+  headers.set("Content-Type", "application/json");
+  for (const [name, value] of Object.entries(NO_STORE)) headers.set(name, value);
+  return new Response(JSON.stringify(body), { status, headers });
 }
 
 export function badRequest(message: string): Response {

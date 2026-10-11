@@ -62,6 +62,17 @@ describe("response shape", () => {
     expect(response.status).toBe(429);
   });
 
+  it("keeps the cache pair even when a caller tries to replace it", () => {
+    const response = json({ ok: true }, 200, {
+      "Cache-Control": "public, s-maxage=60",
+      vary: "Accept-Encoding",
+      "Retry-After": "42",
+    });
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(response.headers.get("Vary")).toBe("Cookie");
+    expect(response.headers.get("Retry-After")).toBe("42");
+  });
+
   it("keeps the zod sentence the caller wrote", () => {
     const parsed = z.object({ name: z.string().min(3) }).safeParse({ name: "a" });
     expect(parsed.success).toBe(false);
