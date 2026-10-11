@@ -8,18 +8,24 @@ Postgres for both gated tables** (integration tier, 9 tests, 2026-09-25); `api_c
 *read* (status only, at `/connections`); the admin panel writes **provisioning only** — clients and
 members, through five `public` definer RPCs, with no credential writes and no sync trigger (2026-10-06);
 the shell around every authenticated page was rebuilt on the shadcn sidebar primitive — collapsible
-icon rail, phone drawer, and the account block moved into the rail's footer (2026-10-09, **not yet
-committed**); the **sync pipeline is still the next unit** and is blocked on a worker-hosting
-decision (see Open Questions 2).
+icon rail, phone drawer, and the account block moved into the rail's footer (2026-10-09, merged as
+PR #23 on 2026-10-09); an **API hardening pass** opened on 2026-10-10 (cache posture, one route gate,
+one column privilege — spec `docs/superpowers/specs/2026-10-10-api-hardening-design.md`); the
+**sync pipeline is still the next unit** and is blocked on a worker-hosting decision (see Open
+Questions 2).
 
 ## Current Goal
-One thing is in flight, and it is a review, not a build: the app shell's navigation pass
-(2026-10-09) — the rail collapses to icons, the destinations move into an off-canvas drawer below
-768px, and the profile menu left the dashboard header for the rail's footer, fed by a new
-`GET /api/auth/me` so `/dashboard` stays prerendered — and the landing CTA → demo sign-in change are
-committed (`c6e340d`, `bd1e84a`) on `feat/rail-collapse-nav-user`, branched off `origin/main`, and
-opened as **PR #23** against `main`. Merge is King's call and ungiven. See In Progress.
-Before it, the admin provisioning panel landed (2026-10-06) and its migration reached the hosted
+Three separately-reviewable units, from a gap review that checked each suspected vulnerability
+against the code and against platform docs before building anything:
+
+1. **Cache posture** — both metrics routes stop claiming a CDN leg that never existed (done,
+   unit 1 below).
+2. **`lib/api/guard.ts`** — one gate and one response shape for the 9 session-gated route handlers.
+3. **`credential_reference`** — revoke the column from `authenticated` and prove it at live Postgres.
+
+The shell pass it follows is **done and merged**: `c6e340d` + `bd1e84a` went in as PR #23
+(https://github.com/jkingz/jk-intelligence/pull/23) at 2026-10-09T13:20Z.
+Before that, the admin provisioning panel landed (2026-10-06) and its migration reached the hosted
 project (2026-10-08). Before that, every authenticated page got one shell
 (`app/(app)/` + a destination rail) and the read-only `/connections` status page landed (2026-09-25 —
 see Completed); before that the build's dynamic-`readFile` tracing warning went away and the auth
@@ -176,11 +182,13 @@ page's claims were made to match the build and the first live-RLS integration sl
   - **What the demo cards prove, and don't.** Local data now covers 3 demo clients, 4 placeholder `api_credentials` rows and 2 fixture rows, but **no local `users` row is linked to the three demo clients** (`scripts/create-demo-user.mjs:39-42` binds one client-role user to one client), so `/connections` shows the demo cards only for an **admin** session; a client-role user sees only its own `rls-test` tenant.
 
 ## In Progress
-- **Pushed, PR open.** The app shell navigation pass and the landing CTA change (both 2026-10-09 —
-  see the top of Recent Work) are committed as `c6e340d` and `bd1e84a`, pushed to
-  `origin/feat/rail-collapse-nav-user`, and submitted as **PR #23** against `main`
-  (https://github.com/jkingz/jk-intelligence/pull/23). Merging is King's call and has **not** been
-  given. This tracker edit is the only uncommitted change on the branch.
+- **API hardening pass (2026-10-10), three branches, three PRs.** Spec:
+  `docs/superpowers/specs/2026-10-10-api-hardening-design.md`. Unit 1 (`fix/metrics-cache-posture`)
+  is built and green on the four gates; units 2 (`lib/api/guard.ts`) and 3 (the
+  `credential_reference` column revoke) follow. Nothing here is committed, pushed or applied to
+  hosted without King's own yes, and unit 3's migration reaches **local** only until it does.
+- **PR #23 merged.** The app shell navigation pass and the landing CTA change (both 2026-10-09)
+  landed on `main` at 2026-10-09T13:20Z as merge `ac9dfe3`.
 - **One thing this pass could not run here.** Six `@auth` admin specs (`tests/admin/e2e/layout.spec.ts`
   ×4, `tests/admin/e2e/panel.spec.ts` ×2) stop at
   `ADMIN_EMAIL / ADMIN_PASSWORD are not in the environment` — `.env` defines only the demo pair, and
@@ -193,6 +201,36 @@ page's claims were made to match the build and the first live-RLS integration sl
   Question 11 is still King's call.
 
 ## Recent Work
+
+- **API hardening, unit 1: the metrics routes stop claiming a CDN they never had** (2026-10-10) —
+  the gap review King asked for after PR #23 merged. Both routes answered the tenant-gated payload
+  with `Cache-Control: public, s-maxage=300, stale-while-revalidate=60` + `Vary: Cookie`, and
+  `architecture-context.md` recorded that as a three-way bound pinned by two unit tests. Per
+  Vercel it was never a cache: Vary "combines the cache key with the values of any request headers
+  specified in Vary", and `Cookie` is a denied high-cardinality header — the CDN returns
+  `x-vercel-cache: MISS` with reason `vary_key_denied:cookie`
+  ([changelog 2026-09-30](https://vercel.com/changelog/vary-cookie-responses-no-longer-cached)),
+  while the cache key stays method/URL/host/scheme and "cache keys are not configurable". So no
+  tenant's data could reach another (the fear), but the recorded invariant was fiction **and** the
+  safety was accidental: tenant isolation rested on a header picked for performance, and deleting
+  `Vary` would turn `s-maxage` into a URL-keyed edge cache of per-tenant data with the RLS gate
+  skipped on the hit. Both routes now send `no-store` + `Vary: Cookie`, matching the nine other
+  authenticated responses; the surviving bound is the two-way `CACHE_TTL_MS` == `unstable_cache
+  revalidate` == 300s. `overview-route.test.ts` and `keywords-route.test.ts` now assert the
+  absence of `public|s-maxage|stale-while-revalidate` — the security property, pinned by a test
+  instead of by a caching header. Docs corrected in the same change: `architecture-context.md`
+  (invariant rewritten), `code-standards.md` (the "or an explicit short `s-maxage`" allowance
+  removed — it invited exactly this), `04-dashboard.md` (claimed the overview `s-maxage` was 60,
+  stale twice over), Open Question 9 re-opened and closed on the record. Verified: `pnpm test` →
+  `Test Files 37 passed (37)` / `Tests 231 passed (231)`, having first printed `3 failed` against
+  the old header — the red run is the evidence the assertions bite; `pnpm typecheck` silent,
+  `pnpm lint` no output, `pnpm build` green with both routes still `ƒ`. **Not verified live:** the
+  `vary_key_denied` behavior is sourced from platform docs, not from an `x-vercel-cache` response
+  header observed on a deployment. Three suspected gaps were checked and found **not** to need
+  work: CSRF (`@supabase/ssr` sets `sameSite: "lax"`, so a cross-site write arrives cookie-less),
+  `credential_reference` (a `vault:<uuid>` pointer, no key material), and env hygiene (no secret
+  behind a `NEXT_PUBLIC_*` name, no `console.*` in `app/` or `lib/`).
+
 
 - **Landing: the CTA now reaches the demo** (2026-10-09) — King asked that `Get started` send
   visitors to sign-in and that the page tell them a demo account exists. Both primary CTAs
@@ -745,6 +783,14 @@ page's claims were made to match the build and the first live-RLS integration sl
      `s-maxage=300, stale-while-revalidate=60` so CDN == `CACHE_TTL_MS` == `unstable_cache
      revalidate`, the unit tests pin the header, and `architecture-context.md` records the
      invariant and its resolution.
+     **Re-opened and closed differently 2026-10-10: there was never a CDN leg.** Vercel's CDN
+     refuses to cache a response whose `Vary` names `Cookie` (`vary_key_denied:cookie`, changelog
+     2026-09-30), so the 300s `s-maxage` produced a guaranteed MISS and the "three-way bound" was
+     fiction — while the header itself was the dangerous part, not the safe part: with `Vary`
+     dropped by any later edit, tenant data becomes URL-keyed edge cache and the RLS gate is
+     skipped on the hit. Both metrics routes now answer `no-store` + `Vary: Cookie` like every
+     other authenticated route, and the surviving bound is the two-way one that was always real:
+     `CACHE_TTL_MS` == `unstable_cache revalidate` == 300s. See Recent Work.
   10. ~~**The admin panel's only entry point can be absent.**~~ **Closed 2026-10-09.** `AccountMenu`
      was rendered by exactly one file, `app/(app)/dashboard/dashboard-view.tsx`, and
      `components/features/dashboard/components/dashboard.tsx`'s `EmptyShell` renders **no header** in
