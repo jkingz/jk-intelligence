@@ -1,3 +1,4 @@
+import { json, NO_STORE } from "@/lib/api/guard";
 import { exportFilename } from "@/lib/exports/filename";
 import { renderPdfReport } from "@/lib/exports/pdf";
 import { loadExportDataset } from "@/lib/exports/server";
@@ -14,14 +15,7 @@ export async function GET(
   try {
     pdf = await renderPdfReport(result.dataset);
   } catch {
-    return new Response(JSON.stringify({ error: "Report rendering failed" }), {
-      status: 503,
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-store",
-        Vary: "Cookie",
-      },
-    });
+    return json({ error: "Report rendering failed" }, 503);
   }
   const filename = exportFilename(
     result.dataset.client.name,
@@ -33,8 +27,7 @@ export async function GET(
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${filename}"`,
-      "Cache-Control": "no-store",
-      Vary: "Cookie",
+      ...NO_STORE,
     },
   });
 }

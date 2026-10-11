@@ -1,15 +1,15 @@
 import { z } from "zod";
 
 import { adminErrorMessage, adminErrorStatus } from "@/lib/admin/errors";
+import { AdminRpcError, callAdminRpc } from "@/lib/admin/rpc";
+import { updateClientBody } from "@/lib/admin/schemas";
 import {
   badRequest,
   firstIssueMessage,
-  jsonResponse,
+  gateAdmin,
+  json,
   readJsonBody,
-} from "@/lib/admin/http";
-import { AdminRpcError, callAdminRpc } from "@/lib/admin/rpc";
-import { updateClientBody } from "@/lib/admin/schemas";
-import { requireAdmin } from "@/lib/agents/authAgent";
+} from "@/lib/api/guard";
 
 const clientIdSchema = z.uuid();
 
@@ -17,13 +17,8 @@ export async function PATCH(
   request: Request,
   ctx: RouteContext<"/api/admin/clients/[clientId]">,
 ) {
-  const gate = await requireAdmin();
-  if (!gate.allow) {
-    return jsonResponse(
-      { error: gate.reason === "unauthenticated" ? "Unauthorized" : "Forbidden" },
-      gate.reason === "unauthenticated" ? 401 : 403,
-    );
-  }
+  const gate = await gateAdmin();
+  if (!gate.allow) return gate.response;
 
   const { clientId: rawClientId } = await ctx.params;
   const clientId = clientIdSchema.safeParse(rawClientId);
@@ -45,10 +40,10 @@ export async function PATCH(
       p_name: parsed.data.name,
       p_is_active: parsed.data.isActive,
     });
-    return jsonResponse({ client }, 200);
+    return json({ client }, 200);
   } catch (error) {
     const code = error instanceof AdminRpcError ? error.code : undefined;
-    return jsonResponse(
+    return json(
       { error: adminErrorMessage("admin_update_client", code) },
       adminErrorStatus(code),
     );

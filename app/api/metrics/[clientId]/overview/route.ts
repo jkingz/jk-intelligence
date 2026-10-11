@@ -1,10 +1,15 @@
 import { z } from "zod";
 
-import { getAuthUser } from "@/lib/agents/authAgent";
+import {
+  badRequest,
+  databaseFailure,
+  gateSession,
+  json,
+  resolveAccessibleClient,
+} from "@/lib/api/guard";
 import {
   getCachedDashboardOverview,
   getCachedKeywordHistory,
-  listAccessibleClients,
 } from "@/lib/db/repository";
 import {
   DASHBOARD_RANGES,
@@ -20,16 +25,7 @@ export async function GET(
 ) {
   const { clientId: rawClientId } = await ctx.params;
   const clientId = clientIdSchema.safeParse(rawClientId);
-  if (!clientId.success) {
-    return new Response(JSON.stringify({ error: "Invalid client id" }), {
-      status: 400,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-store',
-        'Vary': 'Cookie'
-      }
-    });
-  }
+  if (!clientId.success) return badRequest("Invalid client id");
 
   const rawDays = Number(
     new URL(request.url).searchParams.get("days") ?? DEFAULT_DAYS,
@@ -38,53 +34,20 @@ export async function GET(
     ? rawDays
     : DEFAULT_DAYS;
 
+  const session = await gateSession();
+  if (!session.allow) return session.response;
+
+  const access = await resolveAccessibleClient(clientId.data);
+  if (!access.allow) return access.response;
+
   try {
-    const user = await getAuthUser();
-    if (!user) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), {
-        status: 401,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-store',
-          'Vary': 'Cookie'
-        }
-      });
-    }
-
-    const clients = await listAccessibleClients();
-    const client = clients.find((c) => c.id === clientId.data) ?? null;
-    if (!client) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), {
-        status: 403,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-store',
-          'Vary': 'Cookie'
-        }
-      });
-    }
-
     const [overview, history] = await Promise.all([
-      getCachedDashboardOverview(client, days),
-      getCachedKeywordHistory(client, days),
+      getCachedDashboardOverview(access.value, days),
+      getCachedKeywordHistory(access.value, days),
     ]);
-    return new Response(JSON.stringify({ overview, history }), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-store',
-        'Vary': 'Cookie'
-      }
-    });
+    return json({ overview, history }, 200);
   } catch {
-    return new Response(JSON.stringify({ error: "Database operation failed" }), {
-      status: 503,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-store',
-        'Vary': 'Cookie'
-      }
-    });
+    return databaseFailure();
   }
 }
 

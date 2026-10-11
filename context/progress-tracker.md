@@ -20,7 +20,8 @@ against the code and against platform docs before building anything:
 
 1. **Cache posture** — both metrics routes stop claiming a CDN leg that never existed (done,
    unit 1 below).
-2. **`lib/api/guard.ts`** — one gate and one response shape for the 9 session-gated route handlers.
+2. **`lib/api/guard.ts`** — one gate and one response shape for the 9 session-gated route handlers
+   (done, unit 2 below).
 3. **`credential_reference`** — revoke the column from `authenticated` and prove it at live Postgres.
 
 The shell pass it follows is **done and merged**: `c6e340d` + `bd1e84a` went in as PR #23
@@ -182,11 +183,13 @@ page's claims were made to match the build and the first live-RLS integration sl
   - **What the demo cards prove, and don't.** Local data now covers 3 demo clients, 4 placeholder `api_credentials` rows and 2 fixture rows, but **no local `users` row is linked to the three demo clients** (`scripts/create-demo-user.mjs:39-42` binds one client-role user to one client), so `/connections` shows the demo cards only for an **admin** session; a client-role user sees only its own `rls-test` tenant.
 
 ## In Progress
-- **API hardening pass (2026-10-10), three branches, three PRs.** Spec:
-  `docs/superpowers/specs/2026-10-10-api-hardening-design.md`. Unit 1 (`fix/metrics-cache-posture`)
-  is built and green on the four gates; units 2 (`lib/api/guard.ts`) and 3 (the
-  `credential_reference` column revoke) follow. Nothing here is committed, pushed or applied to
-  hosted without King's own yes, and unit 3's migration reaches **local** only until it does.
+- **API hardening pass (2026-10-10), three units.** Spec:
+  `docs/superpowers/specs/2026-10-10-api-hardening-design.md`; unit 2 plan:
+  `docs/superpowers/plans/2026-10-11-api-guard.md`. Units 1 (cache posture) and 2
+  (`lib/api/guard.ts`) are built and green on the four gates on `fix/metrics-cache-posture` —
+  units 1+2 ride **one PR**, per King. Nothing here is committed, pushed or applied to hosted
+  without King's own yes, and unit 3's migration reaches **local** only until it does.
+  Unit 3 (`credential_reference` revoke) is next.
 - **PR #23 merged.** The app shell navigation pass and the landing CTA change (both 2026-10-09)
   landed on `main` at 2026-10-09T13:20Z as merge `ac9dfe3`.
 - **One thing this pass could not run here.** Six `@auth` admin specs (`tests/admin/e2e/layout.spec.ts`
@@ -201,6 +204,53 @@ page's claims were made to match the build and the first live-RLS integration sl
   Question 11 is still King's call.
 
 ## Recent Work
+
+- **Guard follow-up: the fixed cache headers win over `extra`** (2026-10-12) — review finding on
+  unit 2. `json()` spread `extra` last, so any route could have replaced `Cache-Control` / `Vary`
+  and the shared helper no longer owned its cache policy. No caller passed `extra` in `app/` (only
+  `guard.test.ts` did, with `Retry-After`), so this is the contract, not a live leak. `json()` now
+  builds a `Headers` and `set`s `Content-Type` plus every `NO_STORE` entry after the caller's, so a
+  lowercase `cache-control` replaces instead of appending (`new Headers({...})` would have combined
+  the two into `public, s-maxage=60, no-store`). `NO_STORE` stays a spreadable object — the two
+  attachment routes still spread it into their own `ResponseInit`. Test first:
+  `tests/platform/unit/guard.test.ts` "keeps the cache pair even when a caller tries to replace it"
+  failed with `expected 'public, s-maxage=60' to be 'no-store'` before the change. Verified:
+  `pnpm test` → `38 passed (38)` / `249 passed (249)` (248 before, +1 test), `pnpm typecheck`
+  silent, `pnpm lint` no output, `pnpm build` green.
+
+- **API hardening, unit 2: one gate behind the nine session-gated route files** (2026-10-11) —
+  plan `docs/superpowers/plans/2026-10-11-api-guard.md`, built on `fix/metrics-cache-posture`
+  beside unit 1 (one PR, per King). `lib/api/guard.ts` now owns the response shape (`NO_STORE`,
+  `json`/`badRequest`/`unauthorized`/`forbidden`/`databaseFailure`) and the gates (`gateNullable`,
+  `gateSession`, `gateAdmin`, `gateClientAccess`, `resolveAccessibleClient`) for the metrics pair,
+  `/api/auth/me`, `/api/dashboard/boot`, `lib/exports/server.ts` + both export routes, and the
+  three admin routes (ten handlers; `find app/api -name route.ts` prints 11 files, the two bearer
+  routes being the deliberate exception). `lib/admin/http.ts` is deleted — its `jsonResponse`/
+  `readJsonBody`/`firstIssueMessage`/`badRequest` become the guard's, and the trio now answers a
+  failed role read as a JSON 503 where it previously threw unhandled. The guard owns **no**
+  ownership rule: the tenant gates forward to `canAccessClient` / `listAccessibleClients`.
+  Five deviations from the spec, each with its reason: (1) `gateSession()` answers every 401 with
+  `{ error: "Unauthorized" }` — the metrics/export 401 said `"Forbidden"` before — a **wire-only**
+  change: the export menu branches on `response.status === 401` first and never reads the body for
+  that status (`components/features/data-export/components/export-menu.tsx:85-88`), so no
+  user-visible string changed (the plan's expired-session-toast claim was false and is corrected
+  in the plan); (2) `gateAdmin()` is typed `Gate<null>` because `requireAdmin()` returns no user;
+  (3) a sixth export, `gateNullable<T>(read)`, carries `/api/auth/me` and boot's
+  `getProfileView()` gate so `lib/` grows no `components/` import; (4) `NO_STORE` is a spreadable
+  header object, not a `Headers` — the attachment routes spread it into a `ResponseInit`, and
+  `json()` adds `Content-Type` itself; (5) `gateAdmin`'s per-gate `catch` adds the admin trio's
+  missing 503. Verified: `pnpm test` → `Test Files 38 passed (38)` / `Tests 248 passed (248)`
+  (37/231 at the plan's `e40d7bc` baseline; the delta is `tests/platform/unit/guard.test.ts`,
+  15 tests, plus new body assertions, gate-reject cases in the route tests and one boot
+  validation-before-identity case),
+  `pnpm typecheck` silent, `pnpm lint` no output, `pnpm build` green. **Not run in this session:**
+  the integration tier (`pnpm test:all`) — Docker is not running on this machine, so the local
+  stack was not started; starting it is the human partner's call, and the tier's RLS proof stands
+  from 2026-09-25, not from this pass. **Still not verified live:** unit 1's
+  `x-vercel-cache`/`vary_key_denied` behaviour (platform docs only, never an observed header on a
+  deployment). Docs corrected in the same change: `architecture-context.md`, `code-standards.md`,
+  `AGENTS.md`, `05-keyword-rankings.md`, `06-data-export.md`, and this file's stale mechanism line
+  (the undated "Nothing awaited from Supabase escapes its handler any more" entry).
 
 - **API hardening, unit 1: the metrics routes stop claiming a CDN they never had** (2026-10-10) —
   the gap review King asked for after PR #23 merged. Both routes answered the tenant-gated payload
@@ -761,7 +811,7 @@ page's claims were made to match the build and the first live-RLS integration sl
 - Dashboard determinant-of-lazy-fallback split: `DashboardChartFallback` extracted out of `dashboard-chart.tsx` (the recharts-home) to a recharts-free sibling `dashboard-chart-fallback.tsx`, and the chart is now loaded via `next/dynamic(() => import("./dashboard-chart"))` mapped to `{ default: m.DashboardChart }` behind the existing `<Suspense>` boundary (`dashboard.tsx:22`). recharts is no longer in the initial parse of `/dashboard` — it ships in the split chunk only when the Suspense boundary resolves. Convention documented in `code-standards.md` §Next.js. Verified: tsc silent, tests 53/53, no commit.
 - Async-token-vault wires-up, parallelized: `getCachedDashboardOverview` (indexed metrics reads) and the `/api/revalidate/dashboard` route.dashboard APIs (queued sync agent) verified registered + wired to BullMQ/Upstash with Supabase client (admin key) — recharts not involved in this seam. Committed `7314633` + pushed `7fd0d3c`.
 
-- Nothing awaited from Supabase escapes its handler any more. The identity read and the RLS tenant gates were called *before* each route's `try`, so a rejection (`createServerSupabaseClient()` throws on missing env; `databaseOperation` rethrows on a DB error) surfaced as an unhandled 500 instead of the documented JSON 503. Fixed by moving every awaited Supabase call inside the existing database-error handling at the four API sites: `app/api/dashboard/boot/route.ts` (`getProfileView()`), `app/api/metrics/[clientId]/overview/route.ts` and `keywords/route.ts` (`getAuthUser()` + gate; keywords' combined `user ? 403 : 401` return split so the gate still stays behind the auth check), and `lib/exports/server.ts` (identity + gate + quota moved into the `try`, so a failed read cannot burn export quota). Precedence is unchanged (400 → 401 → 403 → 429 → 503); a rejected identity or gate read is now a 503, deliberately not a 401, so an outage never looks like "logged out". Tests: 9 new cases reject the gate and the identity read at each site, asserting 503 + `{"error":"Database operation failed"}` + `no-store` + no downstream read/quota. Docs updated: `code-standards.md` (handler snippet now shows the `try`, API-route and testing rules, Error Handling) and `architecture-context.md` (precedence). Verified: 122 tests (was 113), typecheck, lint, hermetic build green. Not committed/pushed.
+- Nothing awaited from Supabase escapes its handler any more. The identity read and the RLS tenant gates were called *before* each route's `try`, so a rejection (`createServerSupabaseClient()` throws on missing env; `databaseOperation` rethrows on a DB error) surfaced as an unhandled 500 instead of the documented JSON 503. Fixed by moving every awaited Supabase call inside the existing database-error handling at the four API sites: `app/api/dashboard/boot/route.ts` (`getProfileView()`), `app/api/metrics/[clientId]/overview/route.ts` and `keywords/route.ts` (`getAuthUser()` + gate; keywords' combined `user ? 403 : 401` return split so the gate still stays behind the auth check), and `lib/exports/server.ts` (identity + gate + quota moved into the `try`, so a failed read cannot burn export quota — **mechanism superseded 2026-10-11 by unit 2**: both gates now sit *outside* the `try` and the guard's per-gate `catch` supplies their 503, while the behavioral half still holds — a failed gate read cannot burn quota, pinned by `tests/export/unit/export-route.test.ts:119-133`). Precedence is unchanged (400 → 401 → 403 → 429 → 503); a rejected identity or gate read is now a 503, deliberately not a 401, so an outage never looks like "logged out". Tests: 9 new cases reject the gate and the identity read at each site, asserting 503 + `{"error":"Database operation failed"}` + `no-store` + no downstream read/quota. Docs updated: `code-standards.md` (handler snippet now shows the `try`, API-route and testing rules, Error Handling) and `architecture-context.md` (precedence). Verified: 122 tests (was 113), typecheck, lint, hermetic build green. Not committed/pushed.
 
 - Test suite restructured: all 19 suites moved out of `app/`, `lib/` and `components/` into a feature-first `tests/<feature>/unit/` tree (`identity`, `tenant-isolation`, `dashboard`, `export`, `sync`, `landing`, `platform`), with `integration/` and `e2e/` tiers alongside. `vitest.config.ts` now declares `unit` and `integration` projects sharing one root `resolve` via `extends: true`; the colocation mandate is gone from `RULES.md` §13, `AGENTS.md`, `code-standards.md`, `development-workflow.md`, `docs/conventions/feature-components.md`, the `feature-component` skill and `README.md`'s Checks block (added after verifying that README still described CI as running four commands). Every test imports its subject through `@/` — including the bracketed dynamic segments (`@/app/api/metrics/[clientId]/overview/route`), which resolve fine. Five commands: `test` (unit) · `test:integration` · `test:all` · `test:e2e` · `test:e2e:auth`. New: Playwright (`@playwright/test` 1.63.0) with `public`/`auth` projects split by an `@auth` tag — 6 public tests (structure + client-side `required` validation only; they run in CI after the build) and 2 authed tests (dashboard overview, CSV download incl. its UTF-8 BOM and CRLF), local-only because they need real credentials. Design + plan: `docs/superpowers/{specs,plans}/2026-09-23-test-suite-architecture*.md`. Verified: 19 files / 122 tests (unchanged across the move — the count was the safety net, and it caught 3 dynamic `await import()` specifiers the grep-based check missed), typecheck + lint clean, build green, public e2e 6 passed and authed 2 passed against `pnpm dev`. Not pushed.
 
@@ -772,7 +822,7 @@ page's claims were made to match the build and the first live-RLS integration sl
   2. **No host for the BullMQ worker.** Vercel has only the cron, so jobs enqueue with no consumer. Needs a decision: always-on worker (Fly/Render), cron calls sync inline, or QStash.
   3. ~~**Tenant isolation is one layer.**~~ **Fixed 2026-09-23 (step 2).** The tenant gate (`listAccessibleClients`, new `canAccessClient`) now reads `clients` through `createServerSupabaseClient()`, so Postgres RLS decides visibility. Metric reads stay on `getAdminDb()` by design (see Recent Work) — reachable only with a `client_id` that already passed the gate.
   4. ~~**`NEXT_PUBLIC_DEMO_PASSWORD` ships in the client bundle** — move to a server-only credential minted through an endpoint.~~ **Fixed 2026-09-24** via the server-props treatment instead of an endpoint: private `DEMO_EMAIL`/`DEMO_PASSWORD` read in the login/sign-up server pages and prop-fed to `DemoAccess`; guarded by `tests/identity/unit/demo-creds.test.ts`. See Recent Work.
-  5. Missing: `lib/api/guard.ts` (routes hand-roll auth + responses in two styles — **deferred 2026-09-24, fold into the sync-route work**), rate limiting on login/signup/reset (**deferred 2026-09-24, fold into the Upstash-quota work**), Sentry/OTel (skipped), ~~`.env.example`~~ (**written 2026-09-24**), generated `types/database.ts` (currently handwritten), and auth limiter reuse of the Upstash quota helper.
+  5. ~~Missing: `lib/api/guard.ts` (routes hand-roll auth + responses in two styles — **deferred 2026-09-24, fold into the sync-route work**)~~ — **built 2026-10-11** as unit 2 of the API hardening pass (see Recent Work). Still missing: rate limiting on login/signup/reset (**deferred 2026-09-24, fold into the Upstash-quota work**), Sentry/OTel (skipped), ~~`.env.example`~~ (**written 2026-09-24**), generated `types/database.ts` (currently handwritten), and auth limiter reuse of the Upstash quota helper.
   6. **`is_stale` has no writer.** `markMetricsStale()` exists and nothing calls it, so the stale banner and the "Cached data" sync pill can never appear. Falls out of #1.
   7. **`aiCitations` is hardcoded `[]`** (`lib/dashboard/overview.ts:231`), so `AICitationGrid` always renders its empty state — UI for a data source that does not exist. There is no LLM dependency in the repo at all.
   8. ~~**README contradicts `package.json`.~~ **Closed.** README now says Node `>=24`, pnpm `>=10`,

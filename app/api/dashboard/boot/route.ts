@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getProfileView } from "@/components/features/user-profile/lib/profile";
+import { badRequest, databaseFailure, gateNullable, json } from "@/lib/api/guard";
 import {
   getCachedDashboardOverview,
   getCachedKeywordHistory,
@@ -17,11 +17,6 @@ export const revalidate = 0; // user-specific, always fresh
 
 const DEFAULT_DAYS: DashboardRange = DASHBOARD_RANGES[0];
 
-const NO_STORE = {
-  "Cache-Control": "no-store",
-  Vary: "Cookie",
-};
-
 /**
  * Everything the dashboard needs to paint, in one request: identity, the
  * accessible client list, and the overview payload for the initial selection.
@@ -35,22 +30,20 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const rawClientId = params.get("client");
   if (rawClientId !== null && !z.uuid().safeParse(rawClientId).success) {
-    return NextResponse.json({ error: "Invalid client id" }, { status: 400, headers: NO_STORE });
+    return badRequest("Invalid client id");
   }
 
   const rawDays = Number(params.get("days") ?? DEFAULT_DAYS);
   const days: DashboardRange = isDashboardRange(rawDays) ? rawDays : DEFAULT_DAYS;
 
-  try {
-    const profile = await getProfileView();
-    if (!profile) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: NO_STORE });
-    }
+  const gate = await gateNullable(getProfileView);
+  if (!gate.allow) return gate.response;
 
+  try {
     const clients = await listAccessibleClients();
     const client = clients.find((entry) => entry.id === rawClientId) ?? clients[0] ?? null;
     if (!client) {
-      return NextResponse.json({ profile, clients, selection: null }, { headers: NO_STORE });
+      return json({ profile: gate.value, clients, selection: null }, 200);
     }
 
     const [overview, history] = await Promise.all([
@@ -58,9 +51,9 @@ export async function GET(request: Request) {
       getCachedKeywordHistory(client, days),
     ]);
 
-    return NextResponse.json(
+    return json(
       {
-        profile,
+        profile: gate.value,
         clients,
         selection: {
           clientId: client.id,
@@ -68,9 +61,9 @@ export async function GET(request: Request) {
           payload: { overview, history },
         },
       },
-      { headers: NO_STORE },
+      200,
     );
   } catch {
-    return NextResponse.json({ error: "Database operation failed" }, { status: 503, headers: NO_STORE });
+    return databaseFailure();
   }
 }

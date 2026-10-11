@@ -1,22 +1,17 @@
 import { adminErrorMessage, adminErrorStatus } from "@/lib/admin/errors";
+import { AdminRpcError, callAdminRpc } from "@/lib/admin/rpc";
+import { createClientBody } from "@/lib/admin/schemas";
 import {
   badRequest,
   firstIssueMessage,
-  jsonResponse,
+  gateAdmin,
+  json,
   readJsonBody,
-} from "@/lib/admin/http";
-import { AdminRpcError, callAdminRpc } from "@/lib/admin/rpc";
-import { createClientBody } from "@/lib/admin/schemas";
-import { requireAdmin } from "@/lib/agents/authAgent";
+} from "@/lib/api/guard";
 
 export async function POST(request: Request) {
-  const gate = await requireAdmin();
-  if (!gate.allow) {
-    return jsonResponse(
-      { error: gate.reason === "unauthenticated" ? "Unauthorized" : "Forbidden" },
-      gate.reason === "unauthenticated" ? 401 : 403,
-    );
-  }
+  const gate = await gateAdmin();
+  if (!gate.allow) return gate.response;
 
   const body = await readJsonBody(request);
   if (!body.ok) return badRequest(body.message);
@@ -29,10 +24,10 @@ export async function POST(request: Request) {
       p_name: parsed.data.name,
       p_domain: parsed.data.domain,
     });
-    return jsonResponse({ client }, 200);
+    return json({ client }, 200);
   } catch (error) {
     const code = error instanceof AdminRpcError ? error.code : undefined;
-    return jsonResponse(
+    return json(
       { error: adminErrorMessage("admin_create_client", code) },
       adminErrorStatus(code),
     );

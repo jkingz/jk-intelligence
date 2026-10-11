@@ -43,6 +43,7 @@ describe("GET /api/metrics/[clientId]/overview", () => {
 
     const response = await get(CLIENT);
     expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: "Unauthorized" });
     expect(boundary.clients).not.toHaveBeenCalled();
     expect(boundary.overview).not.toHaveBeenCalled();
   });

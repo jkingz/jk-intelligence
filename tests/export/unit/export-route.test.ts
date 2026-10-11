@@ -97,6 +97,7 @@ for (const { name, handler, contentType, extension, suffix } of handlers) {
       boundary.authUser.mockResolvedValue(null);
       const response = await get(handler, CLIENT, "30");
       expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toEqual({ error: "Unauthorized" });
       expect(boundary.snapshots).not.toHaveBeenCalled();
     });
 
@@ -105,6 +106,7 @@ for (const { name, handler, contentType, extension, suffix } of handlers) {
       boundary.accessibleClients.mockResolvedValue([]);
       const response = await get(handler, CLIENT, "30");
       expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({ error: "Forbidden" });
     });
 
     it("returns 503 when the read fails", async () => {

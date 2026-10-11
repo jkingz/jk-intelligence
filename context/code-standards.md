@@ -89,58 +89,66 @@ const row: any = await fetchGSC()
 
 ## API Routes
 
-- Parse the `{clientId}` path param with `z.uuid()` **before** anything else; a malformed id is 400,
-  not 403 — never echo whether the id exists for an unauthenticated caller.
-- Order and status codes: 400 malformed input → 401 unauthenticated → 403 not this caller's client
-  → 429 quota spent (exports, with `Retry-After`) → 503 database failure. There is no 500 path and no
-  404 for another tenant's row.
-- Only pure request validation (parsing the path id and the query) may run before the handler's
-  `try`. Everything that awaits Supabase — the identity read (`getAuthUser()` / `getProfileView()`)
-  and the tenant gate — runs **inside** it, so an outage or missing env config yields the JSON 503
-  rather than an unhandled throw. A rejected read is a 503, not a 401: never turn infrastructure
-  failure into "you are logged out".
+- On the tenant-scoped routes — the metrics pair and both export routes — parse the `{clientId}` path
+  param with `z.uuid()` **before** anything else; a malformed id is 400, not 403 — never echo whether
+  the id exists for an unauthenticated caller. The admin trio is the exception: `gateAdmin()` runs
+  first, so 401/403 precede that family's 400.
+- Order and status codes, on those same tenant-scoped routes: 400 malformed input → 401
+  unauthenticated → 403 not this caller's client → 429 quota spent (exports, with `Retry-After`) →
+  503 database failure; there is no 500 path and no 404 for another tenant's row. The admin trio
+  instead maps Postgres codes via `lib/admin/errors.ts`: 409/403, 500 for `23514`, 502 for an unmapped
+  code.
+- On those routes only pure request validation (parsing the path id and the query) runs before a gate.
+  The identity read and the tenant gate go through `lib/api/guard.ts` (`gateSession()` /
+  `gateNullable()` / `gateClientAccess()` / `resolveAccessibleClient()` / `gateAdmin()`), each of
+  which catches its own rejection and answers the JSON 503 — an outage or missing env config never
+  yields an unhandled throw. The handler's `try` wraps the reads. A rejected read is a 503, not a 401:
+  never turn infrastructure failure into "you are logged out".
+- Routes build no JSON `Response` inline — `json`/`badRequest`/`unauthorized`/`forbidden`/
+  `databaseFailure` are the only shapes a session-gated route may answer; the two bearer routes
+  (`cron/sync`, `revalidate/dashboard`) sit outside the guard and build their own bodies. The two
+  export attachments are the one exception inside the session-gated set: an inline `new Response` for
+  the body, spreading the guard's `NO_STORE` for headers.
 - Bodies: failures are always `{ error: string }` with a fixed, non-reflective message — echoing the
   request or a DB error into the body is a leak. Successes use **two** shapes today, so match the
   route you are extending rather than inventing a third: `/keywords` returns the `{ data, meta }`
   envelope, while `/dashboard/boot` and `/overview` return the composite resource directly
   (`{ profile, clients, selection }`, `{ overview, history }`). Unifying them is an open item, not a
   change to make while doing something else.
-- Every authenticated response sends `Cache-Control: no-store` plus `Vary: Cookie`. No shared-cache
-  freshness on a session-decided payload — `s-maxage` there is a lie while `Vary: Cookie` is present
-  (Vercel refuses to cache it) and a leak the moment `Vary` is dropped.
+- Every session-gated response sends `Cache-Control: no-store` plus `Vary: Cookie` — the guard's
+  `NO_STORE` pair; the two bearer routes are the deliberate exception, answering bare `Response.json`
+  with no cache pair. No shared-cache freshness on a session-decided payload — `s-maxage` there is a
+  lie while `Vary: Cookie` is present (Vercel refuses to cache it) and a leak the moment `Vary` is
+  dropped.
 - Keep handlers thin — push complexity into `lib/db`, `lib/dashboard`, `lib/exports`, `lib/queue`.
 - Never return raw API credentials in any response.
 
 ```ts
 // ✅ real handler shape from app/api/metrics/[clientId]/overview/route.ts
-//    (Next 16 fork: ctx is typed and awaited; there is no json()/unauthorized() helper)
+//    (Next 16 fork: ctx is typed and awaited. No route wires JSON + headers by hand —
+//     lib/api/guard.ts's json() is that helper; bare Response.json() survives only on
+//     the two bearer routes.)
 const { clientId: rawClientId } = await ctx.params;
 const clientId = clientIdSchema.safeParse(rawClientId);
-if (!clientId.success) {
-  return new Response(JSON.stringify({ error: "Invalid client id" }), { status: 400, headers: NO_STORE });
-}
+if (!clientId.success) return badRequest("Invalid client id");
+
+const session = await gateSession();          // null → 401, throw → 503
+if (!session.allow) return session.response;
+
+const access = await resolveAccessibleClient(clientId.data);  // RLS decides
+if (!access.allow) return access.response;
 
 try {
-  const user = await getAuthUser();
-  if (!user) {
-    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 401, headers: NO_STORE });
-  }
-
-  const clients = await listAccessibleClients();
-  const client = clients.find((c) => c.id === clientId.data) ?? null;
-  if (!client) {
-    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: NO_STORE });
-  }
-
-  // …reads → 200
+  const [overview, history] = await Promise.all([...]);
+  return json({ overview, history }, 200);
 } catch {
-  // identity read, tenant gate and reads share this one failure path
-  return new Response(JSON.stringify({ error: "Database operation failed" }), { status: 503, headers: NO_STORE });
+  return databaseFailure();                    // the one 503 sentence
 }
 ```
-`NO_STORE` above is `{ "Content-Type": "application/json", "Cache-Control": "no-store", Vary: "Cookie" }`,
-written inline per route. `getAuthUser()` takes no request argument — it reads the session from the
-cookie store; routes needing identity + role in one round trip use `getAuthSession()`.
+`NO_STORE` is exported by `lib/api/guard.ts` — `{ "Cache-Control": "no-store", Vary: "Cookie" }`,
+no `Content-Type` (the guard's `json()` adds that itself). `getAuthUser()` takes no request argument
+— it reads the session from the cookie store; routes needing identity + role in one round trip use
+`getAuthSession()`.
 
 ## Data & Storage
 
@@ -185,9 +193,9 @@ const [gsc, ga4, semrush] = await Promise.allSettled([
 
 ## Error Handling
 
-- Route handlers catch every awaited Supabase failure — identity read, tenant gate, read — and
-  return 503; a thrown error in a handler becomes an HTML error page that the client `fetch` cannot
-  parse.
+- Every awaited Supabase failure gets a JSON 503 — identity reads and tenant gates through the
+  guard's per-gate `catch` (`lib/api/guard.ts`), reads through the handler's `try`. A thrown error in
+  a handler becomes an HTML error page that the client `fetch` cannot parse.
 - The dashboard has no cached-data fallback yet: a failed boot shows `"Failed to load dashboard
   data"` (`app/(app)/dashboard/dashboard-view.tsx`). Do not claim offline resilience until it exists.
 - Sync failures (when built) write `sync_logs` → mark `is_stale` → alert admin. Agents never throw
@@ -204,6 +212,7 @@ const [gsc, ga4, semrush] = await Promise.allSettled([
 ```
 lib/
   agents/       — authAgent (identity + role). Other agents: not built
+  api/          — `guard.ts`: the response shape and the session/admin/tenant gates for the 9 session-gated route files (the 2 bearer routes build their own bodies)
   auth/         — cron secret check, proxy routing decisions, safe `next`
   cache/        — tag ownership (`invalidate.ts`), worker→app ping (`notify.ts`)
   dashboard/    — read models shared by the boot and metrics routes
@@ -216,7 +225,7 @@ components/
   ui/           — shadcn primitives (protected, do not hand-edit)
   features/     — dashboard, data-export, email-password-auth, landing, user-profile
 app/
-  api/          — thin route handlers (7 today; see architecture-context.md)
+  api/          — thin route handlers behind `lib/api/guard.ts` (11 files: 9 session-gated, 2 bearer; see architecture-context.md)
   dashboard/    — static shell + client-side boot fetch
 types/          — shared contracts: metrics.ts, dashboard.ts, database.ts (handwritten)
 supabase/

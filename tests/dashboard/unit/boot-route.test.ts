@@ -61,6 +61,7 @@ describe("GET /api/dashboard/boot", () => {
 
     const response = await get();
     expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: "Unauthorized" });
     expect(boundary.clients).not.toHaveBeenCalled();
     expect(boundary.overview).not.toHaveBeenCalled();
   });
@@ -70,6 +71,16 @@ describe("GET /api/dashboard/boot", () => {
 
     const response = await get({ client: "not-a-uuid" });
     expect(response.status).toBe(400);
+    expect(boundary.overview).not.toHaveBeenCalled();
+  });
+
+  it("answers the malformed client id with 400 before gating on identity", async () => {
+    boundary.profile.mockResolvedValue(null);
+
+    const response = await get({ client: "not-a-uuid" });
+    expect(response.status).toBe(400);
+    expect(boundary.profile).not.toHaveBeenCalled();
+    expect(boundary.clients).not.toHaveBeenCalled();
     expect(boundary.overview).not.toHaveBeenCalled();
   });
 
