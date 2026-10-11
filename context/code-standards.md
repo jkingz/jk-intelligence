@@ -105,8 +105,9 @@ const row: any = await fetchGSC()
   envelope, while `/dashboard/boot` and `/overview` return the composite resource directly
   (`{ profile, clients, selection }`, `{ overview, history }`). Unifying them is an open item, not a
   change to make while doing something else.
-- Every authenticated response sends `Cache-Control: no-store` (or an explicit short `s-maxage`)
-  plus `Vary: Cookie`, so a shared cache can't serve one tenant to another.
+- Every authenticated response sends `Cache-Control: no-store` plus `Vary: Cookie`. No shared-cache
+  freshness on a session-decided payload — `s-maxage` there is a lie while `Vary: Cookie` is present
+  (Vercel refuses to cache it) and a leak the moment `Vary` is dropped.
 - Keep handlers thin — push complexity into `lib/db`, `lib/dashboard`, `lib/exports`, `lib/queue`.
 - Never return raw API credentials in any response.
 

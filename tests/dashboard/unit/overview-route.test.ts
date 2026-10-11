@@ -91,10 +91,24 @@ describe("GET /api/metrics/[clientId]/overview", () => {
       history: [{ keyword: "coffee", rank: 2 }],
     });
     expect(boundary.overview).toHaveBeenCalledWith(client, 30);
-    // Invariant: CDN s-maxage == CACHE_TTL_MS == unstable_cache revalidate (300s).
-    expect(response.headers.get("Cache-Control")).toBe(
-      "public, s-maxage=300, stale-while-revalidate=60",
-    );
+    // This payload is decided by the session, so it must never advertise shared-cache
+    // freshness. The bound that is real is unstable_cache revalidate (300s).
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+  });
+
+  it("keeps the CDN out of the tenant-gated response", async () => {
+    const client = { id: CLIENT, name: "Atlas Coffee", domain: "atlas.example", initials: "AC" };
+    boundary.user.mockResolvedValue(USER);
+    boundary.clients.mockResolvedValue([client]);
+    boundary.overview.mockResolvedValue({ clicks: 10 });
+    boundary.history.mockResolvedValue([]);
+
+    const response = await get(CLIENT);
+    // Load-bearing: with `public, s-maxage` here the edge would key on the URL alone and
+    // serve one tenant's overview to another, because Vary cannot carry Cookie
+    // (vary_key_denied:cookie). Security rests on this assertion, not on Vary.
+    expect(response.headers.get("Cache-Control")).not.toMatch(/public|s-maxage|stale-while-revalidate/);
+    expect(response.headers.get("Vary")).toBe("Cookie");
   });
 
   it("degrades to 503 with no-store when the read fails", async () => {
