@@ -59,6 +59,17 @@ describe("POST /api/admin/clients", () => {
     expect(hoisted.callAdminRpc).not.toHaveBeenCalled();
   });
 
+  it("503s rather than 500s when the role read itself fails", async () => {
+    hoisted.requireAdmin.mockRejectedValue(new Error("connection reset"));
+
+    const response = await POST(request({ name: "Atlas", domain: "atlas.example" }));
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "Database operation failed",
+    });
+    expect(hoisted.callAdminRpc).not.toHaveBeenCalled();
+  });
+
   it("is 400 with zod's own message for a scheme in the domain", async () => {
     const response = await POST(
       request({ name: "Atlas", domain: "http://atlas.example" }),

@@ -5,36 +5,23 @@ import {
   adminErrorStatus,
   type AdminWriteRpc,
 } from "@/lib/admin/errors";
+import { AdminRpcError, callAdminRpc } from "@/lib/admin/rpc";
+import { attachMemberBody } from "@/lib/admin/schemas";
 import {
   badRequest,
   firstIssueMessage,
-  jsonResponse,
+  gateAdmin,
+  json,
   readJsonBody,
-} from "@/lib/admin/http";
-import { AdminRpcError, callAdminRpc } from "@/lib/admin/rpc";
-import { attachMemberBody } from "@/lib/admin/schemas";
-import { requireAdmin } from "@/lib/agents/authAgent";
+} from "@/lib/api/guard";
 
 const userIdSchema = z.uuid();
-
-// Both verbs share these two; the single-verb route files keep the same five
-// lines inline.
-async function gate(): Promise<Response | null> {
-  const decision = await requireAdmin();
-  if (decision.allow) return null;
-  return jsonResponse(
-    {
-      error: decision.reason === "unauthenticated" ? "Unauthorized" : "Forbidden",
-    },
-    decision.reason === "unauthenticated" ? 401 : 403,
-  );
-}
 
 // Each verb names its own RPC: that is how the two §7 23503 sentences stay
 // switchable without reading Postgres' message text.
 function rpcFailure(rpc: AdminWriteRpc, error: unknown): Response {
   const code = error instanceof AdminRpcError ? error.code : undefined;
-  return jsonResponse(
+  return json(
     { error: adminErrorMessage(rpc, code) },
     adminErrorStatus(code),
   );
@@ -44,8 +31,8 @@ export async function PUT(
   request: Request,
   ctx: RouteContext<"/api/admin/members/[userId]">,
 ) {
-  const denied = await gate();
-  if (denied) return denied;
+  const gate = await gateAdmin();
+  if (!gate.allow) return gate.response;
 
   const { userId: rawUserId } = await ctx.params;
   const userId = userIdSchema.safeParse(rawUserId);
@@ -67,7 +54,7 @@ export async function PUT(
       // what leaves a column alone.
       p_client_id: parsed.data.clientId,
     });
-    return jsonResponse({ member }, 200);
+    return json({ member }, 200);
   } catch (error) {
     return rpcFailure("admin_attach_member", error);
   }
@@ -77,8 +64,8 @@ export async function DELETE(
   _request: Request,
   ctx: RouteContext<"/api/admin/members/[userId]">,
 ) {
-  const denied = await gate();
-  if (denied) return denied;
+  const gate = await gateAdmin();
+  if (!gate.allow) return gate.response;
 
   const { userId: rawUserId } = await ctx.params;
   const userId = userIdSchema.safeParse(rawUserId);
@@ -88,7 +75,7 @@ export async function DELETE(
     const member = await callAdminRpc("admin_detach_member", {
       p_user_id: userId.data,
     });
-    return jsonResponse({ member }, 200);
+    return json({ member }, 200);
   } catch (error) {
     return rpcFailure("admin_detach_member", error);
   }

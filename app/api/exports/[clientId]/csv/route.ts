@@ -1,3 +1,4 @@
+import { NO_STORE } from "@/lib/api/guard";
 import { toCsv } from "@/lib/exports/csv";
 import { exportFilename } from "@/lib/exports/filename";
 import { loadExportDataset } from "@/lib/exports/server";
@@ -21,8 +22,7 @@ export async function GET(
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
-      "Cache-Control": "no-store",
-      Vary: "Cookie",
+      ...NO_STORE,
     },
   });
 }
