@@ -793,12 +793,12 @@ finished plan's references would falsify it. Agents keep their 1,2,3,5 numbering
 - [ ] **Step 1: Failing check**
 
 ```bash
-git grep -n "context/progress-tracker" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md' | wc -l    # expect ≥ 11 (measured 13 at plan time; two die with earlier folds)
+git grep -n "context/progress-tracker" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md' | wc -l    # expect ≥ 11. Measured at `68ef55f`: **11** — `.claude/skills/feature-component/SKILL.md:18`, `AGENTS.md:97`/`:139`/`:484`/`:996`/`:1181`, `README.md:5`, `context/feature-specs/07-admin.md:122`, `docs/conventions/feature-components.md:39`, `tests/admin/integration/provisioning.test.ts:9`, `tests/fixtures/README.md:5`. A **twelfth** site does not match that grep because it names the log without its path: `docs/conventions/feature-components.md:8` ("PR body links spec path + progress-tracker update note"), and it needs the same repair.
 ```
 
 - [ ] **Step 2: Compress the four live sections into `AGENTS.md`**
 
-This is the plan's one condensing task. From `## Current Phase` (5–19), `## Current Goal` (20–47), `## In Progress` (191–214) and `## Open Questions` (885–994), write `### Open product questions` under PROJECT OVERVIEW as the questions only — each one line, each naming what the owner has not decided. Do not carry forward anything that is actually a status claim; Status already says it. Record in the commit message every decision-line you drop, with the reason.
+This is the plan's one condensing task. From `## Current Phase` (5–19), `## Current Goal` (20–47), `## In Progress` (191–214) and `## Open Questions` (885–994) — ranges verified at `68ef55f` against the 1,000-line file — write `### Open product questions` as the **last** `###` of `## Project Overview`, immediately before `## Architecture Context` (measured: `### Success Criteria` at `:197`, its list ending at `:205`, `## Architecture Context` at `:208`), as the questions only — each one line, each naming what the owner has not decided. Do not carry forward anything that is actually a status claim; Status already says it. Record in the commit message every decision-line you drop, with the reason.
 
 Then amend `### Status`'s last line to point at the demoted log:
 
@@ -818,7 +818,17 @@ Its own body keeps its historical text, including lines that cite `RULES.md §13
 > Demoted from `context/` on 2026-10-13 and out of the read order. This is a rolling log: entries
 > below cite the paths that were authoritative when they were written, and those citations are kept
 > as written. Current guidance lives only in `AGENTS.md`.
+>
+> `## Current Phase`, `## Current Goal`, `## In Progress` and `## Open Questions` are kept as history
+> and are **not** the live record. `AGENTS.md` § Project Overview → Status and § Open product questions
+> decide what is current; do not add to the four sections here.
 ```
+
+The second paragraph is the part that matters. Task 7's review found this exact defect — two live records
+of the same state, one of them 20 days staler, in a file whose lead forbids it — and a note covering only
+*path* rot would leave a reader to open the log at `## Open Questions` and treat 110 lines of superseded
+prose as the live question set. The four sections stay in place as history; the disclaimer is what licenses
+leaving them there.
 
 - [ ] **Step 4: Repair the live pointers**
 
@@ -828,7 +838,7 @@ Rewrite, in each file's own wording, the path only:
 - `.claude/skills/feature-component/SKILL.md:18` → `docs/progress-tracker.md` (the tracker "In Progress" entry step)
 - `docs/conventions/feature-components.md:8` → `docs/progress-tracker.md` (the PR-body note)
 - `docs/conventions/feature-components.md:39` → `docs/progress-tracker.md` (the "feature owns its context files update" line — at this commit `context/` holds only `feature-specs/`, which Task 9 moves, so reword the line to name the spec and the log, not "context files")
-- `.claude/skills/feature-component/SKILL.md` — check the whole file, not just line 18; it is the one skill this plan does not author, and if it names other `context/` paths they move with Task 9's grep. **Then check its mirror**: `.agents/skills/feature-component/` may be a symlink, a hardlink, or an independent copy (this repo is all three at once — see `AGENTS.md` § Repo skills), so after editing `.claude/`, run `ls -i` / `readlink` on the counterpart and, if it is a separate copy, repair it in this same commit. A pointer left at the moved file in a mirror is exactly the dangling reference this plan forbids.
+- `.claude/skills/feature-component/SKILL.md` — check the whole file, not just line 18; it is the one skill this plan does not author, and if it names other `context/` paths they move with Task 9's grep (measured at `68ef55f`: it also names `context/feature-specs/` at `:14` and `:17`, and those are Task 9's, not yours). **Then check its mirror**: `.agents/skills/feature-component/` may be a symlink, a hardlink, or an independent copy (this repo is all three at once — see `AGENTS.md` § Repo skills). Measured at `68ef55f`, `.claude/skills/feature-component/SKILL.md` and `.agents/skills/feature-component/SKILL.md` share inode `104056145` — a **hardlink**, not a symlink. That distinction is the trap: an editor that writes a new file and renames it over the old one leaves the mirror holding the *old* text while `git diff` shows only the file you edited. So check `ls -i` on both paths **after** the edit, not before, and if the inodes no longer match, repair the mirror in this same commit — by editing the counterpart too, or re-linking with `ln -f`. A pointer left at the moved file in a mirror is exactly the dangling reference this plan forbids.
 - `AGENTS.md` — four carried-in pointers, each created by an earlier fold: `### Status`'s "State of record" line (from `context/project-overview.md:15`, Task 2), `## UI Context`'s "(see …)" clause (from `context/ui-context.md:162`, Task 4), the queue/worker sentence in § SERVICE ARCHITECTURE that says "see `context/progress-tracker.md`" (hand-maintained since before this plan — locate it by `git grep`, not by line number), and § DEVELOPMENT WORKFLOW's "Before moving to the next unit" item 3 (from `context/development-workflow.md:121`, Task 6). All four → `docs/progress-tracker.md`.
 - `README.md:5`'s two links → `AGENTS.md` for scope (its `context/project-overview.md` pointer dies with Task 2's fold, so by now it must already point at `AGENTS.md § PROJECT OVERVIEW`) and `docs/progress-tracker.md` for status
 - `context/feature-specs/07-admin.md:122` → `docs/progress-tracker.md`. The file's *path* changes in Task 9; its tracker pointer is this task's, because this task is what makes the pointer wrong.
@@ -844,8 +854,13 @@ git log --oneline -1 --follow -- docs/progress-tracker.md    # expect: the move 
 
 - [ ] **Step 6: Commit**
 
+Stage the moved file and each edited path explicitly — never `git add -A` on this plan, because the
+git-ignored `.superpowers/` scratch directory must stay out of the commit. Then read the commit back:
+`git show --stat` must list `docs/progress-tracker.md` as a rename from `context/progress-tracker.md`
+alongside every edited file, with nothing extra.
+
 ```bash
-git add -A && git commit -m "docs: the tracker stops being required reading, and the log keeps its own stale pointers
+git add AGENTS.md README.md docs/conventions/feature-components.md docs/progress-tracker.md .claude/skills/feature-component/SKILL.md .agents/skills/feature-component/SKILL.md tests/admin/integration/provisioning.test.ts tests/fixtures/README.md context/feature-specs/07-admin.md && git commit -m "docs: the tracker stops being required reading, and the log keeps its own stale pointers
 
 A 1,000-line rolling log in the read order is how a session starts by reading 700 lines of
 finished work. The log's own historical citations are left as written; only live pointers moved."
