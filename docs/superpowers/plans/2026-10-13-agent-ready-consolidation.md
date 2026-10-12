@@ -693,12 +693,21 @@ skip-the-PR-for-docs-only exception, none of which rules 1-10 carry."
 - [ ] **Step 1: Failing check**
 
 ```bash
-git grep -n "target-state\.md" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md' | wc -l    # expect > 0; 11 tree-wide at `49fd008`, 7 of them already in AGENTS.md, and Tasks 5 and 6 port three more in
+git grep -n "target-state\.md" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md' | wc -l    # expect > 0. Measured at `530a521`: **10 inside `AGENTS.md`** (`:97,103,220,624,791,943,1031,1051,1285,1339`) plus `README.md:6` = 11 tree-wide. Re-run the grep and use what it prints — this plan's printed counts are forecasts, not gates.
 ```
 
 - [ ] **Step 2: Port the file's seven sections verbatim**
 
 `## Planned agents` (27–199), `## Agent Interaction Map` (200–232), `## Deployment Strategy` (233–247), `## Error Handling Per Agent` (248–275), `## Planned API Route Definitions` (276–331), `## Build sequence (original POC plan)` (332–356), under `# TARGET STATE`. Preserve the file's opening verification note (1–26) as the section's lead paragraph.
+
+Four lines name `AGENTS.md` from inside the file they are about to be ported into — two in that opening
+note, two in the body — so they are the self-citation class Task 3's fix round removed and must be
+converted, not carried: `:22` (`Read `AGENTS.md` → "Implemented surface"`) and `:72` (…`lives in
+`AGENTS.md` → Tenant isolation`) become the bare `§ SERVICE ARCHITECTURE` / `§ Tenant isolation` forms;
+`:278` (…`see `AGENTS.md` § HTTP surface`…) becomes `see § HTTP surface`. `:3` ("Moved out of `AGENTS.md`
+on 2026-09-23 so the root instructions describe only code that exists") is provenance about a file layout
+that this commit ends — drop the sentence and keep the paragraph it opens ("Everything here is **design
+intent**…"), since git log, not a doc, is the record of the move.
 
 - [ ] **Step 3: Merge the sync-agent descriptions — there are now three, not two**
 
@@ -732,11 +741,13 @@ Do **not** renumber the agents (they are 1, 2, 3, 5 with no 4) — the spec puts
 git rm docs/target-state.md
 ```
 
-In `AGENTS.md`, replace each `docs/target-state.md` with `§ TARGET STATE` — 7 hits at `49fd008`, more by the
-time you run it, because Tasks 2–6 carried citations in. Use the `§` form alone, not
+In `AGENTS.md`, replace each `docs/target-state.md` with `§ TARGET STATE` — 10 hits at `530a521`, more by
+the time you run it, because Tasks 2–6 carried citations in. Use the `§` form alone, not
 `` `AGENTS.md` § TARGET STATE ``: you are editing text that now lives *inside* `AGENTS.md`, and naming the
-file from within it is the self-citation class Task 3's fix round removed. Then `README.md` (line 6 and any
-other hit), and `context/code-standards.md` is already gone, so check the survivors:
+file from within it is the self-citation class Task 3's fix round removed. Then `README.md` — it sits
+*outside* `AGENTS.md`, so its hit at line 6 becomes a real link rather than the bare `§` form:
+`[AGENTS.md § TARGET STATE](AGENTS.md)`. `context/code-standards.md` is already gone, so check the
+survivors:
 
 ```bash
 git grep -n "target-state\.md" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md'; echo "exit: $?"
@@ -755,10 +766,15 @@ The template's rule is that a planned route is listed once. If SERVICE ARCHITECT
 
 - [ ] **Step 6: Commit**
 
-```bash
-git add -A && git commit -m "docs: target state lives where the implemented surface is described
+Stage the two paths explicitly — never `git add -A` on this plan: the workspace holds git-ignored SDD
+artifacts and a controller may be mid-edit elsewhere. Then prove the fold and the delete travelled in the
+**same** commit by reading `git show --name-status` yourself and reporting what it lists (one `M AGENTS.md`,
+one `D docs/target-state.md`).
 
-Two sync-agent descriptions merged into one, and the docs/superpowers records keep citing a
+```bash
+git add AGENTS.md README.md docs/target-state.md && git commit -m "docs: target state lives where the implemented surface is described
+
+Three sync-agent descriptions merged into one contract, and the docs/superpowers records keep citing a
 path that no longer exists on purpose — they describe the tree as it was, and rewriting a
 finished plan's references would falsify it. Agents keep their 1,2,3,5 numbering."
 ```
