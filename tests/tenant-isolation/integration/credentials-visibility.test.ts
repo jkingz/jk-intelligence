@@ -52,6 +52,19 @@ describe.skipIf(!hasTestDb)("api_credentials visibility against live RLS", () =>
     return data as CredentialRowShape[];
   }
 
+  // Same session path as credentials(), but naming whichever columns the test
+  // asks for. A column Postgres has stopped granting comes back as a
+  // PostgREST error, and databaseOperation()'s message is the one the rest of
+  // this file already asserts.
+  async function selectAs(email: string, columns: string): Promise<void> {
+    await withSession(email, async () => {
+      const { createServerSupabaseClient } = await import("@/lib/supabase/server");
+      const db = await createServerSupabaseClient();
+      const { error } = await db.from("api_credentials").select(columns);
+      if (error) throw new Error("Database operation failed");
+    });
+  }
+
   it("client@a sees its own tenant's credential and no other", async () => {
     await withSession(FIXTURE_USERS.clientA, async () => {
       const rows = await credentials();
@@ -84,5 +97,22 @@ describe.skipIf(!hasTestDb)("api_credentials visibility against live RLS", () =>
       // the same argument rls-gate.test.ts:65-76 makes.
       await expect(credentials()).rejects.toThrow("Database operation failed");
     });
+  });
+
+  it("a tenant reads the three status columns and nothing else", async () => {
+    // The positive half of the pair: whatever Task 4 does to the grant, this
+    // page's own read must keep working. /connections selects exactly these.
+    await expect(
+      selectAs(FIXTURE_USERS.clientA, COLUMNS),
+    ).resolves.toBeUndefined();
+  });
+
+  it("a tenant cannot select credential_reference at the database", async () => {
+    // The point of the unit. Not "the app never asks for it" — that is
+    // tests/tenant-isolation/unit/connections-read.test.ts:113 — but "asking
+    // for it is refused by Postgres", which only a live session can show.
+    await expect(
+      selectAs(FIXTURE_USERS.clientA, "credential_reference"),
+    ).rejects.toThrow("Database operation failed");
   });
 });
