@@ -38,6 +38,12 @@ Every task's requirements implicitly include this section.
   body that hides a drop to stay short breaks the rule the body exists to serve. Task 1's commit ran 9
   lines for three named drops; that is the trade, not a violation.
 - `AGENTS.md` lines 1–9 (the `<!-- BEGIN:nextjs-agent-rules -->` … `<!-- END:nextjs-agent-rules -->` block) are never edited by hand and never deleted.
+- **A `§` reference matches its heading's exact text.** Task 1's rule 14 names the fold sections in
+  ALL CAPS (`PROJECT OVERVIEW`), while Tasks 2–6 create them as title-case H2s (`## Project Overview`).
+  Ruled during Task 1: the headings win, and **Task 2 amends rule 14's read-order line to title case in
+  the same commit** that creates the first of those headings — one authority, one spelling, and Task 11's
+  heading grep can match it literally. Tasks 3–6 create their headings with the casing rule 14 then
+  cites, and change nothing else in rule 14 beyond deleting their Transitional entry.
 
 ## File Structure
 
@@ -251,6 +257,12 @@ grep -c "^## Project Overview" AGENTS.md
 Expected: `0`.
 
 - [ ] **Step 2: Port, minus the Features block**
+
+In rule 14, retitle the six section names to the casing this task's headings use:
+`PROJECT OVERVIEW → ARCHITECTURE CONTEXT → UI CONTEXT → CODE STANDARDS → DEVELOPMENT WORKFLOW → PM
+CONVENTIONS` becomes `Project Overview → Architecture Context → UI Context → Code Standards →
+Development Workflow → PM Conventions`. Nothing else in rule 14 changes. Name the amendment in the
+commit message.
 
 Delete the `## Application Building Context` stub (everything from that heading through the line `If implementation changes the architecture, scope, or standards documented in the context files, update the relevant file before continuing.`). Three of its claims must survive elsewhere before you delete it — verify each, and stop if one does not hold:
 
