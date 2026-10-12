@@ -99,7 +99,9 @@ entry in the commit that folds its file in; the entry is a pointer, not a note.
 
 ### 15. Tenant isolation is RLS's job
 - Client-ownership is decided only by `canAccessClient` / `listAccessibleClients` in `lib/db/repository.ts`. No route or helper may re-implement that rule in TypeScript.
-- `AGENTS.md` describes implemented code only; anything not built lives in § TARGET STATE. Never cite it as current behavior, and check a module exists before assuming it does (`lib/agents/` holds only `authAgent`).
+- § SERVICE ARCHITECTURE describes implemented code only; anything not built lives in § TARGET STATE.
+  Never cite that section as current behavior, and check a module exists before assuming it does
+  (`lib/agents/` holds only `authAgent`).
 
 ### 16. Supabase
 - Schema changes are new timestamped files in `supabase/migrations/`, applied with `pnpm db:migrate`; never edit an applied migration.
@@ -1026,8 +1028,8 @@ directly to `main` with a conventional message.
 
 # SERVICE ARCHITECTURE — implemented surface
 
-This file describes only code that exists. Design intent for what is **not** built lives in
-§ TARGET STATE; never cite it as current behavior.
+This section describes only code that exists. Design intent for what is **not** built lives in
+§ TARGET STATE; never cite that section as current behavior.
 
 ## Request path
 
@@ -1166,7 +1168,8 @@ Per-route contracts — the detail behind the table's Notes column:
 - `POST /api/revalidate/dashboard` — `revalidateTag(DASHBOARD_OVERVIEW_TAG)`, guarded by `Authorization: Bearer <CRON_SECRET>`. `revalidateTag` throws outside a request context, which is why the standalone worker POSTs here (`lib/cache/notify.ts`) instead of calling it.
 - `GET /api/cron/sync` — Vercel cron (`vercel.json`, `GET`, bearer `CRON_SECRET`): iterates `listActiveClients()` and queues one BullMQ job per client with `Promise.allSettled`; returns `{ queued, errors }`. Jobs are consumed by `lib/queue/worker.ts`, which currently returns `mock_completed` without touching the sources.
 
-Planned and absent: see § TARGET STATE → Planned API Route Definitions.
+Planned and absent: see § TARGET STATE → Planned API Route Definitions, whose `### Cron Trigger` is the
+one route there that exists — it ships as `GET /api/cron/sync`, described just above.
 
 ## Queue, worker, cron
 
@@ -1287,8 +1290,11 @@ surface described here, and move newly built modules out of § TARGET STATE and 
 Design intent for what is **not** built. Nothing here is a description of current behavior: treat it as
 requirements, and give each item its own build + test pass before citing it as fact. Where a promise
 below is already built — § Product features the spec promises and § Build sequence (original POC plan)
-both mix shipped and unshipped halves — § Project Overview → Status is the authority on which half
-exists, and the verified status block below is the opening statement of what does not run today.
+both mix shipped and unshipped halves — § Project Overview → Status is the authority. Two things in this
+section look like current state and are not authority either: the verified-status block below, which is
+the older record (2026-09-23, corrected 2026-09-25) and is subordinate to § Status wherever they
+disagree; and the `POST /api/cron/sync` shape, which ships as `GET /api/cron/sync` — § HTTP surface is
+its authority.
 
 Verified status at 2026-09-23, corrected where a bullet says otherwise:
 - `lib/agents/` contains `authAgent.ts` only. `syncAgent`, `transformAgent`, `cacheAgent`,
@@ -1326,11 +1332,10 @@ actually serves.
 
 ### Automated Data Sync
 
-- Automated daily syncing of every active client from Google Search Console, GA4 and Semrush/Ahrefs; a
-  source that keeps failing pauses that client's sync and alerts the admin.
-- Schedule, the parallel-source mechanics, the retry/backoff and circuit-breaker values, and the
-  sync-log fields are stated once under § Planned agents → 1. API Sync Agent and
-  § Error Handling Per Agent.
+- Automated daily syncing of every active client from Google Search Console, GA4 and Semrush/Ahrefs.
+- Schedule, the parallel-source mechanics, the retry/backoff and circuit-breaker values — including the
+  admin alert on a paused client — and the sync-log fields are stated under § Planned agents →
+  1. API Sync Agent and § Error Handling Per Agent.
 
 ### AI Performance Insights
 
