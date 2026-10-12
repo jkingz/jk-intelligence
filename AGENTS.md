@@ -93,9 +93,9 @@ Rules 1–10 are the **portable core** — they hold in every repo this workspac
 `AGENTS.md` § STANDING RULES → then, for architectural decisions, § APPLICATION BUILDING CONTEXT in
 order: Project Overview → Architecture Context → UI Context → Code Standards → Development Workflow
 → PM Conventions. Then § SERVICE ARCHITECTURE for what exists, § TARGET STATE for what does not.
-
-**Transitional — still authoritative as a separate file:** `context/progress-tracker.md`. Delete an
-entry in the commit that folds its file in; the entry is a pointer, not a note.
+Per-unit feature specs live in `context/feature-specs/`. The rolling log at `docs/progress-tracker.md`
+is history, not required reading: § Project Overview → Status and § Open product questions decide what
+is current.
 
 ### 15. Tenant isolation is RLS's job
 - Client-ownership is decided only by `canAccessClient` / `listAccessibleClients` in `lib/db/repository.ts`. No route or helper may re-implement that rule in TypeScript.
@@ -136,7 +136,7 @@ always renders its empty state), and a consumer for the `seo-sync` queue in prod
 
 Verified: 2026-10-13, against the repo at the commit this section was ported into.
 
-State of record: `context/progress-tracker.md`.
+State of record for completed work: `docs/progress-tracker.md`.
 
 ### Overview
 
@@ -204,6 +204,39 @@ enqueues; nothing consumes it). Step 3 reads seeded rows.
 6. Historical trend visible across any custom date range.
 7. CSV/PDF export works for any date range.
 8. Sync failures logged, admin alerted, no dashboard crash.
+
+### Open product questions
+
+Compressed 2026-10-13 from the log's four live sections; the dated evidence behind each line stays in
+`docs/progress-tracker.md`. Questions only — a line about what is not built belongs in § Project
+Overview → Status, not here.
+
+- **Who hosts the `seo-sync` worker** — an always-on process (Fly/Render), the cron calling sync
+  inline, or QStash. Every real fetch waits on it, and so does the credential write behind the inert
+  Connect button on `/connections`.
+- **Whether to apply `20261010000000_credential_reference_unselectable.sql` to the hosted project.**
+  It has run on the local stack only, so hosted `authenticated` still holds table-wide `select` on
+  `api_credentials`; a hosted apply needs the owner's explicit yes, as every hosted migration here has.
+- **How to stop the next `public` table arriving already open.** `pg_default_acl` grants
+  `authenticated` and `anon` every table privilege on it, so the choice is one
+  `ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated` migration
+  or a standing rule that each new table's migration revokes and re-grants its own columns.
+- **How the `@auth` tier gets an admin account without breaking the integration tier.**
+  `tests/admin/integration/provisioning.test.ts` asserts `admins == 1` globally and its attach case
+  takes the first row with no `order by`, so the second admin — the `ADMIN_EMAIL`/`ADMIN_PASSWORD`
+  pair six `@auth` admin specs still wait on — makes a demotion succeed and the assertion fail. Either
+  scope those two cases to `FIXTURE_USERS.admin`'s id or run `@auth` on a stack that never runs the
+  integration tier.
+- **Whether to stand up a hosted test database.** The integration tier `skipIf`s without
+  `TEST_SUPABASE_URL`, so until that decision CI is unit + public e2e only.
+- **What is actually configured on the hosted Supabase project** — Google OAuth enabled, the
+  `/auth/callback` and `/auth/reset-password` redirect-URL allowlist, PKCE `token_hash` email
+  templates. None of it is checkable from the local stack, so end-to-end OAuth and email flows stay
+  unverified.
+- **Which env vars are mirrored into Vercel production** — `CRON_SECRET`, `NEXT_PUBLIC_APP_URL`,
+  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, the Upstash pair, and the server-only
+  `DEMO_EMAIL`/`DEMO_PASSWORD`. Where they are missing, the cron, the worker and the demo card simply
+  do nothing.
 
 ## Architecture Context
 
@@ -481,7 +514,7 @@ rounded-xl px-4 py-2 text-xs
 ```
 
 `staleSource` mirrors `current_metrics.is_stale`, which nothing writes yet, so this banner is
-reachable in code but not in practice (see `context/progress-tracker.md`).
+reachable in code but not in practice (see `docs/progress-tracker.md`).
 
 #### Sync Status Pill
 
@@ -993,7 +1026,7 @@ observe about "sync" is therefore not evidence about sync.
 1. The unit works end to end inside the scope you stated in step 2 of the loop.
 2. No invariant in § Architecture Context was violated (read the list; #4 tenant
    isolation and #12 the static dashboard shell are the ones that break silently).
-3. `context/progress-tracker.md` reflects what actually happened.
+3. `docs/progress-tracker.md` reflects what actually happened.
 4. The four-gate chain in § STANDING RULES 13 is green — that rule is the authority on which gates,
    and it also names the integration and e2e tiers this checklist used to omit.
 5. Nothing you started is still running — § STANDING RULES 5.
@@ -1177,8 +1210,7 @@ one route there that exists — it ships as `GET /api/cron/sync`, described just
 - `lib/queue/worker.ts` — `pnpm worker` runs it locally. It currently revalidates the dashboard and
   returns `status: "mock_completed"`: no API fetch, no rows written.
 - **Nothing consumes the queue in production.** Vercel hosts only the cron; hosting the worker
-  (always-on process, inline-in-cron, or QStash) is an open decision — see
-  `context/progress-tracker.md`.
+  (always-on process, inline-in-cron, or QStash) is an open decision — see § Open product questions.
 - `persistMetrics`, `markMetricsStale` and `writeSyncLog` in `lib/db/repository.ts` exist but have
   zero callers. All dashboard rows today come from `scripts/seed.mjs`, and the placeholder
   `api_credentials` rows `/connections` renders come from `scripts/seed-connections.mjs`.

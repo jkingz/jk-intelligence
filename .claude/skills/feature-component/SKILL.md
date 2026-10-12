@@ -15,7 +15,7 @@ User asks to "add feature X", "scaffold feature <slug>", "wire up a new feature"
 
 ## Workflow
 1. Verify spec exists in `context/feature-specs/<nn>-<slug>.md`. If not, write it first (goal, scope, UI, implementation, security, checks).
-2. Add tracker "In Progress" entry in `context/progress-tracker.md` BEFORE implementing.
+2. Add tracker "In Progress" entry in `docs/progress-tracker.md` BEFORE implementing.
 3. Create folder + barrel:
    ```
    components/features/<slug>/

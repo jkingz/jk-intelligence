@@ -1,5 +1,13 @@
 # Progress Tracker
 
+> Demoted from `context/` on 2026-10-13 and out of the read order. This is a rolling log: entries
+> below cite the paths that were authoritative when they were written, and those citations are kept
+> as written. Current guidance lives only in `AGENTS.md`.
+>
+> `## Current Phase`, `## Current Goal`, `## In Progress` and `## Open Questions` are kept as history
+> and are **not** the live record. `AGENTS.md` § Project Overview → Status and § Open product questions
+> decide what is current; do not add to the four sections here.
+
 Update this file after every meaningful implementation change.
 
 ## Current Phase

@@ -5,7 +5,7 @@
 - Branch: `feat/<slug>` — e.g. `feat/email-password-auth`
 - Title: `feat(<slug>): <what>` — e.g. `feat(auth): email + password sign-in/sign-up`
 - One feature unit per PR; spec must exist in `context/feature-specs/` before implementation
-- PR body links spec path + progress-tracker update note
+- PR body links spec path + `docs/progress-tracker.md` update note
 - Checks green before ready: `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`
 
 ## Feature Folders
@@ -36,7 +36,7 @@ domain that owns the invariant.
 - Cross-feature imports forbidden — shared logic moves down to `lib/` or up to `components/ui`
 - `components/ui/*` stays untouched (protected foundation)
 - Server components by default; `"use client"` only inside feature components that need interactivity
-- Feature owns its context files update (`context/progress-tracker.md` + relevant spec)
+- Feature owns its spec and log update (`docs/progress-tracker.md` + the feature's spec)
 
 ## Checklist (new feature)
 
