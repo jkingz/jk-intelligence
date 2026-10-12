@@ -18,7 +18,7 @@ real change) may be a single commit; anything larger is a PR.
 - Title: `<type>(<scope>): <imperative summary>` — e.g. `feat(auth): add staff role access`.
 - Body: **what changed** (2-3 bullets), **how it was verified** (tests/typecheck/lint/build,
   plus any live check), and **what wasn't covered** (Vercel mirroring, live OAuth, etc.).
-- One PR per feature/unit — follow the scoping rules in `RULES.md` (standing constraints)
+- One PR per feature/unit — follow the scoping rules in `AGENTS.md` § STANDING RULES (standing constraints)
   and `context/development-workflow.md`. No grab-bag PRs.
 - Draft until green; request review after the suite passes.
 - Rebase-merge onto `main`; history is linear, so rebase before pushing.

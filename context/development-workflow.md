@@ -65,8 +65,7 @@ A unit is done when, in this order:
 ## This repo — appendix
 
 ### Read order before implementing
-`RULES.md` → `AGENTS.md` → `context/project-overview.md` → `context/architecture-context.md` →
-`context/ui-context.md` → `context/code-standards.md` → `context/progress-tracker.md`.
+`AGENTS.md` § STANDING RULES → § APPLICATION BUILDING CONTEXT.
 Unbuilt design lives in `docs/target-state.md`; treat it as requirements, never as description.
 
 ### Commands

@@ -25,7 +25,7 @@ cannot be connected yet and why.
 - One policy migration: `api_credentials` loses `using (false)`, gains
   `api_credentials_select_tenant_or_admin` — the same `private.current_user_role()` /
   `current_user_client_id()` predicate as `clients_select_authenticated`. No TypeScript
-  helper re-derives ownership (`RULES.md` section 15). The grant that decides which *columns*
+  helper re-derives ownership (`AGENTS.md` § STANDING RULES 15). The grant that decides which *columns*
   that row policy can reach is a second migration, the bullet below.
 - `listConnections()` reads `clients` then `api_credentials`, both through the cookie-bound
   client, and selects `client_id, source, created_at`. It is never wrapped in
