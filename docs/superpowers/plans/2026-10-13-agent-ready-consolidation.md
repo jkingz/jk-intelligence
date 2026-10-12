@@ -889,7 +889,7 @@ git grep -n "context/feature-specs" -- ':!docs/superpowers' ':!supabase/migratio
 
 - [ ] **Step 2: Create `specs/00-template.md`**
 
-Copy the template's `context/feature-specs/00-template.md` from the agent-ready template folder byte-identical (its `# \`<NN>\` — \`<feature name>\`` header already matches the nine files here). Then append:
+Copy the template's `context/feature-specs/00-template.md` from the agent-ready template folder byte-identical. Measured header fit across the nine files here: **four** match its `# \`<NN>\` — \`<feature name>\`` form (`02`, `04`, `05`, `06`), three use a bare title with no number (`07` "# Admin: provisioning", `08` "# App Shell and Destination Rail", `09` "# Connections (read-only)"), and two have no `# ` heading at all (`01`, `03`, both opening "Read `AGENTS.md` before starting."). The template therefore states the plurality convention — four of nine — more precisely than the tree does: do not retitle the other five to match it, and do not soften the template's header to match them. **Do not switch to the template's other copy at `specs/00-template.md`, and do not reconcile the two:** measured at the controller's pre-flight, that folder really does hold both, the template's own `AGENTS.md:493` names `specs/00-template.md` as "the template", and its `context/README.md:48` calls the `context/` table "historical reference only" — the template disagrees with itself. `context/`'s variant wins here for two checkable reasons: its header form matches `02`/`04`/`05`/`06` in this tree, and it carries the guidance blockquote ("anything stated here is a requirement, not an idea") that the terser copy dropped. Note the choice in the commit message. Then append:
 
 ```markdown
 ## Where the two spec homes differ
