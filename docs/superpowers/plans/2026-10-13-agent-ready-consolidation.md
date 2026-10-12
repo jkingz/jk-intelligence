@@ -676,16 +676,36 @@ skip-the-PR-for-docs-only exception, none of which rules 1-10 carry."
 - [ ] **Step 1: Failing check**
 
 ```bash
-git grep -n "docs/target-state" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md' | wc -l    # expect > 0
+git grep -n "target-state\.md" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md' | wc -l    # expect > 0; 11 tree-wide at `49fd008`, 7 of them already in AGENTS.md, and Tasks 5 and 6 port three more in
 ```
 
 - [ ] **Step 2: Port the file's seven sections verbatim**
 
 `## Planned agents` (27–199), `## Agent Interaction Map` (200–232), `## Deployment Strategy` (233–247), `## Error Handling Per Agent` (248–275), `## Planned API Route Definitions` (276–331), `## Build sequence (original POC plan)` (332–356), under `# TARGET STATE`. Preserve the file's opening verification note (1–26) as the section's lead paragraph.
 
-- [ ] **Step 3: Merge the two sync-agent descriptions into one**
+- [ ] **Step 3: Merge the sync-agent descriptions — there are now three, not two**
 
-Task 3's `## Sync agent contract (from the architecture doc)` and `## Planned agents` 1/2/3/5 describe the same unbuilt system. Keep `## Planned agents` (it is the fuller contract) and delete from the merged text only what duplicates it. The architecture doc's version carries one thing `Planned agents` lacks — the explicit sentence `No syncAgent, transformAgent, cacheAgent, or insightsAgent exists; lib/queue/worker.ts returns mock_completed.` Keep it as TARGET STATE's opening status line. List the other dropped lines in the commit message.
+Task 3's `## Sync agent contract (from the architecture doc)` and `## Planned agents` 1/2/3/5 describe the
+same unbuilt system, and Task 2's `### Automated Data Sync` + `### AI Performance Insights` describe it a
+third time. All three sit in the **same register** — intent — so unlike the § UI Context / § Pages and
+caching overlap, dedupe here is required, not merely licensed. Keep `## Planned agents` (the fuller
+contract) and delete from the other two only what it already carries; the spec-promises bullets keep
+anything it holds that `Planned agents` does not (the source list GSC/GA4/Semrush-Ahrefs, "alert admin").
+Two divergences to resolve rather than restate, keeping the more precise claim: `Cached (not regenerated
+daily — cost control)` against `Cache TTL: 24hrs`, and any retry/circuit-breaker numbers stated once with
+their values (`3 attempts`, `1s → 4s → 16s`, `5 consecutive failures`). The architecture doc's version
+carries one thing `Planned agents` lacks — `No syncAgent, transformAgent, cacheAgent, or insightsAgent
+exists; lib/queue/worker.ts returns mock_completed.` Keep it as TARGET STATE's opening status line, and
+delete the `## Sync agent contract (from the architecture doc)` heading itself: it names a document that no
+longer exists. List every dropped line in the commit message.
+
+**Also decide the section heading, which is why this step is yours.** `# TARGET STATE — Not Yet Built`
+currently heads a section that also holds Task 2's `## Product features the spec promises`, some halves of
+which *are* built — Task 2 was mandated to move that block whole, and Task 2's re-review left the heading
+text to you as an explicit residual. Either drop `— Not Yet Built` or amend the lead so the reader knows
+which claims in the section are unbuilt; the lead sentence rewritten in `eff8a5b` ("where a promise below is
+already built, § Project Overview → Status is the authority on which half exists") is the wording to keep or
+supersede, not to duplicate.
 
 Do **not** renumber the agents (they are 1, 2, 3, 5 with no 4) — the spec puts that out of scope.
 
@@ -695,10 +715,14 @@ Do **not** renumber the agents (they are 1, 2, 3, 5 with no 4) — the spec puts
 git rm docs/target-state.md
 ```
 
-In `AGENTS.md`, replace each `docs/target-state.md` with `§ TARGET STATE` — 3 hits when the file was written, more now that Tasks 2–6 carried citations in. Then `README.md` (line 6 and any other hit), and `context/code-standards.md` is already gone, so check the survivors:
+In `AGENTS.md`, replace each `docs/target-state.md` with `§ TARGET STATE` — 7 hits at `49fd008`, more by the
+time you run it, because Tasks 2–6 carried citations in. Use the `§` form alone, not
+`` `AGENTS.md` § TARGET STATE ``: you are editing text that now lives *inside* `AGENTS.md`, and naming the
+file from within it is the self-citation class Task 3's fix round removed. Then `README.md` (line 6 and any
+other hit), and `context/code-standards.md` is already gone, so check the survivors:
 
 ```bash
-git grep -n "docs/target-state" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md'; echo "exit: $?"
+git grep -n "target-state\.md" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md'; echo "exit: $?"
 ```
 
 Expected: `exit: 1`. Delete `docs/target-state.md` from rule 14's Transitional list. `docs/superpowers/` keeps its old references untouched — a dated plan or spec that cited `docs/target-state.md` described the tree at that moment, and rewriting it would falsify the record.
