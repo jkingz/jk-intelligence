@@ -303,8 +303,9 @@ Verified against `supabase/migrations/*` — not from the original spec.
 
 **How invariants 4-5 apply to `/connections` (applied deliberately, not forgotten).** `listConnections()`
 is never wrapped in `unstable_cache`, and `app/(app)/connections/page.tsx` declares
-`export const dynamic = "force-dynamic"` — the app's only server-rendered tenant read (`/profile` reads only
-the caller's own `users` row; every metric read goes through `/api/*`), so it opts out of
+`export const dynamic = "force-dynamic"` — a server-rendered tenant read, the only one besides `/admin`,
+whose `getAdminView()` lists an admin's whole client set through the same user-scoped client (`/profile`
+reads only the caller's own `users` row; every metric read goes through `/api/*`), so it opts out of
 the data cache entirely rather than keying a cookie-bound client on nothing. The `force-dynamic` line
 is load-bearing: the cookie read happens inside `databaseOperation()`, whose catch-all converts Next's
 prerender bailout into `Error("Database operation failed")`, so removing it fails `pnpm build`. The
