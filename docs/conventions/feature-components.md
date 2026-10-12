@@ -4,13 +4,13 @@
 
 - Branch: `feat/<slug>` — e.g. `feat/email-password-auth`
 - Title: `feat(<slug>): <what>` — e.g. `feat(auth): email + password sign-in/sign-up`
-- One feature unit per PR; spec must exist in `context/feature-specs/` before implementation
+- One feature unit per PR; spec must exist in `specs/` before implementation
 - PR body links spec path + `docs/progress-tracker.md` update note
 - Checks green before ready: `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`
 
 ## Feature Folders
 
-Every feature gets its own folder in `components/features/<slug>/`. Number prefixes belong only to `context/feature-specs/<nn>-<slug>.md`; use unnumbered folders, imports, branches, and PR scopes.
+Every feature gets its own folder in `components/features/<slug>/`. Number prefixes belong only to `specs/<nn>-<slug>.md`; use unnumbered folders, imports, branches, and PR scopes.
 
 ```
 components/features/<slug>/
@@ -40,9 +40,9 @@ domain that owns the invariant.
 
 ## Checklist (new feature)
 
-1. Spec in `context/feature-specs/<nn>-<slug>.md`
-2. Tracker "In Progress" entry added before implementation
+1. Spec in `specs/<nn>-<slug>.md`
+2. No tracker entry yet — `## In Progress` is history, not a status board; the record lands at step 6
 3. Folder `components/features/<slug>/` with barrel
 4. Implement components/hooks/lib in folder; tests in `tests/<feature>/<tier>/`, not here
 5. Wire via barrel in `app/` pages/routes
-6. Checks green, tracker moved to Completed
+6. Checks green, then record the unit under `docs/progress-tracker.md`'s `## Completed` — never as status in the four history sections

@@ -93,7 +93,7 @@ Rules 1–10 are the **portable core** — they hold in every repo this workspac
 `AGENTS.md` § STANDING RULES → then, for architectural decisions, § APPLICATION BUILDING CONTEXT in
 order: Project Overview → Architecture Context → UI Context → Code Standards → Development Workflow
 → PM Conventions. Then § SERVICE ARCHITECTURE for what exists, § TARGET STATE for what does not.
-Per-unit feature specs live in `context/feature-specs/`. The rolling log at `docs/progress-tracker.md`
+Per-unit feature specs live in `specs/`. The rolling log at `docs/progress-tracker.md`
 is history, not required reading: § Project Overview → Status and § Open product questions decide what
 is current.
 
@@ -547,7 +547,7 @@ colours, and note `--accent-primary-dim` is a red tint — it is the brand accen
 
 - **Dashboard:** full-viewport, left destination rail (persistent and icon-collapsible on `md+`,
   an off-canvas drawer below), page header inside the content column, main content area.
-  Authoritative shell spec: `context/feature-specs/08-app-shell.md`.
+  Authoritative shell spec: `specs/08-app-shell.md`.
 - **Sidebar (`AppNav`):** the shadcn `Sidebar` primitive with `collapsible="icon"` — 15rem
   (`--sidebar-width` is overridden from the primitive's 16rem to keep the documented `w-60`)
   expanded, 3rem icons, `bg-sidebar border-r border-default`. Destinations come from
@@ -900,34 +900,12 @@ scripts/        — migrations runner, seed, demo user (the only way data lands 
 
 ### Testing
 
-Vitest, Node environment, split into `unit` and `integration` projects. `pnpm test` runs the unit
-project only; `pnpm test tenant-isolation` narrows by path — `pnpm test -- tenant-isolation` does
-not, it silently runs the whole tier. A filter that matches nothing exits 1, so a moved file
-announces itself instead of passing empty. `pnpm test:all` adds integration, which runs the tenant
-policies against a **real Postgres** (`pnpm exec supabase start` + `.env.test`; it `skipIf`s without
-`TEST_SUPABASE_URL`, so read the passed/skipped counts rather than the exit code), `pnpm test:e2e` is
-the public Playwright tier and `pnpm test:e2e:auth` the credential-gated one. Quote counts from the
-run's own output rather than restating them here.
+See `/testing` for tiers, organization, mocking patterns and commands.
 
-- New behavior gets a test in the same change; a bugfix gets a test that fails without the fix.
-- Mock the **module boundary** with `vi.mock("@/lib/db/repository", …)`, never an internal function
-  or a real network/DB call. Use `vi.hoisted(() => ({ fn: vi.fn() }))` so the mock factory can close
-  over the spies, and `afterEach(() => vi.resetAllMocks())`.
-- `vitest.config.ts` aliases `server-only` to its empty module and sets `conditions: ["react-server"]`,
-  so a test never needs its own `vi.mock("server-only")` — the few that carry one are dead weight;
-  drop it when you touch that file.
-- Route tests assert the things that matter: 400 on malformed id, 401 with no session, **403 with no
-  body data** for the other tenant's id, and 503 rather than a throw when the identity read, the
-  tenant gate, or the read itself rejects.
-- Tenant isolation is the highest-value test in the repo: two client fixtures (A and B), and every
-  assertion checks that B's data never appears in A's response.
-- `@/tests/sync/unit/flow.test.ts` covers cron → queue handoff;
-  `tests/tenant-isolation/unit/repository.test.ts` covers the RLS gate contract. Change either and
-  those tests must change with it.
-- e2e lives in `tests/<feature>/e2e/*.spec.ts` and is Playwright: a `public` project that runs in CI
-  against placeholder env, and an `@auth` project that runs only locally. Component-render tests remain
-  deliberately absent — adding a testing-library dependency is a decision to raise, not one to make
-  silently (see `docs/superpowers/specs/2026-09-23-test-suite-architecture-design.md` §2).
+- Tests live in `tests/<feature>/<tier>/`, imported through `@/`, never relatively
+- Mock at the boundary, unit tier only
+- Every route test covers `401`/`403`/`400` and no-data-before-auth
+- Opt-in tiers exit 0 — report which tier a run covered
 
 ## Development Workflow — Portable core
 
@@ -1150,7 +1128,7 @@ After the narrowing there is **no** `authenticated` entry in `pg_class.relacl` �
 (2026-09-30), so `/connections` serves a signed-in user on hosted and the only `api_credentials`
 rows there are the seeded placeholders; the narrowing migration above is applied **to the local
 stack only** — hosted still grants table-wide `select` to `authenticated` until that apply gets its
-own yes. The accepted limitation both this file and `context/feature-specs/09-connections.md` used
+own yes. The accepted limitation both this file and `specs/09-connections.md` used
 to record (row-level policy → the reference column-selectable) is closed; it was acceptable while it
 stood because the column holds an opaque Vault reference, not key material, and nothing in the app
 decrypts it.
@@ -1234,7 +1212,7 @@ and the entry is the role-gated Admin item in `NavUser`. `/profile` is in the sa
 row was deleted as a duplicate of that block, which carries Profile and Edit profile. Because
 `NavUser` sits in the shell and
 not in the dashboard header, the admin door is now open on the `EmptyShell` states too — the gap
-`context/feature-specs/07-admin.md` tracked is closed, and `AccountMenu` is deleted.
+`specs/07-admin.md` tracked is closed, and `AccountMenu` is deleted.
 No `sitemap.ts`/`robots.ts`, and no LLM/Claude dependency.
 
 `lib/cache/invalidate.ts` owns `DASHBOARD_OVERVIEW_TAG = "dashboard-overview"`; revalidation happens
@@ -1302,6 +1280,10 @@ Skills that exist and when to load them:
 
 - `babysitting-a-pr` + `leaving-pr-comment` — how PR review bots, comments and checks get handled
   and worded. Also installed user-level, so they apply to every repo.
+- Process: `development-workflow` (the per-unit loop), `verification-gates` (the gate chain and how
+  to report each run), `testing` (tiers, organization, mocking boundaries, route coverage),
+  `git-workflow` (commits, push discipline, PR shape). Each closes by naming the section it
+  implements; that section, not the skill, is the contract.
 - Stack: `code-review`, `feature-component`, `frontend-design`, `shadcn`, `supabase`,
   `supabase-postgres-best-practices`, `tailwind-design-system`, `motion-design`, `playwright-cli`,
   `migrate-radix-to-base`.
@@ -1312,11 +1294,13 @@ The mirror, measured 2026-10-13 with `readlink` and `-L`. It is **neither one me
 direction**, and there are **no hardlinks** — an inode match in `ls -i` printed above a linked name
 is one file reached twice, not two links to it:
 
-- `.agents/skills/` carries 13 entries and holds the real content for **12**. `feature-component`
-  is itself a symlink (`git ls-files -s` mode `120000`) into `.claude/skills/`.
-- `.claude/skills/` carries 22 entries: **18 symlinks into `.agents/skills/`** and **4** real
+- `.agents/skills/` carries 17 entries and holds the real content for **12**. Five are symlinks
+  (`git ls-files -s` mode `120000`) into `.claude/skills/`: `feature-component` and the four process
+  skills above.
+- `.claude/skills/` carries 26 entries: **18 symlinks into `.agents/skills/`** and **8** real
   directories. So for those 18 the source of truth is `.agents/skills/`, and only `feature-component`
-  is authored in `.claude/skills/` — the opposite of "edit `.claude/`, the mirror follows".
+  plus those four are authored in `.claude/skills/` — the opposite of "edit `.claude/`, the mirror
+  follows".
 - `babysitting-a-pr`, `leaving-pr-comment` and `playwright-cli` are the exception: each is a real
   directory in **both** trees, byte-identical today (`diff -rq` clean). Nothing propagates between
   the pair, so editing one silently un-pairs them.
@@ -1330,8 +1314,8 @@ is one file reached twice, not two links to it:
 Check the counterpart before editing it — `[ -L path ]` separates a link from a directory, and
 `git ls-files -s path` prints `120000` for a committed link. `git add` refuses a path that resolves
 *through* a link (`fatal: pathspec '…' is beyond a symbolic link`, exit `128`), so stage the real
-directory: `.agents/skills/<name>/` for the 18, `.claude/skills/feature-component/` for the one that
-goes the other way. `.opencode/` carries only
+directory: `.agents/skills/<name>/` for the 18, `.claude/skills/<name>/` for the five that
+go the other way. `.opencode/` carries only
 `commands/feature-component.md` — its own `.gitignore` keeps the tool's `node_modules/` and
 `package.json` untracked, so do not expect skills there.
 
@@ -1341,6 +1325,12 @@ goes the other way. `.opencode/` carries only
 regenerated by `next dev` — commit it with your work rather than deleting it. Everything below the
 `# SERVICE ARCHITECTURE` heading is hand-maintained: update it in the same change that alters the
 surface described here, and move newly built modules out of § TARGET STATE and into this section.
+
+# FEATURE SPECS
+
+Feature specifications live in `specs/`, one file per deliverable unit, numbered in implementation
+order; `specs/00-template.md` is the skeleton. `docs/superpowers/specs/` holds dated design docs
+instead — a spec states requirements for one unit, a design doc records one decision.
 
 # TARGET STATE
 

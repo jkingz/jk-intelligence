@@ -50,10 +50,11 @@ CI (`.github/workflows/ci.yml`) runs the four above plus the public e2e tier on 
 
 ## Feature workflow
 
-Read [AGENTS.md](AGENTS.md) and its ordered `context/` files before implementing.
+Read [AGENTS.md](AGENTS.md) before implementing: § STANDING RULES, then § APPLICATION BUILDING
+CONTEXT in order.
 
-- Specs: `context/feature-specs/<nn>-<slug>.md`. Components: `components/features/<slug>/`, exported through `index.ts`. Numbers belong only to spec filenames.
-- Tracker: mark **In Progress** before implementing, complete after verification.
+- Specs: `specs/<nn>-<slug>.md`. Components: `components/features/<slug>/`, exported through `index.ts`. Numbers belong only to spec filenames.
+- Tracker: record the unit under `docs/progress-tracker.md`'s `## Completed` **after** verification; the four history sections stay as they are. Current status lives in AGENTS.md § Project Overview → Status and § Open product questions.
 - Branches `feat/<slug>`, titles `feat(<slug>): <summary>`. Commit, push and open PRs only when asked.
 - Full rules: [docs/conventions/feature-components.md](docs/conventions/feature-components.md).
 

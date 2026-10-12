@@ -11,11 +11,11 @@ Scaffold, structure, and wire a new feature as a self-contained folder under `co
 User asks to "add feature X", "scaffold feature <slug>", "wire up a new feature", or creates a new feature spec.
 
 ## Inputs
-- Use the requested spec `context/feature-specs/<nn>-<slug>.md` (or ask). Strip `<nn>-` for feature folders, imports, branches, and PR scopes; numbers belong only to specs.
+- Use the requested spec `specs/<nn>-<slug>.md` (or ask). Strip `<nn>-` for feature folders, imports, branches, and PR scopes; numbers belong only to specs.
 
 ## Workflow
-1. Verify spec exists in `context/feature-specs/<nn>-<slug>.md`. If not, write it first (goal, scope, UI, implementation, security, checks).
-2. Add tracker "In Progress" entry in `docs/progress-tracker.md` BEFORE implementing.
+1. Verify spec exists in `specs/<nn>-<slug>.md`. If not, write it first (goal, scope, UI, implementation, security, checks).
+2. Write no tracker entry yet — `## In Progress` in `docs/progress-tracker.md` is history, not a status board; the record is step 8, after verification.
 3. Create folder + barrel:
    ```
    components/features/<slug>/
@@ -32,7 +32,7 @@ User asks to "add feature X", "scaffold feature <slug>", "wire up a new feature"
 5. Wire pages/routes via barrel only: `import { X } from "@/components/features/<slug>"`.
 6. PR (when requested): branch `feat/<slug>`, title `feat(<slug>): <what>`, body links spec + tracker note.
 7. Verify: `pnpm test && pnpm typecheck && pnpm lint && pnpm build`.
-8. Move tracker entry to Completed; update any changed context files.
+8. Record the unit under `docs/progress-tracker.md`'s `## Completed`; update the feature's spec in `specs/` and any `AGENTS.md` section the change made untrue.
 
 Full rules: `docs/conventions/feature-components.md`
 
