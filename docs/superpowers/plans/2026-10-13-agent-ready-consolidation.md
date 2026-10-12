@@ -28,6 +28,14 @@ Every task's requirements implicitly include this section.
   records. `supabase/migrations/` is excluded because rule 16 forbids rewriting an applied migration
   — `20261010000000_credential_reference_unselectable.sql:10` names `RULES.md §16` and must keep
   doing so. Task 11's final grep uses this same form.
+- **Every fold grep runs twice: the path-prefixed term *and* the bare basename.** Measured during Task 3's
+  review: a comment that says `see architecture-context.md invariant 4-5` is a live pointer at a file this
+  plan deletes, and `git grep "context/architecture-context"` cannot see it — the gate then reports
+  `exit: 1` on a tree with four dangling references. So each task's failing check is
+  `git grep -n "<basename>\.md" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md'`
+  as well as the path-prefixed form, and the bare form is the one that must reach zero for the file it
+  deletes. The exception is Task 9: `context/feature-specs/` *moves*, so a bare `08-app-shell.md` still
+  resolves to a real file and is not dangling — there the path-prefixed grep is the gate.
 - **Rule 14 carries a `Transitional` list that every fold task shrinks by exactly one entry** (Tasks 2–9). That is how the read order stays truthful while six files are being emptied one commit at a time. A task that forgets it leaves a pointer at a deleted file, which is the defect this whole plan is built to avoid.
 - **No new facts.** Anything not pointable at existing text or code goes under `# TARGET STATE — Not Yet Built`, labelled as intent.
 - **No application behavior changes.** The only `.ts` edits in this plan are comment citation strings.
@@ -70,8 +78,8 @@ belongs to the task that deletes the *target* — that is what keeps no commit d
 | deleted file | live pointers to repair, in the commit that deletes it | host dies at |
 | --- | --- | --- |
 | `context/project-overview.md` | `README.md:5` (its overview half; the tracker half is Task 8's) | — |
-| `context/architecture-context.md` | `README.md:24`, `context/development-workflow.md:102` and `:118`, `docs/target-state.md:278`, `lib/db/repository.ts:325` | Task 6 / Task 7 / stays |
-| `context/ui-context.md` | none outside `AGENTS.md`'s Transitional list and the Task 2 stub | — |
+| `context/architecture-context.md` | `README.md:24`, `context/development-workflow.md:102` and `:118`, `docs/target-state.md:278`, `lib/db/repository.ts:325`, **plus four bare-name sites measured at `009a57d`**: `app/(app)/connections/page.tsx:11`, `context/code-standards.md:8` and `:230`, `context/feature-specs/04-dashboard.md:50` | Task 6 / Task 7 / stays |
+| `context/ui-context.md` | `AGENTS.md`'s Transitional list **plus five bare-name sites measured at `009a57d`**: `components/features/app-shell/components/sidebar-provider.tsx:43`, `components/features/dashboard/components/dashboard.tsx:95`, `context/feature-specs/03-user-profile.md:19`, `context/feature-specs/08-app-shell.md:32`, `tests/dashboard/e2e/rail.spec.ts:11` | — |
 | `context/code-standards.md` | `context/pm-conventions.md:30` | Task 6 |
 | `context/development-workflow.md` + `context/pm-conventions.md` | none outside `AGENTS.md:98` | — |
 | `docs/target-state.md` | `README.md:6`, `AGENTS.md` inside the ported rules (`:104`) and the sections Tasks 2–6 carried in | — |
@@ -445,6 +453,7 @@ over intact, including the force-dynamic note that is load-bearing for pnpm buil
 **Files:**
 - Modify: `AGENTS.md` (new `## UI Context`)
 - Delete: `context/ui-context.md`
+- Modify (bare-name pointers at the deleted file, measured at `009a57d`): `components/features/app-shell/components/sidebar-provider.tsx:43`, `components/features/dashboard/components/dashboard.tsx:95`, `context/feature-specs/03-user-profile.md:19`, `context/feature-specs/08-app-shell.md:32`, `tests/dashboard/e2e/rail.spec.ts:11`
 
 **Produces:** `## UI Context` with every subsection of the source in its original order and wording.
 
@@ -452,21 +461,39 @@ over intact, including the force-dynamic note that is load-bearing for pnpm buil
 
 ```bash
 grep -c "^## UI Context" AGENTS.md    # expect 0
+git grep -n "ui-context\.md" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' | wc -l    # expect 6 at this commit: rule 14's Transitional entry plus the five bare-name sites above
 ```
 
 - [ ] **Step 2: Port, nothing dropped**
 
-Copy everything from `context/ui-context.md`'s `## Theme` through `## Icons` under `## UI Context`, demoting each heading one level. The token tables are verified hex-for-hex against `globals.css` and the design says do not compress them. Line 162's citation of `context/progress-tracker.md` stays byte-identical — that file still exists until Task 8, and Task 8 amends the pointer.
+Copy everything from `context/ui-context.md`'s `## Theme` (line 3) through **end of file** (line 290 —
+`## Icons` is the last heading and its prose runs past it) under `## UI Context`, demoting each heading one
+level. Insert the section **before `# SERVICE ARCHITECTURE`**, so rule 14's read order — Project Overview →
+Architecture Context → UI Context — is the file's own order. The token tables are verified hex-for-hex
+against `globals.css` and the design says do not compress them. Line 162's citation of
+`context/progress-tracker.md` and line 193's of `context/feature-specs/08-app-shell.md` both stay
+byte-identical — neither target has moved yet; Task 8 amends the first and Task 9 the second, and both
+count their sites by grep, so travelling in is not losing them.
+
+**Ruling on the overlap, so it is not re-litigated by review:** § Layout Patterns restates the rail's
+collapse width, the `Sheet` drawer, `NavUser`, and `/admin` having no active row — all of which § SERVICE
+ARCHITECTURE → Pages and caching already says. Keep both, and say why in the commit body: § Pages and
+caching claims *what exists and why the page is static or dynamic*; § UI Context claims *how the thing is
+composed* — the class names, the `group-data-[collapsible=icon]:hidden` rationale, `NavUser`'s three-line
+deviation. Port rule 2 drops only where the destination carries *the same* claim, and here it does not.
 
 - [ ] **Step 3: Verify and delete**
 
 ```bash
 git rm context/ui-context.md
 grep -n "bg-base\|text-copy-primary" AGENTS.md; echo "exit: $?"   # expect exit 1: the bad tokens must not appear
-wc -l AGENTS.md                                                   # expect ≈ 915 (Task 3's total + ui-context.md's ~286 ported lines)
+git grep -n "ui-context" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md'; echo "exit: $?"    # expect exit 1 — this is the bare-name gate
+wc -l AGENTS.md                                                   # expect ≈ 928 (639 at `57e37d5` + 288 source lines + the section heading) — the running measured total governs, not the printed number
 ```
 
-Delete `context/ui-context.md` from rule 14's Transitional list.
+Delete `context/ui-context.md` from rule 14's Transitional list. Repoint each of the five bare-name sites at
+the section that now holds the claim (`AGENTS.md § UI Context`), in each host file's own wording — the two
+component comments and the e2e comment name a token or a width, and the two spec files name layout patterns.
 
 - [ ] **Step 4: Commit**
 
@@ -474,7 +501,10 @@ Delete `context/ui-context.md` from rule 14's Transitional list.
 git add -A && git commit -m "docs: the UI context moves in whole, token tables and all
 
 Nothing dropped: every hex value here was checked against globals.css, and the template's own
-anti-pattern list says an unverified token name fails silently rather than loudly."
+anti-pattern list says an unverified token name fails silently rather than loudly.
+Kept both copies of the rail/drawer/NavUser claims on purpose: § Pages and caching says what
+exists and why the page is static, § UI Context says how the thing is composed.
+Repaired five bare-name pointers this commit would otherwise have left dangling."
 ```
 
 ---
@@ -1017,6 +1047,7 @@ Add the four skills to `## Repo skills`' load-when list.
 pnpm typecheck && pnpm lint
 ls context 2>&1 | head -2                                   # expect: No such file or directory
 git grep -n "RULES\.md\|context/" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md'; echo "exit: $?"
+git grep -n "project-overview\.md\|architecture-context\.md\|ui-context\.md\|code-standards\.md\|development-workflow\.md\|pm-conventions\.md\|target-state\.md" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md'; echo "exit: $?"    # the bare-name gate — the path-prefixed one above cannot see `see ui-context.md` in a code comment
 git log --oneline -1 --follow -- specs/09-connections.md     # expect the move visible in history
 ```
 
