@@ -463,7 +463,7 @@ Copy everything from `context/ui-context.md`'s `## Theme` through `## Icons` und
 ```bash
 git rm context/ui-context.md
 grep -n "bg-base\|text-copy-primary" AGENTS.md; echo "exit: $?"   # expect exit 1: the bad tokens must not appear
-wc -l AGENTS.md                                                   # expect ≈ 750
+wc -l AGENTS.md                                                   # expect ≈ 915 (Task 3's total + ui-context.md's ~286 ported lines)
 ```
 
 Delete `context/ui-context.md` from rule 14's Transitional list.
@@ -503,7 +503,7 @@ Copy `## General` through the end of `## Testing`, demoting headings one level. 
 ```bash
 git rm context/code-standards.md
 grep -n "invented helpers\|readDashboard" AGENTS.md; echo "exit: $?"   # expect exit 1 — no invented helper names
-wc -l AGENTS.md                                                        # expect ≈ 1,000
+wc -l AGENTS.md                                                        # expect ≈ 1,155 (Task 4's total + ~240, Testing's 29 lines going to a pointer)
 ```
 
 Delete `context/code-standards.md` from rule 14's Transitional list.
@@ -533,11 +533,26 @@ pointer first would have pointed at a file that is not there."
 grep -c "^## Development Workflow\|^## PM Conventions" AGENTS.md    # expect 0
 ```
 
-- [ ] **Step 2: Two subsections must be preserved, not dropped**
+- [ ] **Step 2: Which portable-core lines survive the fold — measured, not assumed**
 
-The source's portable core (1–63) mostly restates rules 1–10, but two lines exist nowhere else. Add them to `## Development Workflow — Portable core` verbatim:
-- `A guessed constant, threshold, or policy is a requirement you invented. Label it or drop it.` (line 31)
-- `If a foundation file seems to need editing, the real problem is upstream of it — say so instead of working around it.` (lines 53–54)
+The source's portable core (1–63) partly restates rules 1–10, and the spec says the core drops. Measured
+line by line against `AGENTS.md` rules 1–17, these lines are **not** carried anywhere in the file and must
+be ported verbatim into `## Development Workflow — Portable core`:
+
+| source lines | the claim | why rules 1–17 do not cover it |
+| --- | --- | --- |
+| 19–22 | one unit or one agent at a time; split when a step crosses boundaries (the repo's five pairings); "if end-to-end verification of a step is not quick, the scope is too broad" | rule 3 fixes *what* is in scope, never *how to split* it |
+| 33–40 | the ordered done-definition — tests, typecheck, lint, build, then "anything a test cannot reach was exercised for real"; new behavior gets a new test in the same change | rule 13 names the four commands, not the order or the untestable-then-exercise step |
+| 46 | status docs record actual state; delete or re-mark an entry the moment its claim stops being true | no rule addresses a status doc |
+| 48 | do not restate the spec in a doc — link it; duplication is how docs go stale silently | no rule addresses doc duplication |
+| 51–52 | never patch a vendored component, framework file or third-party internals; if a foundation file seems to need editing the real problem is upstream | rules 1–17 say nothing about vendored code |
+| 57–58 | one logical change per commit; on a long-lived branch pull/rebase the trunk before pushing, `--force-with-lease` only | rule 7 covers the `dev` pull and the force-push prohibition, not the lease form |
+
+Line 31 (`A guessed constant, threshold, or policy is a requirement you invented. Label it or drop it.`)
+and the rest of Requirements (28–30) are rule 10's — port 31 only. The loop (10–16) is replaced by Step 3's
+quick reference. Scoping 23–25 is rule 3. Docs-and-truth 43–45 is rules 10 and 15. Git and review 59–61 is
+rule 8. Requirements 27's heading and everything else not listed above is duplicated and drops — **name every
+dropped line in the commit body**, and if a line you meant to drop turns out to be uncovered, port it.
 
 - [ ] **Step 3: Port the three sections**
 
@@ -567,7 +582,7 @@ git rm context/development-workflow.md context/pm-conventions.md
 ```bash
 git grep -n "context/development-workflow\|context/pm-conventions" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md'; echo "exit: $?"
 grep -c "^## Development Workflow\|^## PM Conventions" AGENTS.md    # expect 3
-wc -l AGENTS.md                                                     # expect ≈ 1,100
+wc -l AGENTS.md                                                     # expect ≈ 1,235 (Task 5's total + ~60 appendix + ~20 PM)
 ```
 
 Delete `context/development-workflow.md` and `context/pm-conventions.md` from rule 14's Transitional list.
