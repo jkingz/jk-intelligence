@@ -698,8 +698,8 @@ const row: any = await fetchGSC()
   When unsure, `grep -- "--color-" app/globals.css`.
 - Opacity modifiers on state tokens are the standard tint pattern: `bg-state-warning/10` +
   `text-state-warning`.
-- Border radius scale: `rounded-xl` small elements, `rounded-2xl` cards (metric cards always),
-  `rounded-3xl` modals.
+- Border radius comes from § Border Radius — do not invent a value. Metric cards are always
+  `rounded-2xl`, and badges/inline stay on `rounded-lg` rather than the button value.
 
 ### API Routes
 
