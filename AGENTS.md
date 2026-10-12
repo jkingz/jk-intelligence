@@ -372,7 +372,8 @@ All colors defined as CSS custom properties in `globals.css`, mapped to Tailwind
 #### globals.css Pattern
 
 ```css
-:root {
+:root,
+[data-theme="dark"] {
   /* dark mode defaults */
   --bg-base: #0d0d0d;
   --accent-primary: #ff3b30;
@@ -385,6 +386,12 @@ All colors defined as CSS custom properties in `globals.css`, mapped to Tailwind
   /* ... */
 }
 ```
+
+The dark block is declared on `:root` **and** on any `[data-theme="dark"]` element — same values, scoped
+locally — so a subtree can pin dark without a toggle. `AuthPageShell` does exactly that on both its
+branches (`components/features/email-password-auth/components/auth-page-shell.tsx:19,29`), because no
+theme control exists on an auth route, and `tests/identity/unit/auth-dark-default.test.ts:33` asserts the
+two-selector form in the stylesheet.
 
 Toggle: set `document.documentElement.dataset.theme = 'light' | 'dark'`. Persist to localStorage.
 
@@ -601,7 +608,9 @@ Lucide React. Stroke-based only — no filled variants.
 | Empty states | `h-8 w-8` |
 | Trend arrows | `h-3 w-3` |
 
-Trend up/down icons: `TrendingUp` / `TrendingDown` from Lucide. Color via state tokens, not icon props.
+Trend direction is `ArrowUpRight` / `ArrowDownRight` — see § Trend Indicators. `TrendingUp` is a card and
+section icon (`dashboard-metrics.tsx:28`, `landing-page.tsx:27`), never a direction glyph, and
+`TrendingDown` is not used anywhere. Color via state tokens, not icon props.
 
 ## Code Standards
 
@@ -818,22 +827,26 @@ const [gsc, ga4, semrush] = await Promise.allSettled([
 
 ```
 lib/
+  admin/        — provisioning schemas, Postgres error copy, definer-RPC caller (no React, no `cookies()`)
   agents/       — authAgent (identity + role). Other agents: not built
   api/          — `guard.ts`: the response shape and the session/admin/tenant gates for the 9 session-gated route files (the 2 bearer routes build their own bodies)
   auth/         — cron secret check, proxy routing decisions, safe `next`
   cache/        — tag ownership (`invalidate.ts`), worker→app ping (`notify.ts`)
+  connections/  — `status.ts`: the pure join that backs `/connections`
   dashboard/    — read models shared by the boot and metrics routes
   db/           — repository (reads, tenant gate, writes) + `admin.ts` service-role client
   exports/      — dataset builder, CSV, PDF + `fonts/`, quota, filename
+  navigation/   — `destinations.ts`: the rail's link list and `activeDestination()`
   queue/        — BullMQ queue definition + worker entrypoint
   rate-limit.ts — `SlidingWindowLimiter`
   supabase/     — client construction (protected)
 components/
   ui/           — shadcn primitives (protected, do not hand-edit)
-  features/     — dashboard, data-export, email-password-auth, landing, user-profile
+  features/     — app-shell, admin, connections, dashboard, data-export, email-password-auth, landing, user-profile
 app/
   api/          — thin route handlers behind `lib/api/guard.ts` (11 files: 9 session-gated, 2 bearer; see § HTTP surface)
-  dashboard/    — static shell + client-side boot fetch
+  (app)/        — route group, adds no URL segment: dashboard, connections, profile, admin
+    dashboard/  — static shell + client-side boot fetch
 types/          — shared contracts: metrics.ts, dashboard.ts, database.ts (handwritten)
 supabase/
   migrations/   — append-only, timestamped; schema + RLS together
