@@ -27,7 +27,7 @@ real change) may be a single commit; anything larger is a PR.
 
 - `pnpm test && pnpm typecheck && pnpm lint && pnpm build` — all four, in that order. No test
   count is quoted here on purpose: read the suite output, not this file.
-- Add/update tests for behavior changed, per `context/code-standards.md` (Testing) and the
+- Add/update tests for behavior changed, per `AGENTS.md` § Code Standards (Testing) and the
   verification loop in `context/development-workflow.md`.
 
 **Skip when not needed:** tiny doc-only or rename-only changes don't need a PR; commit
