@@ -624,7 +624,17 @@ dropped line in the commit body**, and if a line you meant to drop turns out to 
 6. Report what changed, what was verified, what is unknown
 ```
 
-`## Development Workflow — Project appendix`: the source's 65–123 verbatim (Read order, Commands table, Where logic goes, Next.js 16 fork, Schema changes, Data today, Agent development rules, Before moving to the next unit). In its `### Read order` subsection, list only what is authoritative now — `AGENTS.md` § STANDING RULES → § APPLICATION BUILDING CONTEXT (PROJECT OVERVIEW → ARCHITECTURE CONTEXT → UI CONTEXT → CODE STANDARDS) → `context/development-workflow.md`'s successors inline → `docs/target-state.md` → `context/progress-tracker.md`.
+`## Development Workflow — Project appendix`: the source's 65–123 verbatim (Read order, Commands table, Where logic goes, Next.js 16 fork, Schema changes, Data today, Agent development rules, Before moving to the next unit).
+
+Its `### Read order before implementing` subsection is two lines (68–69) and needs one change plus one restraint:
+- `:68` reads `` `AGENTS.md` § STANDING RULES → § APPLICATION BUILDING CONTEXT ``. Ported *into* `AGENTS.md`,
+  naming the host file from inside it is the self-citation class Task 3's fix round removed and Task 5's
+  Step 2 restates — drop the filename, keep the `§ …` form.
+- Do **not** expand it into the six-section ordering. Rule 14 in § STANDING RULES already carries that
+  order, and both lines are prescriptive — so the appendix restating it would be same-register duplication,
+  which the register rule forbids. The appendix keeps its two sentences and points at rule 14 for the order.
+- `:69`'s `docs/target-state.md` keeps its path: that file still exists until Task 7, which rewrites the
+  pointer to `§ TARGET STATE`.
 
 `## PM Conventions`: `context/pm-conventions.md` 3–24 verbatim (its lead paragraph, then Commits, PRs), **excluding** its `## Review gate` (26–31) which restates rule 13, and **keeping** its closing `**Skip when not needed:**` lines (33–34) — that exception is not in rules 1–17.
 
@@ -632,10 +642,12 @@ Two things this line was missing, measured at `57e37d5`:
 - **Lines 3–5 carry a number no rule holds** — "small tasks (< 15 lines of real change) may be a single
   commit; anything larger is a PR". 33–34 only says a doc-only change skips the PR, which is the other
   direction. Port the lead; dropping it is the silent-content-death this plan keeps hitting.
-- **Line 22 cites `context/development-workflow.md`, which this commit deletes.** Amend it here, in the
-  same commit, to `AGENTS.md § Development Workflow` — the one pointer in this plan whose host and target
-  die together, so no later task can repair it. Lines 30–31 also cite both files but die with the
-  `## Review gate` exclusion.
+- **Lines 21–22 carry two citations this commit invalidates.** The bullet reads "follow the scoping rules
+  in `` `AGENTS.md` § STANDING RULES `` (standing constraints) and `context/development-workflow.md`". After
+  the fold both targets live inside `AGENTS.md`, so port it as "§ STANDING RULES (standing constraints) and
+  § Development Workflow" — the filename drops with the self-citation rule, and `context/development-workflow.md`
+  is the one pointer in this plan whose host and target die in the same commit, so no later task can repair
+  it. Lines 30–31 also cite both files but die with the `## Review gate` exclusion.
 
 - [ ] **Step 4: Delete both sources**
 
@@ -648,8 +660,13 @@ git rm context/development-workflow.md context/pm-conventions.md
 ```bash
 git grep -n "context/development-workflow\|context/pm-conventions" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md'; echo "exit: $?"
 grep -c "^## Development Workflow\|^## PM Conventions" AGENTS.md    # expect 3
-wc -l AGENTS.md                                                     # expect ≈ 1,235 (Task 5's total + ~60 appendix + ~20 PM)
+git grep -c "\`AGENTS.md\` §" AGENTS.md    # expect the count NOT to have grown — the three conversions above
+wc -l AGENTS.md   # ≈ Task 5's actual total + ~60 appendix + ~20 PM. The running measured total governs; this plan's printed budgets are forecasts, not gates.
 ```
+
+Task 5 repointed `context/pm-conventions.md:30` at `` `AGENTS.md` § Code Standards `` to keep *its* gate
+clean; that line sits inside the excluded `## Review gate` (26–31), so it never reaches this commit and needs
+no further repair. If you find yourself porting it, you have ported the excluded range — stop.
 
 Delete `context/development-workflow.md` and `context/pm-conventions.md` from rule 14's Transitional list.
 
