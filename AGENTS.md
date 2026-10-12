@@ -90,14 +90,13 @@ Rules 1–10 are the **portable core** — they hold in every repo this workspac
 
 ### 14. Read order
 `AGENTS.md` § STANDING RULES → then, for architectural decisions, § APPLICATION BUILDING CONTEXT in
-order: PROJECT OVERVIEW → ARCHITECTURE CONTEXT → UI CONTEXT → CODE STANDARDS → DEVELOPMENT WORKFLOW
-→ PM CONVENTIONS. Then § SERVICE ARCHITECTURE for what exists, § TARGET STATE for what does not.
+order: Project Overview → Architecture Context → UI Context → Code Standards → Development Workflow
+→ PM Conventions. Then § SERVICE ARCHITECTURE for what exists, § TARGET STATE for what does not.
 
-**Transitional — still authoritative as separate files:** `context/project-overview.md`,
-`context/architecture-context.md`, `context/ui-context.md`, `context/code-standards.md`,
-`context/development-workflow.md`, `context/pm-conventions.md`, `docs/target-state.md`,
-`context/progress-tracker.md`. Delete an entry in the commit that folds its file in; the entry is a
-pointer, not a note.
+**Transitional — still authoritative as separate files:** `context/architecture-context.md`,
+`context/ui-context.md`, `context/code-standards.md`, `context/development-workflow.md`,
+`context/pm-conventions.md`, `docs/target-state.md`, `context/progress-tracker.md`. Delete an entry
+in the commit that folds its file in; the entry is a pointer, not a note.
 
 ### 15. Tenant isolation is RLS's job
 - Client-ownership is decided only by `canAccessClient` / `listAccessibleClients` in `lib/db/repository.ts`. No route or helper may re-implement that rule in TypeScript.
@@ -114,22 +113,94 @@ pointer, not a note.
 - `next/image` `Image`, never raw `<img>`. SVG sources only if self-authored and script-free.
 - shadcn/`components/ui/*` and `lib/supabase/*` are protected foundations: don't edit to make a feature pass.
 
-## Application Building Context
+# APPLICATION BUILDING CONTEXT
 
-Read the following files in order before implementing or making any architectural decision:
+## Project Overview
 
-1. `context/project-overview.md` — product definition, goals, features, and scope
-2. `context/architecture-context.md` — system structure, boundaries, storage model, and invariants
-3. `context/ui-context.md` — theme, colors, typography, canvas design, and component conventions
-4. `context/code-standards.md` — implementation rules and conventions
-5. `context/development-workflow.md` — development workflow, scoping rules, and delivery approach
-6. `context/progress-tracker.md` — current phase, completed work, open questions, and next steps
+### Status
 
-Project-wide convention: all images use `next/image` (`Image`), never a raw `<img>` element (enforced by `@next/next/no-img-element`). SVG sources are allowed for self-authored, script-free assets only. Details in `context/code-standards.md` → "Images".
+**Built** — Supabase Auth (Google + email/password) with the RLS-backed tenant gate; a multi-client
+dashboard (metric cards, trends, keyword rank chart, query table, date ranges) booting from one
+`GET /api/dashboard/boot`; CSV/PDF export behind a sliding-window quota; a read-only `/connections`
+status page; an admin provisioning panel at `/admin` with three `/api/admin/*` write routes; and the
+`app/(app)/` shell whose destination rail lists **two** rows — Dashboard and Connections
+(`lib/navigation/destinations.ts`).
 
-Update `context/progress-tracker.md` after each meaningful implementation change.
+**Not built** — real sync (`lib/queue/worker.ts` returns `mock_completed`; dashboard rows come from
+`scripts/seed.mjs` and the `api_credentials` rows `/connections` renders from
+`scripts/seed-connections.mjs`), any LLM integration (no `@anthropic-ai/sdk`, no `ANTHROPIC_API_KEY`,
+no Claude call in the repo), and a consumer for the `seo-sync` queue in production.
 
-If implementation changes the architecture, scope, or standards documented in the context files, update the relevant file before continuing.
+Verified: 2026-10-13, against the repo at the commit this section was ported into.
+
+State of record: `context/progress-tracker.md`.
+
+### Overview
+
+Multi-client automated SEO reporting platform. Clients and internal staff log in to view marketing and SEO performance data pulled daily from GSC, GA4, and SEO APIs. AI generates plain-English performance summaries. Admins manage clients, credentials, and sync jobs from a central admin panel.
+
+### Goals
+
+1. Authenticated multi-client access with strict data isolation.
+2. Automated daily data syncing from GSC, GA4, Semrush/Ahrefs.
+3. Historical metric storage and trend visualization.
+4. AI-generated performance commentary per client.
+5. Admin panel to add/manage clients and API credentials.
+6. Resilient sync: API failure does not break dashboard.
+
+### Core User Flow
+
+1. User signs in (Google OAuth).
+2. Client routed to own dashboard; admin routed to client list.
+3. Dashboard loads from cache (current_metrics); stale banner shown if > 24hrs.
+4. User views organic traffic, conversions, rankings, keyword movements.
+5. User selects date range for historical comparison.
+6. AI insight widget shows auto-generated summary of performance.
+7. Admin adds new client → sets API credentials → activates daily sync.
+8. Daily cron job syncs all clients → stores snapshots → updates cache.
+9. User downloads CSV/PDF export of metrics.
+
+Steps that do not execute today: 6 (no AI insight exists), 7's credential-and-activation half
+(`api_credentials` is read-only; the panel writes clients and members only), and 8 (the cron
+enqueues; nothing consumes it). Step 3 reads seeded rows.
+
+### Scope
+
+#### In Scope
+
+- Google OAuth + route protection
+- Multi-client data isolation (Supabase RLS)
+- Admin panel: client + credential management
+- GSC, GA4, Semrush/Ahrefs API integrations
+- Automated daily sync with error handling + retry
+- Historical metric storage (immutable snapshots)
+- Denormalized current_metrics cache (fast dashboard loads)
+- Stale-data detection + warning UI
+- Keyword rankings time-series
+- AI-generated performance summaries (Claude API)
+- CSV + PDF export
+- Sync audit logs
+
+#### Out of Scope
+
+- Billing and subscriptions
+- White-label branding per client (Phase 3+)
+- Competitor benchmarking (Phase 2+)
+- Technical SEO health crawl (Phase 2+)
+- Versioned spec history
+- Mobile-native app (responsive web only)
+- Slack/Zapier integrations
+
+### Success Criteria
+
+1. Client logs in, sees only their own data.
+2. Daily sync runs without manual intervention.
+3. Dashboard renders cached data even if all APIs are down.
+4. Admin can add new client and activate sync in < 5 mins.
+5. AI insight summary generated and displayed per client.
+6. Historical trend visible across any custom date range.
+7. CSV/PDF export works for any date range.
+8. Sync failures logged, admin alerted, no dashboard crash.
 
 # SERVICE ARCHITECTURE — implemented surface
 
@@ -364,3 +435,52 @@ the tool's `node_modules/` and `package.json` untracked, so do not expect skills
 regenerated by `next dev` — commit it with your work rather than deleting it. Everything below the
 `# SERVICE ARCHITECTURE` heading is hand-maintained: update it in the same change that alters the
 surface described here, and move newly built modules out of `docs/target-state.md`.
+
+# TARGET STATE — Not Yet Built
+
+Design intent that is **not** implemented. Treat this section as requirements for future work,
+**never** as a description of current behavior.
+
+## Product features the spec promises
+
+### Authentication & Access Control
+
+- Google OAuth and email/password via Supabase Auth, with email confirmation and password recovery.
+- Route protection: clients see only own data (RLS at DB layer).
+- Roles: admin (full access) | client (own data only) | staff (assigned clients).
+
+### Multi-Client Dashboard
+
+- Per-client dashboard: organic traffic, conversions, clicks, impressions, CTR, avg position.
+- Keyword rankings: top 3/10/20, biggest movers (up/down).
+- Landing page performance, backlinks summary, SEO visibility score.
+- Month-on-month + custom date range comparisons.
+- Last updated timestamp + stale-data warning banner.
+
+### Automated Data Sync
+
+- Daily cron job (2 AM) syncs all active clients.
+- Parallel API calls per client (Promise.allSettled — partial failure safe).
+- Sources: Google Search Console, GA4, Semrush/Ahrefs.
+- Retry: exponential backoff (3 attempts per source).
+- Circuit breaker: pause after 5 consecutive failures, alert admin.
+- Sync logs persisted per client per run.
+
+### AI Performance Insights
+
+- Claude API generates plain-English summary per client.
+- Input: current metrics + historical deltas.
+- Output: top wins, top declines, recommended focus areas.
+- Cached (not regenerated daily — cost control).
+
+### Admin Panel
+
+- Add/manage clients and API credentials (stored in Supabase Vault).
+- View sync logs and failure alerts per client.
+- Manual sync trigger per client.
+- Activate/deactivate clients.
+
+### Data Export
+
+- CSV export of historical metrics.
+- PDF report generation (per client, per date range).
