@@ -56,7 +56,11 @@ Every task's requirements implicitly include this section.
   **Exception, ruled during Task 1:** when a task must name the lines it dropped or amended (the
   drop-and-name constraint above), those names come first and the budget stretches to cover them — a
   body that hides a drop to stay short breaks the rule the body exists to serve. Task 1's commit ran 9
-  lines for three named drops; that is the trade, not a violation.
+  lines for three named drops; that is the trade, not a violation. **Amended at Task 9 review: the
+  shipped `/git-workflow` skill carries no `≤ 4 lines` number.** The cap is the template's, this
+  repo's § PM Conventions → Commits never had it, and every fold commit here needs a body long enough
+  to name its drops — so a skill that restates the cap would bounce its own delivering commit at the
+  Task 11 gate. The skill states the *why* requirement and the drop-naming duty instead.
 - `AGENTS.md` lines 1–9 (the `<!-- BEGIN:nextjs-agent-rules -->` … `<!-- END:nextjs-agent-rules -->` block) are never edited by hand and never deleted.
 - **A `§` reference matches its heading's exact text.** Task 1's rule 14 names the fold sections in
   ALL CAPS (`PROJECT OVERVIEW`), while Tasks 2–6 create them as title-case H2s (`## Project Overview`).
@@ -986,8 +990,9 @@ Declare the spies where the factory can close over them:
 `const boundary = vi.hoisted(() => ({ fn: vi.fn() }))`, and `afterEach(() => vi.resetAllMocks())`.
 
 `vitest.config.ts` aliases `server-only` to its empty module and sets `conditions: ["react-server"]`,
-so a test never needs its own `vi.mock("server-only")` — the few that carry one are dead weight; drop
-it when you touch that file.
+so a test never needs its own `vi.mock("server-only")` — 11 of the 41 test files still carry one
+(measured 2026-10-13), which is dead weight rather than a defect; drop it when you touch that file,
+and do not add it to a new one.
 
 New behavior gets a test in the same change; a bugfix gets a test that fails without the fix.
 
@@ -1092,7 +1097,9 @@ description: Commit conventions, push discipline for this repo's dev branch, PR 
 ## Commits
 
 Conventional prefixes: `feat:` `fix:` `style:` `perf:` `refactor:` `chore:` `docs:` `test:` `build:`
-`ci:`. One logical change per commit. Subject says **why**; body ≤ 4 lines. No co-authors, no
+`ci:`. One logical change per commit. Subject says **why** — a reader of `git log` alone should
+understand what defect existed before. Where a change drops or rewrites documented lines, the body
+names them, and that disclosure outranks brevity. No co-authors, no
 "generated with", no boilerplate. Check `git status` before `git add` — `.env*` is gitignored and a
 real env value must never land in a commit.
 

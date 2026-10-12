@@ -87,7 +87,7 @@ Rules 1–10 are the **portable core** — they hold in every repo this workspac
 - Tests live in `tests/<feature>/<tier>/` — features `identity`, `tenant-isolation`, `dashboard`, `export`, `sync`, `landing`, `platform`; tiers `unit`, `integration`, `e2e`. `AGENTS.md` lists what each feature owns. Name the file `<sut>.test.ts` (unit/integration) or `<flow>.spec.ts` (e2e); import the **subject under test** through `@/`, never relatively — a `./` specifier can silently resolve to a neighbouring file of the same name. Shared helpers under `tests/helpers/` are the one exception and may be imported relatively.
 - Unit tests mock at the boundary (`@/lib/agents/...`, `@/lib/db/repository`) — never inside business logic, and never make a real network or DB call. That last clause is **unit-tier only**: the integration tier exists precisely to put a real Postgres behind `canAccessClient`.
 - `pnpm test` is the **unit project**, not the whole suite. The `integration` project is `tests/*/integration/**/*.test.ts` — **three files / 21 tests as of 2026-10-12**: the two live-RLS files `tests/tenant-isolation/integration/rls-gate.test.ts` (`clients`, 5) and `credentials-visibility.test.ts` (`api_credentials`, 6), plus `tests/admin/integration/provisioning.test.ts` (admin definer RPCs, 10), run against the local stack. All three `skipIf(!TEST_SUPABASE_URL)`, so a green tier can mean *nothing ran* — read the passed/skipped counts, not the exit code. E2E is a separate runner. Run `pnpm test:all` and `pnpm test:e2e` before pushing. Narrow with `pnpm test dashboard`, never `pnpm test -- dashboard` — the latter silently runs everything.
-- Route handlers get a `<name>-route.test.ts` covering 401 / 403 / 400 and the no-data-leaked-before-auth path.
+- Route handlers get a `<name>-route.test.ts` covering 401 / 403 / 400 / 503 and the no-data-leaked-before-auth path.
 
 ### 14. Read order
 `AGENTS.md` § STANDING RULES → then, for architectural decisions, § APPLICATION BUILDING CONTEXT in
@@ -905,7 +905,8 @@ See `/testing` for tiers, organization, mocking patterns and commands.
 - Tests live in `tests/<feature>/<tier>/`, imported through `@/`, never relatively
 - Mock at the boundary, unit tier only
 - Every route test covers `401`/`403`/`400`/`503` and no-data-before-auth
-- Opt-in tiers exit 0 — report which tier a run covered
+- Opt-in tiers exit 0 — `pnpm test:integration` carries `--passWithNoTests` (`package.json:12`), so a
+  green run can mean nothing matched. Report which tier a run covered
 - Component-render tests are deliberately absent; a testing-library dependency is a decision to raise,
   not one to make silently (§2 of `docs/superpowers/specs/2026-09-23-test-suite-architecture-design.md`)
 
@@ -1316,8 +1317,9 @@ is one file reached twice, not two links to it:
 Check the counterpart before editing it — `[ -L path ]` separates a link from a directory, and
 `git ls-files -s path` prints `120000` for a committed link. `git add` refuses a path that resolves
 *through* a link (`fatal: pathspec '…' is beyond a symbolic link`, exit `128`), so stage the real
-directory: `.agents/skills/<name>/` for the 18, `.claude/skills/<name>/` for the five that
-go the other way. `.opencode/` carries only
+directory: `.agents/skills/<name>/` for the **nine** of those 18 that resolve — the other nine are
+links to nothing, so there is no file to stage for them anywhere — and `.claude/skills/<name>/` for
+the five that go the other way. `.opencode/` carries only
 `commands/feature-component.md` — its own `.gitignore` keeps the tool's `node_modules/` and
 `package.json` untracked, so do not expect skills there.
 

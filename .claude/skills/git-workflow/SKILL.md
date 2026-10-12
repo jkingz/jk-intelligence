@@ -8,7 +8,9 @@ description: Commit conventions, push discipline for this repo's dev branch, PR 
 ## Commits
 
 Conventional prefixes: `feat:` `fix:` `style:` `perf:` `refactor:` `chore:` `docs:` `test:` `build:`
-`ci:`. One logical change per commit. Subject says **why**; body ≤ 4 lines. No co-authors, no
+`ci:`. One logical change per commit. Subject says **why** — a reader of `git log` alone should
+understand what defect existed before. Where a change drops or rewrites documented lines, the body
+names them, and that disclosure outranks brevity. No co-authors, no
 "generated with", no boilerplate. Check `git status` before `git add` — `.env*` is gitignored and a
 real env value must never land in a commit.
 
