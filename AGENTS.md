@@ -264,7 +264,7 @@ Verified against `supabase/migrations/*` — not from the original spec.
 
 - `clients`: id uuid PK, name, **domain** (unique on `lower(domain)`), is_active, created_at.
 - `users`: id uuid PK → `auth.users` on delete cascade, role (`admin`|`client`|`staff`, default `client`), client_id FK (on delete set null), created_at. **No email column** — email lives in `auth.users`. Constraint `users_admin_has_no_tenant`: `admin` must have `client_id is null`.
-- `api_credentials`: client_id FK, source (`gsc`|`ga4`|`semrush`), credential_reference (must match `^vault:<uuid>$`), unique `(client_id, source)`. A pointer only — no key material in Postgres. The app reads `client_id`, `source`, `created_at` (via `listConnections()` for `/connections`); `credential_reference` is selected by no code path, and on the migrated local stack Postgres refuses it to `authenticated` rather than leaving it to convention — see `AGENTS.md` → Tenant isolation.
+- `api_credentials`: client_id FK, source (`gsc`|`ga4`|`semrush`), credential_reference (must match `^vault:<uuid>$`), unique `(client_id, source)`. A pointer only — no key material in Postgres. The app reads `client_id`, `source`, `created_at` (via `listConnections()` for `/connections`); `credential_reference` is selected by no code path, and on the migrated local stack Postgres refuses it to `authenticated` rather than leaving it to convention — see § SERVICE ARCHITECTURE → Tenant isolation.
 - `metrics_snapshots`: id uuid PK, client_id FK, source, run_id (1–512 chars), metrics jsonb (non-empty array), synced_at, created_at, unique `(client_id, source, run_id)` — immutable, append-only.
 - `keyword_rankings`: PK `(snapshot_id, metric_index)`, client_id FK, source, keyword, rank numeric ≥ 0, synced_at. FK to `metrics_snapshots` is `on delete cascade`, so deleting a snapshot deletes its keyword rows — hence invariant 7.
 - `current_metrics`: PK `(client_id, source)`, snapshot_id FK, run_id, metrics jsonb, synced_at, is_stale.
@@ -303,7 +303,8 @@ Verified against `supabase/migrations/*` — not from the original spec.
 
 **How invariants 4-5 apply to `/connections` (applied deliberately, not forgotten).** `listConnections()`
 is never wrapped in `unstable_cache`, and `app/(app)/connections/page.tsx` declares
-`export const dynamic = "force-dynamic"` — the app's only server-rendered tenant read, so it opts out of
+`export const dynamic = "force-dynamic"` — the app's only server-rendered tenant read (`/profile` reads only
+the caller's own `users` row; every metric read goes through `/api/*`), so it opts out of
 the data cache entirely rather than keying a cookie-bound client on nothing. The `force-dynamic` line
 is load-bearing: the cookie read happens inside `databaseOperation()`, whose catch-all converts Next's
 prerender bailout into `Error("Database operation failed")`, so removing it fails `pnpm build`. The
@@ -375,8 +376,8 @@ export async function canAccessClient(clientId: string): Promise<boolean> {
 
 Policies: `supabase/migrations/20260917000000_seo_poc.sql`,
 `20260920000000_add_staff_role.sql`, `20260920000001_rls_hardening.sql`,
-`20260925000000_connections_read.sql`, and `20261005000000_admin_provisioning.sql` — the five `public`
-`security definer` functions, applied to the local stack 2026-10-05 **and** to the hosted project
+`20260925000000_connections_read.sql`, and `20261005000000_admin_provisioning.sql`, whose five `public`
+`security definer` functions were applied to the local stack 2026-10-05 **and** to the hosted project
 2026-10-08, where an anonymous `POST /rest/v1/rpc/admin_directory` answers `42501` from the grant layer
 (no `EXECUTE` to `anon`) before any function body runs. `api_credentials` is readable through
 `api_credentials_select_tenant_or_admin`, which applies the same two `security definer` helpers as
@@ -416,7 +417,7 @@ Ten handlers in nine session-gated route files (`find app/api -name route.ts` �
 bearer routes are the exception) share one response-shape and gate module, `lib/api/guard.ts` — see
 Tenant isolation above.
 
-Nine session-gated route files (ten handlers) share one enforcement surface: `lib/api/guard.ts`. The tenant-scoped ones — the metrics pair and both export routes: validate the `{clientId}` path param → resolve identity → pass the RLS-backed tenant gate → read or delegate. Their precedence is 400 malformed id → 401 unauthenticated → 403 not this caller's client → 503 database failure; the two export routes add 429 (`Retry-After`) once the sliding-window quota is spent. The 401/403/503 decisions and their bodies come from the guard, which returns either the value the route needs or a finished `Response` — ordering stays in the handler, and only path/query validation runs before a gate. A rejected identity or gate read is a 503 with `{ error: "Database operation failed" }`, never a 401. Tenant gates go through `listAccessibleClients()` / `canAccessClient()`, never a TypeScript re-derivation: the guard forwards to those two and owns no ownership rule of its own. The gate's own denials are one sentence per status — 401 `Unauthorized` on every session-gated route since 2026-10-11, which replaced `"Forbidden"` on the metrics and export 401 path — while a body a route authors itself varies: `badRequest` messages name the input, and the PDF route's render failure answers 503 `"Report rendering failed"`. The two bearer routes (`cron/sync`, `revalidate/dashboard`) are the deliberate exception: no session, so `verifyCronSecret` and their own bodies.
+The tenant-scoped ones — the metrics pair and both export routes: validate the `{clientId}` path param → resolve identity → pass the RLS-backed tenant gate → read or delegate. Their precedence is 400 malformed id → 401 unauthenticated → 403 not this caller's client → 503 database failure; the two export routes add 429 (`Retry-After`) once the sliding-window quota is spent. The 401/403/503 decisions and their bodies come from the guard, which returns either the value the route needs or a finished `Response` — ordering stays in the handler, and only path/query validation runs before a gate. A rejected identity or gate read is a 503 with `{ error: "Database operation failed" }`, never a 401. Tenant gates go through `listAccessibleClients()` / `canAccessClient()`, never a TypeScript re-derivation: the guard forwards to those two and owns no ownership rule of its own. The gate's own denials are one sentence per status — 401 `Unauthorized` on every session-gated route since 2026-10-11, which replaced `"Forbidden"` on the metrics and export 401 path — while a body a route authors itself varies: `badRequest` messages name the input, and the PDF route's render failure answers 503 `"Report rendering failed"`. The two bearer routes (`cron/sync`, `revalidate/dashboard`) are the deliberate exception: no session, so `verifyCronSecret` and their own bodies.
 
 The three `/api/admin/*` handlers (`lib/api/guard.ts` owns their shape) replace that order with
 `gateAdmin()` → path-param uuid → body → zod → `callAdminRpc` → code→status, so the role guard and

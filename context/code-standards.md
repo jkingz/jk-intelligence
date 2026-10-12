@@ -5,7 +5,7 @@
 - Keep modules small and single-purpose.
 - Fix root causes — do not layer workarounds.
 - Do not mix unrelated concerns in one component or route.
-- Respect the system boundaries in `architecture-context.md`; a helper belongs in the layer that owns the data.
+- Respect the system boundaries in `AGENTS.md` § Architecture Context → System boundaries; a helper belongs in the layer that owns the data.
 - One agent per file, and one file per concern — `lib/agents/authAgent.ts` is the template. Agents other than `authAgent` do not exist yet; when added they follow `docs/target-state.md`.
 - Import within the app with the `@/` alias (`@/lib/db/repository`), never `../../..` climbing.
 - Any module reading env secrets or the service-role client starts with `import "server-only"`.
@@ -227,7 +227,7 @@ components/
   ui/           — shadcn primitives (protected, do not hand-edit)
   features/     — dashboard, data-export, email-password-auth, landing, user-profile
 app/
-  api/          — thin route handlers behind `lib/api/guard.ts` (11 files: 9 session-gated, 2 bearer; see architecture-context.md)
+  api/          — thin route handlers behind `lib/api/guard.ts` (11 files: 9 session-gated, 2 bearer; see `AGENTS.md` § HTTP surface)
   dashboard/    — static shell + client-side boot fetch
 types/          — shared contracts: metrics.ts, dashboard.ts, database.ts (handwritten)
 supabase/
