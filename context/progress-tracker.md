@@ -971,9 +971,14 @@ page's claims were made to match the build and the first live-RLS integration sl
   from pg_default_acl;` shows `authenticated=arwdDxtm/…` for kind `r` (table) in schema `public`,
   from **both** `postgres` and `supabase_admin` — the roles that create application tables here. A
   future `create table` in `public` therefore arrives already readable *and writable* by `authenticated`
-  with no migration ever granting it, which is how `api_credentials` got its table-wide `select` in
-  the first place. `RULES.md` §16 already binds every new table to ship its **policies** in the same
-  migration; this is the grant-shaped half of the same sentence, and the two ways to close it are
+  with no migration ever granting it. `api_credentials` did **not** get its wide grant that way:
+  `20260917000000_seo_poc.sql:199-207` revoked `all` from `public, anon, authenticated` on each table
+  it created (`api_credentials` at `:201`), and
+  `20260925000000_connections_read.sql:21` then granted `select` back explicitly — the exposure unit 3
+  closed. That is the useful comparison: the default is neutralized only when a migration says so, so a
+  future table whose migration forgets a blanket revoke is born open. `RULES.md` §16 already binds
+  every new table to ship its **policies** in the same migration; this is the grant-shaped half of the
+  same sentence, and the two ways to close it are
   `ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated` (one
   migration, after which each table must grant explicitly) or a standing rule that each new table's
   migration names the columns its reads actually use. **King's call** — unit 3 was one column of one

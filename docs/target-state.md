@@ -63,18 +63,18 @@ export async function syncClient(clientId: string) {
 }
 ```
 
-**Credential-resolution constraint (added 2026-10-12; the worker design is intent, the grant state
-below is current — on the local stack only).** The worker resolves a credential reference through a
+**Credential-resolution constraint (added 2026-10-12).** The worker resolves a credential reference through a
 **service-role read** or a **`security definer` function** — never through a tenant-visible `select`.
 `20261010000000_credential_reference_unselectable.sql` revoked `authenticated`'s table-wide `select`
 on `public.api_credentials` and granted it back on `client_id`, `source`, `created_at` only, so
 `credential_reference` (and `id`) are unreadable to the `authenticated` role, and
 `getClientCredentials()` above cannot be implemented as a `select` made with the caller's session.
-That holds **on the migrated local stack**: hosted has not been given this migration, so there the
-table-wide `select` from `20260925000000_connections_read.sql:21` still stands and the column remains
-nameable. The constraint does not depend on which database you are in, and neither reading should be
-chosen because the column happens to be readable today. A worker reading the reference *as the
-caller* would undo the narrowing and put tenant-facing code on the credential path at the same time.
+Which databases that narrowing has actually been applied to is current state and lives in `AGENTS.md`
+→ Tenant isolation, not here — this file holds design intent only, and one of its own claims is that
+`credential_reference` is never resolved through a tenant-visible read. The constraint does not depend
+on which database you are in, and neither reading should be chosen because the column happens to be
+readable today. A worker reading the reference *as the caller* would undo the narrowing and put
+tenant-facing code on the credential path at the same time.
 The service-role option is the one `getAdminDb()` already exists for; the definer option keeps the
 read inside a role guard, the pattern the admin RPCs use.
 
@@ -331,7 +331,8 @@ Purpose: View sync history and failure reasons.
 
 ## Build sequence (original POC plan)
 
-Kept as the dependency order for the unbuilt parts. Marked against the code as of 2026-09-23, steps 1 and 3 re-marked 2026-09-25 — re-verify before trusting a line.
+Kept as the dependency order for the unbuilt parts. Marked against the code as of 2026-09-23, steps 1
+and 3 re-marked 2026-09-25, step 3 again on 2026-10-12 — re-verify before trusting a line.
 
 1. ✅ DB schema + migrations — six files under `supabase/migrations/` (recounted 2026-10-12).
 2. ✅ Supabase Auth + Google OAuth + email/password + RLS policies.
