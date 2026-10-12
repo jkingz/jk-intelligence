@@ -19,9 +19,15 @@ Every task's requirements implicitly include this section.
 - **A citation names the location that is authoritative at that commit.** So `docs/target-state.md` stays cited until Task 7, and `context/progress-tracker.md` until Task 8 — even though the same sentence's body has already moved. Amend, never leave dangling.
 - **Dated log entries are exempt from that amendment.** `context/progress-tracker.md`'s entries and
   `docs/superpowers/{plans,specs}/` record what was true when they were written; `RULES.md` is
-  referenced in six of them and stays referenced there. Repairing a live pointer is required;
-  rewriting a record is falsification. A grep that "finds" one of these is a mis-scoped grep, not a
-  defect — every verify step in this plan is scoped to live paths for that reason.
+  referenced in seven of the former (239, 249, 255, 546, 736, 883, 979) and stays referenced there.
+  Repairing a live pointer is required; rewriting a record is falsification. A grep that "finds" one
+  of these is a mis-scoped grep, not a defect — every verify step in this plan is scoped to live
+  paths for that reason. The scope that works is `git grep -n "<term>" -- ':!docs/superpowers'
+  ':!context/progress-tracker.md' ':!supabase/migrations'`: it walks the whole tracked tree, so it
+  cannot miss a path a hand-written directory list omits, and its three exclusions are exactly the
+  records. `supabase/migrations/` is excluded because rule 16 forbids rewriting an applied migration
+  — `20261010000000_credential_reference_unselectable.sql:10` names `RULES.md §16` and must keep
+  doing so. Task 11's final grep uses this same form.
 - **Rule 14 carries a `Transitional` list that every fold task shrinks by exactly one entry** (Tasks 2–9). That is how the read order stays truthful while six files are being emptied one commit at a time. A task that forgets it leaves a pointer at a deleted file, which is the defect this whole plan is built to avoid.
 - **No new facts.** Anything not pointable at existing text or code goes under `# TARGET STATE — Not Yet Built`, labelled as intent.
 - **No application behavior changes.** The only `.ts` edits in this plan are comment citation strings.
@@ -48,6 +54,20 @@ docs/target-state.md          ← deleted by Task 7
 **Test cycle for docs work.** There is no unit test for a prose move, so each task's failing test is the citation grep and its passing test is the same grep returning empty, plus `wc -l` against the section budget. `pnpm typecheck && pnpm lint` run only on the tasks that touch code comments — `.ts` in Tasks 1, 3, 8, 9, and one `.mjs` comment in Task 1 (`scripts/seed-connections.mjs`, which `eslint.config.mjs` does lint, since it sets no `files:` restriction) — because a comment change needs no Supabase stack and no Vitest run, and `pnpm test:all` must not be started for one. The full chain runs once, in Task 11.
 
 **Anchor copies by heading, not by line number.** Line numbers below orient you; the copy range is the named heading through the next heading of equal or higher level.
+
+**Measured citation baselines**, tree-wide `git grep` with the exclusion set above, taken at `17bba45` (after Task 1). Each task's failing check should start from its own number, and each number includes the hits *inside* the file being folded, which die with that fold:
+
+| term | hits | zeroed by |
+| --- | --- | --- |
+| `RULES.md` | 0 live (7 dated tracker lines exempt) | Task 1 |
+| `context/project-overview` | 3 | Task 2 |
+| `context/architecture-context` | 7 | Task 3 |
+| `context/ui-context` | 2 | Task 4 |
+| `context/code-standards` | 4 | Task 5 |
+| `context/development-workflow` + `context/pm-conventions` | 4 | Task 6 |
+| `docs/target-state` | 13 | Task 7 |
+| `context/progress-tracker` | 13 → 11 after Tasks 2 and 4 fold their two pointers | Task 8 |
+| `context/feature-specs` | 11 | Task 9 |
 
 ---
 
@@ -107,11 +127,12 @@ Expected: `RULES.md` 94 · `docs/target-state.md` 356 · `context/progress-track
 - Modify: `tests/tenant-isolation/integration/credentials-visibility.test.ts:23` (comment cites `RULES.md §16`)
 - Modify: `scripts/seed-connections.mjs:6` (comment cites `RULES.md section 16`)
 - Modify: `docs/conventions/feature-components.md:27` (cites `RULES.md` §13)
+- Modify: `.env.example:1` (the header comment cites `RULES.md §6`) — found by `git grep`, not by the directory list this task first used, which is why the grep below is a `git grep` now
 - Modify: `context/development-workflow.md:68` and `context/pm-conventions.md:21` (both start their read-order/scoping line by pointing at `RULES.md`)
 - Modify: `specs/09-connections.md` — path is `context/feature-specs/09-connections.md:28` until Task 9 (comment cites `` `RULES.md` section 15 ``)
 
-**Not touched by this task, deliberately:** the six `RULES.md` hits in `context/progress-tracker.md`
-(§239, 249, 255, 546, 736, 979) sit inside dated log entries describing what a past change did, and
+**Not touched by this task, deliberately:** the seven `RULES.md` hits in `context/progress-tracker.md`
+(239, 249, 255, 546, 736, 883, 979) sit inside dated log entries describing what a past change did, and
 one of them records the very act of splitting `RULES.md` into a portable core. Rewriting them would
 falsify the record. They are exempted by name in the verify grep, not silently.
 
@@ -120,7 +141,7 @@ falsify the record. They are exempted by name in the verify grep, not silently.
 - [ ] **Step 1: Run the failing check**
 
 ```bash
-grep -rn "RULES\.md" README.md AGENTS.md app lib components scripts tests docs specs context .claude/skills 2>/dev/null
+git grep -n "RULES\.md" -- ':!docs/superpowers' ':!context/progress-tracker.md' ':!supabase/migrations'
 ```
 
 Expected, exactly as measured before this plan was written: `AGENTS.md:11`, `context/development-workflow.md:68`,
@@ -179,19 +200,21 @@ Each edit changes the citation string only; the surrounding sentence stays byte-
 | `context/feature-specs/09-connections.md:28` | `` `RULES.md` section 15 `` | `` `AGENTS.md` § STANDING RULES 15 `` |
 | `context/development-workflow.md:68` | `` `RULES.md` → `AGENTS.md` → `context/project-overview.md` → … `` | `` `AGENTS.md` § STANDING RULES → § APPLICATION BUILDING CONTEXT `` — the trailing `context/` names are cut here because rule 14 now owns that sequence |
 | `context/pm-conventions.md:21` | `` scoping rules in `RULES.md` `` | `` scoping rules in `AGENTS.md` § STANDING RULES `` |
+| `.env.example:1` | `(RULES.md §6)` | `(AGENTS.md § STANDING RULES 6)` — the wrap may reflow one comment line; nothing else in the file changes |
 
 - [ ] **Step 5: Verify**
 
 ```bash
 pnpm typecheck && pnpm lint
-grep -rn "RULES\.md" README.md AGENTS.md app lib components scripts tests docs specs context .claude/skills 2>/dev/null \
-  | grep -v 'context/progress-tracker\.md:'; echo "exit: $?"
+git grep -n "RULES\.md" -- ':!docs/superpowers' ':!context/progress-tracker.md' ':!supabase/migrations'
+echo "exit: $?"
 wc -l AGENTS.md
 ```
 
-Expected: typecheck and lint clean; the grep prints nothing before its own `exit: 1` — every live
-citation is repaired and only the six exempted log lines in `context/progress-tracker.md` still name
-`RULES.md`. `AGENTS.md` ≈ 355 lines (262 measured now, + ~95, − the 2-line stub).
+Expected: typecheck and lint clean; the grep prints nothing and exits 1 — every live citation is
+repaired, and only the exempted records still name `RULES.md`. `AGENTS.md` **366** lines: 262 − the
+2-line stub + 106 pasted, where 106 (not the budget's ~95) is what Step 3's own amendments cost —
+rule 12 grows 1 → 5 and rule 14 grows 2 → 10. `# SERVICE ARCHITECTURE` moves from line 30 to 134.
 
 - [ ] **Step 6: Commit**
 
@@ -342,7 +365,7 @@ In `lib/db/repository.ts:325`, replace `(context/architecture-context.md invaria
 
 ```bash
 pnpm typecheck && pnpm lint
-grep -rn "context/architecture-context" README.md app lib components tests docs/conventions .claude/skills 2>/dev/null; echo "exit: $?"
+git grep -n "context/architecture-context" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md'; echo "exit: $?"
 grep -c "20261010000000_credential_reference_unselectable" AGENTS.md   # expect ≥ 1 (one list)
 wc -l AGENTS.md                                                        # expect ≈ 520
 ```
@@ -485,7 +508,7 @@ git rm context/development-workflow.md context/pm-conventions.md
 - [ ] **Step 5: Verify**
 
 ```bash
-grep -rn "context/development-workflow\|context/pm-conventions" README.md app lib components tests docs/conventions .claude/skills 2>/dev/null; echo "exit: $?"
+git grep -n "context/development-workflow\|context/pm-conventions" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md'; echo "exit: $?"
 grep -c "^## Development Workflow\|^## PM Conventions" AGENTS.md    # expect 3
 wc -l AGENTS.md                                                     # expect ≈ 1,100
 ```
@@ -515,7 +538,7 @@ skip-the-PR-for-docs-only exception, none of which rules 1-10 carry."
 - [ ] **Step 1: Failing check**
 
 ```bash
-grep -rn "docs/target-state" README.md AGENTS.md app lib components tests 2>/dev/null | wc -l    # expect > 0
+git grep -n "docs/target-state" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md' | wc -l    # expect > 0
 ```
 
 - [ ] **Step 2: Port the file's seven sections verbatim**
@@ -537,7 +560,7 @@ git rm docs/target-state.md
 In `AGENTS.md`, replace each `docs/target-state.md` with `§ TARGET STATE` — 3 hits when the file was written, more now that Tasks 2–6 carried citations in. Then `README.md` (line 6 and any other hit), and `context/code-standards.md` is already gone, so check the survivors:
 
 ```bash
-grep -rn "docs/target-state" README.md AGENTS.md app lib components tests .claude/skills 2>/dev/null; echo "exit: $?"
+git grep -n "docs/target-state" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md'; echo "exit: $?"
 ```
 
 Expected: `exit: 1`. Delete `docs/target-state.md` from rule 14's Transitional list. `docs/superpowers/` keeps its old references untouched — a dated plan or spec that cited `docs/target-state.md` described the tree at that moment, and rewriting it would falsify the record.
@@ -575,7 +598,7 @@ finished plan's references would falsify it. Agents keep their 1,2,3,5 numbering
 - [ ] **Step 1: Failing check**
 
 ```bash
-grep -rn "context/progress-tracker" README.md AGENTS.md app lib components tests docs/conventions context .claude/skills 2>/dev/null | wc -l    # expect ≥ 11 (measured 13 at plan time; two die with earlier folds)
+git grep -n "context/progress-tracker" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md' | wc -l    # expect ≥ 11 (measured 13 at plan time; two die with earlier folds)
 ```
 
 - [ ] **Step 2: Compress the four live sections into `AGENTS.md`**
@@ -620,7 +643,7 @@ Rewrite, in each file's own wording, the path only:
 
 ```bash
 pnpm typecheck && pnpm lint
-grep -rn "context/progress-tracker" README.md AGENTS.md app lib components tests docs/conventions context .claude/skills 2>/dev/null; echo "exit: $?"
+git grep -n "context/progress-tracker" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md'; echo "exit: $?"
 git log --oneline -1 --follow -- docs/progress-tracker.md    # expect: the move commit, history intact
 ```
 
@@ -651,7 +674,7 @@ finished work. The log's own historical citations are left as written; only live
 
 ```bash
 git mv context/feature-specs specs
-grep -rn "context/feature-specs" README.md AGENTS.md docs/conventions .claude/skills specs 2>/dev/null | wc -l    # the count you must now zero
+git grep -n "context/feature-specs" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md' | wc -l    # the count you must now zero
 ```
 
 - [ ] **Step 2: Create `specs/00-template.md`**
@@ -912,7 +935,7 @@ Add the four skills to `## Repo skills`' load-when list.
 ```bash
 pnpm typecheck && pnpm lint
 ls context 2>&1 | head -2                                   # expect: No such file or directory
-grep -rn "RULES\.md\|context/" README.md app lib components tests docs/conventions .claude/skills specs 2>/dev/null; echo "exit: $?"
+git grep -n "RULES\.md\|context/" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md'; echo "exit: $?"
 git log --oneline -1 --follow -- specs/09-connections.md     # expect the move visible in history
 ```
 
