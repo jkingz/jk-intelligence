@@ -29,9 +29,9 @@ sign-out instead of each re-declaring a header.
 
 ## Sizing
 `--sidebar-width` is overridden to 15rem because the primitive defaults to 16rem, which is wider
-than the `w-60` rail `ui-context.md` documents. The icon rail keeps the primitive's 3rem. The
-drawer uses the primitive's own 18rem. Breakpoint is the primitive's 768px (`useIsMobile`), so
-`MobileNav` is `md:hidden` and the rail's header trigger is `hidden md:flex`.
+than the `w-60` rail `AGENTS.md § UI Context` documents. The icon rail keeps the primitive's
+3rem. The drawer uses the primitive's own 18rem. Breakpoint is the primitive's 768px
+(`useIsMobile`), so `MobileNav` is `md:hidden` and the rail's header trigger is `hidden md:flex`.
 
 ## Non-goals
 - Role-gated destinations. A `visibleDestinations(role)` filter still has zero callers: the rail

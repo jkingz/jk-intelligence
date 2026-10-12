@@ -40,8 +40,9 @@ export function PersistentSidebarProvider({ children }: { children: React.ReactN
       <SidebarProvider
         open={open}
         onOpenChange={persist}
-        // The primitive's own 16rem is wider than the `w-60` rail ui-context.md
-        // documents; 15rem restores it. Its 3rem icon width already matches.
+        // The primitive's own 16rem is wider than the `w-60` rail
+        // AGENTS.md § UI Context documents; 15rem restores it. Its 3rem icon width
+        // already matches.
         style={{ "--sidebar-width": "15rem" } as React.CSSProperties}
       >
         {children}
