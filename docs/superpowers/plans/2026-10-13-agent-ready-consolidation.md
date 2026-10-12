@@ -89,14 +89,20 @@ Exempt and never edited: `supabase/migrations/20260925000000_connections_read.sq
 | term | hits | zeroed by |
 | --- | --- | --- |
 | `RULES.md` | 0 live (7 dated tracker lines exempt) | Task 1 |
-| `context/project-overview` | 3 | Task 2 |
-| `context/architecture-context` | 7 | Task 3 |
-| `context/ui-context` | 2 | Task 4 |
-| `context/code-standards` | 4 | Task 5 |
-| `context/development-workflow` + `context/pm-conventions` | 4 | Task 6 |
-| `docs/target-state` | 13 | Task 7 |
-| `context/progress-tracker` | 13 → 11 after Tasks 2 and 4 fold their two pointers | Task 8 |
-| `context/feature-specs` | 11 | Task 9 |
+| `context/project-overview` | 3 → 0 | Task 2 |
+| `context/architecture-context` | 7 → **6** at `2fcd3e2` | Task 3 |
+| `context/ui-context` | 2 → **1** | Task 4 |
+| `context/code-standards` | 4 → **2** | Task 5 |
+| `context/development-workflow` + `context/pm-conventions` | **3 + 1** | Task 6 |
+| `docs/target-state` | 13 → **12** | Task 7 |
+| `context/progress-tracker` | 13 → **11** (Tasks 2 and 4's two pointers went early) | Task 8 |
+| `context/feature-specs` | 11 → **10** | Task 9 |
+
+Bold numbers re-measured tree-wide at `2fcd3e2` after Task 2, because Task 2's fold deleted the stub that
+carried four of them. **Every remaining task re-measures its own starting count** — the printed column is a
+floor, not a prediction. Same for the file total: `AGENTS.md` is at **486** where this plan's staging
+expected ≈425, because the mandated `### Status` block (17) and the `## Features` relocation (48) land in
+one commit. Task 11 compares against the running measured total, not the spec's ≈1,430.
 
 ---
 
@@ -289,7 +295,7 @@ Delete the `## Application Building Context` stub (everything from that heading 
 ```bash
 grep -n "next/image" context/code-standards.md          # the Image convention lives there
 grep -n "progress-tracker" context/development-workflow.md  # the update-the-tracker duty lives there
-grep -n "doc is the defect\|docs are untrue\|made untrue" RULES.md  # the update-docs rule is §10/§5
+grep -n "doc is the defect\|docs are untrue\|made untrue" AGENTS.md  # STANDING RULES 10; corrected after Task 2 — this grep said RULES.md, which Task 1 deletes
 ```
 
 In their place add `# APPLICATION BUILDING CONTEXT` and `## Project Overview`, containing `context/project-overview.md` verbatim from `## Overview` through `## Success Criteria`, **excluding** `## Features` (lines 42–85), which moves in Step 4.
@@ -364,7 +370,7 @@ because nothing in it is implemented except dashboard widgets and export."
 ### Task 3: ARCHITECTURE CONTEXT — fold `architecture-context.md` in
 
 **Files:**
-- Modify: `AGENTS.md` (new `## Architecture Context` under APPLICATION BUILDING CONTEXT; relocate two paragraphs into `# SERVICE ARCHITECTURE`)
+- Modify: `AGENTS.md` (new `## Architecture Context` under APPLICATION BUILDING CONTEXT; the `## HTTP API — implemented` prose — two paragraphs, the cache-bound invariant and nine route bullets — relocated into `# SERVICE ARCHITECTURE`; the Sync Agent Model appended to `# TARGET STATE`)
 - Delete: `context/architecture-context.md`
 - Modify: `README.md:24`, `context/development-workflow.md:102` and `:118`, `docs/target-state.md:278` — every live pointer at the file this task deletes (measured; the inventory above says why two of them are not this task's to delete)
 - Modify: `lib/db/repository.ts:325` (comment cites `context/architecture-context.md invariant 4-5`)
@@ -388,6 +394,17 @@ One correction: the migration list at 44–48 omits `20261010000000_credential_r
 `## HTTP API — implemented` (86–111) is prose `SERVICE ARCHITECTURE` does not carry. Move it, byte-identical, into `# SERVICE ARCHITECTURE`:
 - the two precedence paragraphs (88 and the `lib/admin/*` one at 90–96) → under `## HTTP surface (what actually exists)`, before the table;
 - the cache-bound invariant paragraph (102, the `vary_key_denied:cookie` story) → under `## Pages and caching`;
+- **the nine route bullets (98–106)** — boot payload shape, the `?days=`/`?source=` contracts, the CSV/PDF
+  filename slugging and its 503-on-render-failure, `revalidateTag` throwing outside a request context, the
+  cron's `Promise.allSettled` — move verbatim to the end of `## HTTP surface`, directly after the table and
+  before the `Planned and absent:` line, under the one-line lead
+  `Per-route contracts — the detail behind the table's Notes column:`. Ruled during planning after the brief
+  was found to omit them: the table is the index (route, method, auth, one-line note), the bullets are the
+  contracts, and the spec says the HTTP-API sections move *out*, not away. Do not edit the table.
+- **the tenth bullet (107, `GET /connections`) is dropped as duplicated** — its claims (the app's only
+  server-rendered tenant read, `dynamic = "force-dynamic"`, and why removing it fails `pnpm build`) survive
+  in § Pages and caching *and* in the closing `/connections` note of `## Invariants`, which Step 2 ports.
+  Name it as dropped-duplicated in the commit.
 - `## HTTP API — planned, not built` (109–111) → dropped: `## HTTP surface` already ends with a `Planned and absent:` line. Name it as dropped-duplicated in the commit.
 
 `## Sync Agent Model — target state, not built` (113–131) → appended to `# TARGET STATE` as `## Sync agent contract (from the architecture doc)`. It is not deduped against `docs/target-state.md` here because that file is still the authority until Task 7; Task 7 merges the two and names the overlap.
@@ -406,7 +423,7 @@ In `lib/db/repository.ts:325`, replace `(context/architecture-context.md invaria
 pnpm typecheck && pnpm lint
 git grep -n "context/architecture-context" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md'; echo "exit: $?"
 grep -c "20261010000000_credential_reference_unselectable" AGENTS.md   # expect ≥ 1 (one list)
-wc -l AGENTS.md                                                        # expect ≈ 520
+wc -l AGENTS.md                                                        # expect ≈ 630 (see the running-total note below)
 ```
 
 Delete `context/architecture-context.md` from rule 14's Transitional list.
