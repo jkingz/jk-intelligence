@@ -375,7 +375,10 @@ export async function canAccessClient(clientId: string): Promise<boolean> {
 
 Policies: `supabase/migrations/20260917000000_seo_poc.sql`,
 `20260920000000_add_staff_role.sql`, `20260920000001_rls_hardening.sql`,
-`20260925000000_connections_read.sql`. `api_credentials` is readable through
+`20260925000000_connections_read.sql`, and `20261005000000_admin_provisioning.sql` — the five `public`
+`security definer` functions, applied to the local stack 2026-10-05 **and** to the hosted project
+2026-10-08, where an anonymous `POST /rest/v1/rpc/admin_directory` answers `42501` from the grant layer
+(no `EXECUTE` to `anon`) before any function body runs. `api_credentials` is readable through
 `api_credentials_select_tenant_or_admin`, which applies the same two `security definer` helpers as
 `clients`; that policy is **row-level**, so it decides which rows a caller sees and never which
 columns. The column question is answered by grants, **on the migrated local stack**: `authenticated`
