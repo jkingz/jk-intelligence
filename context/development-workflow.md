@@ -99,7 +99,7 @@ before touching a framework API: `proxy.ts` replaces `middleware.ts`, route hand
 
 ### Schema changes
 Never edit an applied migration — add a timestamped one. Every new table needs RLS enabled with a
-policy matching the role/tenant model in `context/architecture-context.md`, in the same change.
+policy matching the role/tenant model in `AGENTS.md` § Architecture Context, in the same change.
 
 ### Data today
 The dashboard's rows come from `scripts/seed.mjs`, and the `api_credentials` rows `/connections`
@@ -115,7 +115,7 @@ observe about "sync" is therefore not evidence about sync.
 
 ### Before moving to the next unit
 1. The unit works end to end inside the scope you stated in step 2 of the loop.
-2. No invariant in `context/architecture-context.md` was violated (read the list; #4 tenant
+2. No invariant in `AGENTS.md` § Architecture Context was violated (read the list; #4 tenant
    isolation and #12 the static dashboard shell are the ones that break silently).
 3. `context/progress-tracker.md` reflects what actually happened.
 4. `pnpm test && pnpm typecheck && pnpm lint && pnpm build` are green.

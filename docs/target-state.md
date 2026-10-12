@@ -275,7 +275,7 @@ await logSync({
 
 ## Planned API Route Definitions
 
-Only `/api/cron/sync` is implemented, and as `GET` (Vercel cron sends no body) — see `context/architecture-context.md` for the real contract. The `POST` shape below is the original spec, kept for reference.
+Only `/api/cron/sync` is implemented, and as `GET` (Vercel cron sends no body) — see `AGENTS.md` § HTTP surface for the real contract. The `POST` shape below is the original spec, kept for reference.
 
 ### Cron Trigger
 ```

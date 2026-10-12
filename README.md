@@ -21,7 +21,7 @@ Not live yet, do not demo them as working:
 
 ![JK Intelligence architecture](docs/architecture.svg)
 
-Request path, the RLS-backed tenant gate and the HTTP surface: [AGENTS.md](AGENTS.md). Deep boundaries: [context/architecture-context.md](context/architecture-context.md).
+Request path, the RLS-backed tenant gate and the HTTP surface: [AGENTS.md](AGENTS.md). Deep boundaries: [AGENTS.md § Architecture Context](AGENTS.md#architecture-context).
 
 ## Development
 
