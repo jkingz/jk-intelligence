@@ -93,9 +93,9 @@ Rules 1–10 are the **portable core** — they hold in every repo this workspac
 order: Project Overview → Architecture Context → UI Context → Code Standards → Development Workflow
 → PM Conventions. Then § SERVICE ARCHITECTURE for what exists, § TARGET STATE for what does not.
 
-**Transitional — still authoritative as separate files:** `context/development-workflow.md`,
-`context/pm-conventions.md`, `docs/target-state.md`, `context/progress-tracker.md`. Delete an entry
-in the commit that folds its file in; the entry is a pointer, not a note.
+**Transitional — still authoritative as separate files:** `docs/target-state.md`,
+`context/progress-tracker.md`. Delete an entry in the commit that folds its file in; the entry is a
+pointer, not a note.
 
 ### 15. Tenant isolation is RLS's job
 - Client-ownership is decided only by `canAccessClient` / `listAccessibleClients` in `lib/db/repository.ts`. No route or helper may re-implement that rule in TypeScript.
@@ -891,6 +891,133 @@ run's own output rather than restating them here.
   against placeholder env, and an `@auth` project that runs only locally. Component-render tests remain
   deliberately absent — adding a testing-library dependency is a decision to raise, not one to make
   silently (see `docs/superpowers/specs/2026-09-23-test-suite-architecture-design.md` §2).
+
+## Development Workflow — Portable core
+
+1. Read what governs the change (§ STANDING RULES, then the context sections)
+2. State scope in one sentence
+3. Implement the smallest verifiable increment
+4. Verify with commands, not claims
+5. Update the docs the change made untrue
+6. Report what changed, what was verified, what is unknown
+
+### Scoping
+- One feature unit or one agent at a time.
+- Split when a step crosses boundaries: UI + sync agent, schema + API route, cache + auth,
+  queue/cron + dashboard, or anything whose behavior is not written down.
+- If end-to-end verification of a step is not quick, the scope is too broad — split it.
+- A guessed constant, threshold, or policy is a requirement you invented. Label it or drop it.
+
+### Verification
+A unit is done when, in this order:
+1. tests covering the changed paths pass (new behavior gets a new test in the same change);
+2. typecheck passes;
+3. lint passes;
+4. the production build passes;
+5. anything a test cannot reach (a page, a migration, a queue job) was exercised for real, and
+   the observation is reported. "It should work" is not a status.
+
+### Docs and truth
+- Status docs record actual state, not intended state. Delete or re-mark an entry the moment its
+  claim stops being true.
+- Do not restate the spec in a doc — link it. Duplication is how docs go stale silently.
+
+### Protected foundations
+- Never patch a vendored component, framework file, or third-party internals to make a feature
+  work. Project logic goes in project layers.
+- If a foundation file seems to need editing, the real problem is upstream of it — say so instead
+  of working around it.
+
+### Git and review
+- One logical change per commit; conventional prefix.
+- Long-lived branch: pull/rebase the trunk before pushing; `--force-with-lease` only.
+
+## Development Workflow — Project appendix
+
+### Read order before implementing
+§ STANDING RULES → § APPLICATION BUILDING CONTEXT.
+Unbuilt design lives in `docs/target-state.md`; treat it as requirements, never as description.
+
+### Commands
+| Need | Command |
+|------|---------|
+| Dev server | `pnpm dev` |
+| Tests | `pnpm test` (Vitest unit project) · `pnpm test:all` (+ integration) · `pnpm test:e2e` · narrow with `pnpm test <path>`, not `pnpm test -- <path>` |
+| Types | `pnpm typecheck` (runs `next typegen` first) |
+| Lint | `pnpm lint` |
+| Build | `pnpm build` |
+| Migrations | `pnpm db:migrate` |
+| Seed demo data | `pnpm db:seed` |
+| Seed connection placeholders | `pnpm db:seed-connections` — placeholder-only `api_credentials` rows (`vault:` reference, never a key), idempotent via `on conflict (client_id, source) do nothing`; needs the same `SUPABASE_DB_URL` redirection as `db:seed` |
+| Demo user | `pnpm db:demo-user` |
+| Queue worker | `pnpm worker` (manual only — no production host yet) |
+
+`pnpm` only (`packageManager` is pinned); Node ≥ 24. npm/yarn produce a lockfile this repo does not use.
+
+### Where logic goes
+`lib/agents` identity/role only · `lib/db` persistence + the RLS-backed tenant gate ·
+`lib/dashboard` read models shared by routes · `lib/connections` the connection-state join (derives
+no ownership) · `lib/navigation` the rail's destination list · `lib/queue` queue + worker ·
+`lib/cache` tag ownership · `lib/exports` CSV/PDF · `app/api` thin handlers.
+Protected: `components/ui/*` (shadcn) and `lib/supabase/*` (client construction).
+
+### Next.js 16 fork
+This is not the Next you may remember. Read the matching guide in `node_modules/next/dist/docs/`
+before touching a framework API: `proxy.ts` replaces `middleware.ts`, route handlers take a
+`RouteContext<"/path">` second arg, `revalidateTag(tag, profile)` is two-argument, and
+`next typegen` generates route types. Do not hand-write a `Middleware` export.
+
+### Schema changes
+Never edit an applied migration — add a timestamped one. Every new table needs RLS enabled with a
+policy matching the role/tenant model in § Architecture Context, in the same change.
+
+### Data today
+The dashboard's rows come from `scripts/seed.mjs`, and the `api_credentials` rows `/connections`
+renders from `scripts/seed-connections.mjs` — both are placeholders; nothing is fetched.
+`pnpm worker` consumes the queue and returns `mock_completed`; it writes nothing. Anything you
+observe about "sync" is therefore not evidence about sync.
+
+### Agent development rules
+- Build each agent in isolation before wiring it into the queue; mock the external API responses.
+- Verify partial failure: kill one mock source, confirm the others still write.
+- Verify the circuit breaker fires after 5 consecutive failures and that a paused client is alerted.
+- Verify `is_stale` flips when a sync misses the 24-hour window — the banner depends on it.
+
+### Before moving to the next unit
+1. The unit works end to end inside the scope you stated in step 2 of the loop.
+2. No invariant in § Architecture Context was violated (read the list; #4 tenant
+   isolation and #12 the static dashboard shell are the ones that break silently).
+3. `context/progress-tracker.md` reflects what actually happened.
+4. `pnpm test && pnpm typecheck && pnpm lint && pnpm build` are green.
+5. No orphaned dev server, worker, or background process left running.
+
+## PM Conventions
+
+Tracked, reviewable work in this repo follows these conventions. Small tasks (< 15 lines of
+real change) may be a single commit; anything larger is a PR.
+
+### Commits
+
+- Prefix with a conventional type: `feat:` `fix:` `style:` `perf:` `refactor:` `chore:`
+  `docs:` `test:` `build:` `ci:`.
+- One logical change per commit. No sweeping mixed commits ("misc cleanup + feature").
+- No co-authors, no "generated with", no body boilerplate.
+- Never commit secrets / rotated tokens / real env values (gitignored, but check `git status`
+  before `git add`).
+- Don't commit or push unless asked.
+
+### PRs
+
+- Title: `<type>(<scope>): <imperative summary>` — e.g. `feat(auth): add staff role access`.
+- Body: **what changed** (2-3 bullets), **how it was verified** (tests/typecheck/lint/build,
+  plus any live check), and **what wasn't covered** (Vercel mirroring, live OAuth, etc.).
+- One PR per feature/unit — follow the scoping rules in § STANDING RULES (standing constraints)
+  and § Development Workflow. No grab-bag PRs.
+- Draft until green; request review after the suite passes.
+- Rebase-merge onto `main`; history is linear, so rebase before pushing.
+
+**Skip when not needed:** tiny doc-only or rename-only changes don't need a PR; commit
+directly to `main` with a conventional message.
 
 # SERVICE ARCHITECTURE — implemented surface
 
