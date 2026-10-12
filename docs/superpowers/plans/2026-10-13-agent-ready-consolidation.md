@@ -33,6 +33,10 @@ Every task's requirements implicitly include this section.
 - **No application behavior changes.** The only `.ts` edits in this plan are comment citation strings.
 - Never run a bare `db:*` script; never start a hosted apply; never push. `pnpm` only; Node ≥ 24.
 - Commit messages: conventional prefix, subject says **why**, body ≤ 4 lines, no boilerplate.
+  **Exception, ruled during Task 1:** when a task must name the lines it dropped or amended (the
+  drop-and-name constraint above), those names come first and the budget stretches to cover them — a
+  body that hides a drop to stay short breaks the rule the body exists to serve. Task 1's commit ran 9
+  lines for three named drops; that is the trade, not a violation.
 - `AGENTS.md` lines 1–9 (the `<!-- BEGIN:nextjs-agent-rules -->` … `<!-- END:nextjs-agent-rules -->` block) are never edited by hand and never deleted.
 
 ## File Structure
@@ -144,12 +148,14 @@ falsify the record. They are exempted by name in the verify grep, not silently.
 git grep -n "RULES\.md" -- ':!docs/superpowers' ':!context/progress-tracker.md' ':!supabase/migrations'
 ```
 
-Expected, exactly as measured before this plan was written: `AGENTS.md:11`, `context/development-workflow.md:68`,
-`context/pm-conventions.md:21`, `context/feature-specs/09-connections.md:28`, the six
-`context/progress-tracker.md` log lines, `tests/tenant-isolation/integration/credentials-visibility.test.ts:23`,
+Expected at `01ec09c`, measured with the command above: `AGENTS.md:11`, `.env.example:1`,
+`context/development-workflow.md:68`, `context/pm-conventions.md:21`,
+`context/feature-specs/09-connections.md:28`, `tests/tenant-isolation/integration/credentials-visibility.test.ts:23`,
 `docs/conventions/feature-components.md:27`, `scripts/seed-connections.mjs:6`. `README.md` does **not**
-cite `RULES.md` — verified, not assumed. If a hit appears somewhere this list does not name, note it
-and carry it into Task 9's rewiring list rather than expanding this commit.
+cite `RULES.md` — verified, not assumed. Because this grep now walks the whole tracked tree, a hit this
+list does not name is genuinely new information: repair it in this commit if it is a live pointer (the
+gate is "no commit leaves a pointer at a file it deletes"), and only carry forward what is a dated
+record. Task 1 found exactly one such pointer — `.env.example` — and it belongs here, not in Task 9.
 
 - [ ] **Step 2: Insert the section into `AGENTS.md`, replacing the two-line stub**
 
