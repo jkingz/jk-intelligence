@@ -3,7 +3,7 @@
 Multi-client SEO reporting platform: Next.js 16, React 19, TypeScript, Supabase (Postgres + RLS + auth), shadcn/ui, BullMQ on Upstash.
 
 - Scope and status: [AGENTS.md § Project Overview](AGENTS.md#project-overview), [context/progress-tracker.md](context/progress-tracker.md)
-- Built vs planned: [AGENTS.md](AGENTS.md) describes implemented code only; [docs/target-state.md](docs/target-state.md) holds the rest
+- Built vs planned: [AGENTS.md](AGENTS.md) describes implemented code only; [AGENTS.md § TARGET STATE](AGENTS.md) holds the rest
 
 ## Dashboard
 
