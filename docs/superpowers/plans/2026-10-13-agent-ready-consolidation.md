@@ -48,7 +48,7 @@ Every task's requirements implicitly include this section.
   path prints hits forever and can never reach zero. The other exception is Task 9: `context/feature-specs/`
   *moves*, so a bare `08-app-shell.md` still resolves to a real file and is not dangling — there the
   path-prefixed grep is the gate.
-- **Rule 14 carries a `Transitional` list that every fold task shrinks by exactly one entry** (Tasks 2–9). That is how the read order stays truthful while six files are being emptied one commit at a time. A task that forgets it leaves a pointer at a deleted file, which is the defect this whole plan is built to avoid.
+- **Rule 14 carries a `Transitional` list that every fold task shrinks by exactly one entry** (Tasks 2–9). That is how the read order stays truthful while six files are being emptied one commit at a time. A task that forgets it leaves a pointer at a deleted file, which is the defect this whole plan is built to avoid. **Amended at Task 8: `0803c17` deleted the paragraph whole, one task early,** because Task 8 demoted the tracker, which was the paragraph's last live entry — `grep -c "Transitional" AGENTS.md` is `0` from here on, and Task 9 must not look for it.
 - **No new facts.** Anything not pointable at existing text or code goes under `# TARGET STATE — Not Yet Built`, labelled as intent.
 - **No application behavior changes.** The only `.ts` edits in this plan are comment citation strings.
 - Never run a bare `db:*` script; never start a hosted apply; never push. `pnpm` only; Node ≥ 24.
@@ -876,7 +876,7 @@ finished work. The log's own historical citations are left as written; only live
 - Create: `.claude/skills/testing/SKILL.md`, `.claude/skills/verification-gates/SKILL.md`, `.claude/skills/development-workflow/SKILL.md`, `.claude/skills/git-workflow/SKILL.md`
 - Create: `.agents/skills/{testing,verification-gates,development-workflow,git-workflow}` (symlinks)
 - Modify: `AGENTS.md` (`# FEATURE SPECS`, `## Repo skills`, `## Verification`'s test-folder table, § Code Standards → Testing shortened)
-- Modify: `README.md:55`, `docs/conventions/feature-components.md:7`/`:13`/`:43`, `.claude/skills/feature-component/SKILL.md:14`/`:17`, `.opencode/commands/feature-component.md:9` path citations (that last file is tracked — verified with `git ls-files .opencode`; the plan's File Structure line about `.opencode/` describes what it carries, not that it is untracked)
+- Modify: `README.md:55`, `docs/conventions/feature-components.md:7`/`:13`/`:43`/`:44`/`:48`, `.claude/skills/feature-component/SKILL.md:14`/`:17`/`:18`/`:35`, `README.md:56`, `.opencode/commands/feature-component.md:9` path citations (that last file is tracked — verified with `git ls-files .opencode`; the plan's File Structure line about `.opencode/` describes what it carries, not that it is untracked) — measured line set at Task 8's head, `0803c17`. `:18`, `:35`, `docs/conventions/…:44`/`:48` and `README.md:56` are the tracker-status instructions Step 6 also owns.
 
 **Produces:** the final tree. After this task `context/` is gone.
 
@@ -1109,7 +1109,29 @@ find .agents/skills -maxdepth 1 -type l | sort      # expect the 4 new ones + fe
 ls -L .agents/skills/testing/SKILL.md              # resolves through the link
 ```
 
-Then update `AGENTS.md ## Repo skills`: it currently warns that the mirror is "not one mechanism: some entries are symlinks, some genuine hardlinks, some plain copies". Add the four new entries as **symlinks** and keep the warning — it is still true of the older entries.
+Then update `AGENTS.md ## Repo skills`. **This plan's original premise for that section was wrong and was
+corrected at the controller's follow-up commit before you run this step**: there are **no hardlinks** in
+either tree, and `.claude/skills/` is *not* the source of truth. Re-measure per entry with `[ -L ]`
+(and `git ls-files -s`, where a committed link prints mode `120000`) rather than trusting any inode
+comparison — an inode match can be one file reached through a link. Measured at Task 8's head, before
+your four additions: `.agents/skills/` = 13 entries, 12 real directories and `feature-component` as a
+link into `.claude/skills/`; `.claude/skills/` = 22 entries, 18 links into `.agents/skills/` and 4 real
+directories, of which the three that also exist in `.agents/` (`babysitting-a-pr`,
+`leaving-pr-comment`, `playwright-cli`) are byte-identical independent copies; and 9 of those 18 links
+are **dangling** (`brandkit`, `design-taste-frontend`, `high-end-visual-design`, `image-to-code`,
+`imagegen-frontend-mobile`, `imagegen-frontend-web`, `minimalist-ui`, `redesign-existing-projects`,
+`stitch-design-taste`) because their `.agents/` targets were never authored. The section already says
+all of that.
+
+Your job here is the increment: the four skills you create are authored in `.claude/skills/` and linked
+from `.agents/skills/`, which is the *reverse* of the 18 and the same direction as `feature-component`.
+So add them to the section's per-entry list, add them to the load-when bullet (Step 5), and update the
+counts the increment changes: `.claude/skills/` 22 → 26 entries, of which 18 links (unchanged) and 4 → 8
+real directories; `.agents/skills/` 13 → 17 entries, of which 12 real (unchanged) and 1 → 5 links. Do **not** restate the section's mechanism prose, and do not fix the nine dangling
+links — closing that gap means authoring nine skills, which is the owner's call and is recorded as one.
+`git add` cannot stage a path resolving through a link (`fatal: pathspec '…' is beyond a symbolic
+link`, exit `128`), so stage `.claude/skills/<name>/` and, for the four links, `.agents/skills/<name>`
+itself.
 
 - [ ] **Step 5: Point `AGENTS.md` at the skills and shorten § Code Standards → Testing**
 
@@ -1140,6 +1162,25 @@ Add the four skills to `## Repo skills`' load-when list.
 
 `README.md` (its ordered-`context/`-files sentence, the doc links), `docs/conventions/feature-components.md`, `.claude/skills/feature-component/SKILL.md`, `specs/07-admin.md`, `specs/09-connections.md`, `specs/00-template.md` if it names a `context/` path, and `## Verification`'s test-folder table if it still says `context/feature-specs`.
 
+**Also yours: three contributor instructions that still command the action Task 8 forbade.** Task 8
+demoted the tracker and put a note at `docs/progress-tracker.md:7-9` saying `## Current Phase`,
+`## Current Goal`, `## In Progress` and `## Open Questions` are history and "do not add to the four
+sections here" — but three live files tell a reader to do exactly that, and the reviewer that cleared
+Task 8 assigned them here because this task already edits two of the three:
+
+- `.claude/skills/feature-component/SKILL.md:18` — step 2, "Add tracker "In Progress" entry in `docs/progress-tracker.md` BEFORE implementing." Its step 8 at `:35` is the same defect twice over — "Move tracker entry to Completed; **update any changed context files**" — the `context/` half of which is the Step 6 path repair, and the `## Completed` half of which belongs here: after the `specs/` move there is no `context/` left to "own files" in, so name the feature's spec under `specs/` instead.
+- `docs/conventions/feature-components.md:44` — checklist item 2, "Tracker "In Progress" entry added before implementation", and item 6 at `:48`, "Checks green, tracker moved to Completed".
+- `README.md:56` — "Tracker: mark **In Progress** before implementing, complete after verification."
+
+Reword all three to the log's actual live section, `## Completed`: record the unit in
+`docs/progress-tracker.md`'s `## Completed` list **after** verification, and do not write status into
+the four history sections — current status is `AGENTS.md` § Project Overview → Status and § Open product
+questions. Keep each file's own voice and its position in its list; the change is which section a
+contributor touches and when, not a new rule. `## Completed` exists at `docs/progress-tracker.md:56` and
+`## Recent Work` at `:223` — name `## Completed`, which is what the three files already aim at for
+finished work. Say in the commit body that the note and these three lines were in conflict and which way
+you resolved it.
+
 - [ ] **Step 7: Verify**
 
 ```bash
@@ -1150,7 +1191,7 @@ git grep -n "project-overview\.md\|architecture-context\.md\|ui-context\.md\|cod
 git log --oneline -1 --follow -- specs/09-connections.md     # expect the move visible in history
 ```
 
-Expected: `context/` gone; the citation grep prints `exit: 1`. Rule 14's **Transitional** paragraph is now empty of live entries — delete the whole paragraph, and amend its read-order line to name `specs/`. The three memory notes and dated plans under `docs/superpowers/` are allowed to name old paths and are excluded from that grep on purpose.
+Expected: `context/` gone; the citation grep prints `exit: 1`. **Rule 14's `Transitional` paragraph is already gone** — Task 8 deleted the whole paragraph at `0803c17` because demoting the tracker emptied it — so there is nothing to delete here; verify instead with `grep -c "Transitional" AGENTS.md` → `0`, and check rule 14's read-order line names `specs/` rather than `context/feature-specs/`. The three memory notes and dated plans under `docs/superpowers/` are allowed to name old paths and are excluded from that grep on purpose.
 
 - [ ] **Step 8: Commit**
 

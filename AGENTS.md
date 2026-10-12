@@ -224,9 +224,11 @@ Overview → Status, not here.
 - **How the `@auth` tier gets an admin account without breaking the integration tier.**
   `tests/admin/integration/provisioning.test.ts` asserts `admins == 1` globally and its attach case
   takes the first row with no `order by`, so the second admin — the `ADMIN_EMAIL`/`ADMIN_PASSWORD`
-  pair six `@auth` admin specs still wait on — makes a demotion succeed and the assertion fail. Either
-  scope those two cases to `FIXTURE_USERS.admin`'s id or run `@auth` on a stack that never runs the
-  integration tier.
+  pair six `@auth` admin specs still wait on — makes a demotion succeed and the assertion fail, after
+  the suite has mutated a row it does not own. Measured 2026-10-06: 2 failed / 17 passed with two
+  admins, 19/19 with one. Either scope those two cases to `FIXTURE_USERS.admin`'s id or run `@auth`
+  on a stack that never runs the integration tier; the first removes a landmine but edits a shipped,
+  currently-green test file, and the second leaves the two tiers untestable on one machine.
 - **Whether to stand up a hosted test database.** The integration tier `skipIf`s without
   `TEST_SUPABASE_URL`, so until that decision CI is unit + public e2e only.
 - **What is actually configured on the hosted Supabase project** — Google OAuth enabled, the
@@ -1293,22 +1295,45 @@ A test goes in the feature that owns the *invariant the test protects*, not the 
 
 ## Repo skills
 
-`.claude/skills/` is the source of truth; `.agents/skills/` mirrors it for other loaders, and the
-mirror is **not** one mechanism: some entries are symlinks, some are genuine hardlinks (shared
-inode), and some are plain independent copies. Edit the `.claude/` file and then check the
-counterpart with `ls -i` / `readlink` rather than assuming either propagates. `.opencode/` carries only `commands/feature-component.md` — its own `.gitignore` keeps
-the tool's `node_modules/` and `package.json` untracked, so do not expect skills there.
+Two loader directories. `.claude/skills/` and `.agents/skills/` are reachable from different agents,
+and which one holds a skill's bytes is per entry, not a repo-wide rule.
+
+Skills that exist and when to load them:
 
 - `babysitting-a-pr` + `leaving-pr-comment` — how PR review bots, comments and checks get handled
   and worded. Also installed user-level, so they apply to every repo.
 - Stack: `code-review`, `feature-component`, `frontend-design`, `shadcn`, `supabase`,
   `supabase-postgres-best-practices`, `tailwind-design-system`, `motion-design`, `playwright-cli`,
   `migrate-radix-to-base`.
-- Visual direction: `design-taste-frontend`, `stitch-design-taste`, `high-end-visual-design`,
-  `redesign-existing-projects`, `minimalist-ui`, `brandkit`, `gpt-taste`, `image-to-code`,
-  `imagegen-frontend-web`, `imagegen-frontend-mobile`.
-- `.agents/skills/` mirrors only a 13-entry subset. `ls` both before assuming a skill is reachable
-  from another loader, and never edit a skill in one place without the other.
+- Visual direction: `gpt-taste` only. The other nine below are listed because `.claude/skills/`
+  names them; none resolves — see the dangling entries immediately after.
+
+The mirror, measured 2026-10-13 with `readlink` and `-L`. It is **neither one mechanism nor one
+direction**, and there are **no hardlinks** — an inode match in `ls -i` printed above a linked name
+is one file reached twice, not two links to it:
+
+- `.agents/skills/` carries 13 entries and holds the real content for **12**. `feature-component`
+  is itself a symlink (`git ls-files -s` mode `120000`) into `.claude/skills/`.
+- `.claude/skills/` carries 22 entries: **18 symlinks into `.agents/skills/`** and **4** real
+  directories. So for those 18 the source of truth is `.agents/skills/`, and only `feature-component`
+  is authored in `.claude/skills/` — the opposite of "edit `.claude/`, the mirror follows".
+- `babysitting-a-pr`, `leaving-pr-comment` and `playwright-cli` are the exception: each is a real
+  directory in **both** trees, byte-identical today (`diff -rq` clean). Nothing propagates between
+  the pair, so editing one silently un-pairs them.
+- **9 of the 18 `.claude/` symlinks are dangling** — `brandkit`, `design-taste-frontend`,
+  `high-end-visual-design`, `image-to-code`, `imagegen-frontend-mobile`, `imagegen-frontend-web`,
+  `minimalist-ui`, `redesign-existing-projects`, `stitch-design-taste` all point at `.agents/skills/`
+  entries that do not exist, and are committed as links. `.claude/skills/` therefore advertises nine
+  skills no loader can read. Closing that gap means authoring or vendoring nine skills, not editing
+  this file, so it stays open as the owner's call.
+
+Check the counterpart before editing it — `[ -L path ]` separates a link from a directory, and
+`git ls-files -s path` prints `120000` for a committed link. `git add` refuses a path that resolves
+*through* a link (`fatal: pathspec '…' is beyond a symbolic link`, exit `128`), so stage the real
+directory: `.agents/skills/<name>/` for the 18, `.claude/skills/feature-component/` for the one that
+goes the other way. `.opencode/` carries only
+`commands/feature-component.md` — its own `.gitignore` keeps the tool's `node_modules/` and
+`package.json` untracked, so do not expect skills there.
 
 ## Editing this file
 
