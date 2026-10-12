@@ -94,18 +94,35 @@ Policies: `supabase/migrations/20260917000000_seo_poc.sql`,
 `20260920000000_add_staff_role.sql`, `20260920000001_rls_hardening.sql`,
 `20260925000000_connections_read.sql`. `api_credentials` is readable through
 `api_credentials_select_tenant_or_admin`, which applies the same two `security definer` helpers as
-`clients`; the app reads `client_id`, `source` and `created_at` only, and never
-`credential_reference`. That last migration is applied to the local stack **and** to the hosted
-project (2026-09-30), so `/connections` serves a signed-in user on hosted; the only
-`api_credentials` rows there are the seeded placeholders. Being row-level, the policy leaves
-`credential_reference` column-selectable to any tenant that can see the row — recorded as an
-accepted limitation in `context/feature-specs/09-connections.md`.
+`clients`; that policy is **row-level**, so it decides which rows a caller sees and never which
+columns. The column question is answered by grants, **on the migrated local stack**: `authenticated`
+holds no table-wide `select` on this table —
+`20261010000000_credential_reference_unselectable.sql` revoked it and granted `select` back on
+`client_id`, `source` and `created_at` only, which is exactly what the app reads and what
+`listConnections()` names. A live tenant session that asks for `credential_reference` by name gets
+`42501 permission denied for table api_credentials`, with no PostgREST schema-cache reload — that
+SQLSTATE is asserted by the negative case in
+`tests/tenant-isolation/integration/credentials-visibility.test.ts`, not merely quoted. `id` is
+ungranted too (no caller reads it), and `select *` is refused for the same reason: Postgres does not
+silently shrink `*` to the granted columns here (checked directly with
+`set role authenticated; select * from public.api_credentials` → `42501`).
+After the narrowing there is **no** `authenticated` entry in `pg_class.relacl` — the grants live in
+`pg_attribute.attacl`, so `aclexplode(relacl)` prints zero rows on a correctly migrated database and
+`has_column_privilege` / `information_schema.column_privileges` are the audit tools.
+`20260925000000_connections_read.sql` is applied to the local stack **and** to the hosted project
+(2026-09-30), so `/connections` serves a signed-in user on hosted and the only `api_credentials`
+rows there are the seeded placeholders; the narrowing migration above is applied **to the local
+stack only** — hosted still grants table-wide `select` to `authenticated` until that apply gets its
+own yes. The accepted limitation both this file and `context/feature-specs/09-connections.md` used
+to record (row-level policy → the reference column-selectable) is closed; it was acceptable while it
+stood because the column holds an opaque Vault reference, not key material, and nothing in the app
+decrypts it.
 
 These policies have been exercised against a live Postgres (local `supabase start` stack) by
 `tests/tenant-isolation/integration/rls-gate.test.ts` and
 `tests/tenant-isolation/integration/credentials-visibility.test.ts` — client/staff/admin/anon
-visibility for `clients` and for `api_credentials`, proven at the database and not only through a
-faked PostgREST.
+visibility for `clients` and for `api_credentials`, including the denial above for the reference
+column, proven at the database and not only through a faked PostgREST.
 
 ## HTTP surface (what actually exists)
 

@@ -4,14 +4,17 @@ Update this file after every meaningful implementation change.
 
 ## Current Phase
 Hardening the built surface: read paths and tenant isolation are done **and proven against a live
-Postgres for both gated tables** (integration tier, 9 tests, 2026-09-25); `api_credentials` is now
+Postgres for both gated tables** (integration tier: 21 tests across 3 files, re-run against the
+migrated local stack 2026-10-12); `api_credentials` is now
 *read* (status only, at `/connections`); the admin panel writes **provisioning only** — clients and
 members, through five `public` definer RPCs, with no credential writes and no sync trigger (2026-10-06);
 the shell around every authenticated page was rebuilt on the shadcn sidebar primitive — collapsible
 icon rail, phone drawer, and the account block moved into the rail's footer (2026-10-09, merged as
-PR #23 on 2026-10-09); an **API hardening pass** opened on 2026-10-10 (cache posture, one route gate,
-one column privilege — spec `docs/superpowers/specs/2026-10-10-api-hardening-design.md`); the
-**sync pipeline is still the next unit** and is blocked on a worker-hosting decision (see Open
+PR #23 on 2026-10-09); the **API hardening pass is complete at three units** — cache posture, one
+route gate, and the `api_credentials` column grant (2026-10-10 → 2026-10-12, spec
+`docs/superpowers/specs/2026-10-10-api-hardening-design.md`); unit 3's migration is applied to the
+**local stack only**, so hosted still carries the table-wide grant until its apply gets its own yes;
+the **sync pipeline is the next unit** and is blocked on a worker-hosting decision (see Open
 Questions 2).
 
 ## Current Goal
@@ -22,7 +25,10 @@ against the code and against platform docs before building anything:
    unit 1 below).
 2. **`lib/api/guard.ts`** — one gate and one response shape for the 9 session-gated route handlers
    (done, unit 2 below).
-3. **`credential_reference`** — revoke the column from `authenticated` and prove it at live Postgres.
+3. **`credential_reference`** — make it unreadable to `authenticated` and prove it at live Postgres
+   (done, unit 3 below). Phrasing corrected 2026-10-12: this is **not** "revoke the column" — the
+   bare column `REVOKE` is inert under a surviving table-wide grant, so the change **narrowed the
+   table-wide `select` to the three status columns**.
 
 The shell pass it follows is **done and merged**: `c6e340d` + `bd1e84a` went in as PR #23
 (https://github.com/jkingz/jk-intelligence/pull/23) at 2026-10-09T13:20Z.
@@ -183,13 +189,16 @@ page's claims were made to match the build and the first live-RLS integration sl
   - **What the demo cards prove, and don't.** Local data now covers 3 demo clients, 4 placeholder `api_credentials` rows and 2 fixture rows, but **no local `users` row is linked to the three demo clients** (`scripts/create-demo-user.mjs:39-42` binds one client-role user to one client), so `/connections` shows the demo cards only for an **admin** session; a client-role user sees only its own `rls-test` tenant.
 
 ## In Progress
-- **API hardening pass (2026-10-10), three units.** Spec:
+- **API hardening pass (2026-10-10), three units — all three built.** Spec:
   `docs/superpowers/specs/2026-10-10-api-hardening-design.md`; unit 2 plan:
-  `docs/superpowers/plans/2026-10-11-api-guard.md`. Units 1 (cache posture) and 2
-  (`lib/api/guard.ts`) are built and green on the four gates on `fix/metrics-cache-posture` —
-  units 1+2 ride **one PR**, per King. Nothing here is committed, pushed or applied to hosted
-  without King's own yes, and unit 3's migration reaches **local** only until it does.
-  Unit 3 (`credential_reference` revoke) is next.
+  `docs/superpowers/plans/2026-10-11-api-guard.md`; unit 3 plan:
+  `docs/superpowers/plans/2026-10-12-credential-reference-unselectable.md`. Units 1 (cache posture)
+  and 2 (`lib/api/guard.ts`) rode **one PR** (#25, per King). Unit 3 — `credential_reference`
+  unselectable — is built on `fix/credential-reference-column` and **green against the migrated local
+  stack**: four gates clean, integration tier `21 passed / 0 skipped`, and `/connections` read in a
+  browser as the fixture tenant. **Hosted has not been told**: the migration reaches the local stack
+  only, and its apply needs King's own yes, as every hosted migration here has. Nothing is pushed or
+  opened without that same ask.
 - **PR #23 merged.** The app shell navigation pass and the landing CTA change (both 2026-10-09)
   landed on `main` at 2026-10-09T13:20Z as merge `ac9dfe3`.
 - **One thing this pass could not run here.** Six `@auth` admin specs (`tests/admin/e2e/layout.spec.ts`
@@ -204,6 +213,64 @@ page's claims were made to match the build and the first live-RLS integration sl
   Question 11 is still King's call.
 
 ## Recent Work
+
+- **API hardening unit 3: `authenticated`'s select on `api_credentials` narrowed to the three status
+  columns** (2026-10-12, branch `fix/credential-reference-column`, migration
+  `supabase/migrations/20261010000000_credential_reference_unselectable.sql`) — **local stack only**.
+  The mechanism is **not** what the spec predicted. `revoke select (credential_reference) on …` was
+  probed inside a rolled-back transaction and left the column readable (`t | t`): a bare column
+  `REVOKE` does not subtract from a surviving table-wide grant, because privileges are additive —
+  access is allowed if *either* the table bit or the column bit is present. What works is
+  `revoke select on public.api_credentials from authenticated;` followed by
+  `grant select (client_id, source, created_at) on public.api_credentials to authenticated;`, so the
+  unit is accurately described as **the table-wide grant being narrowed to three columns**, not as
+  revoking a column. Before → after, from
+  `has_column_privilege('authenticated','public.api_credentials',…,'select')`:
+  `credential_reference` `t` → **`f`**, while `client_id` and `created_at` stay `t`; `id` became
+  unselectable too, which is intended (no caller reads it, and `authenticated` can therefore no
+  longer `select *` here). `information_schema.column_privileges` for `authenticated` now lists
+  exactly `client_id, created_at, source`.
+  After the narrowing, `pg_class.relacl` holds **no** `authenticated` entry at all — the grants live
+  in `pg_attribute.attacl` — so anyone auditing with `aclexplode(relacl)` sees zero rows and must not
+  conclude the grant is missing; `has_column_privilege` / `column_privileges` are the audit tools.
+  Enforcement is real at request time, not just in the catalog: a live tenant session naming the
+  column through PostgREST gets `42501 permission denied for table api_credentials` (table-worded,
+  never column-worded) with **no** schema-cache reload. `20260925000000_connections_read.sql:21`
+  stays byte-identical — applied migrations are never rewritten (`RULES.md` §16) — and the new file
+  supersedes it.
+  Verified: `pnpm test` → `38 files / 249 tests passed`; `pnpm test:integration` → **`21 passed,
+  0 skipped` across 3 files** (this unit took `credentials-visibility.test.ts` from 4 tests to 6);
+  `pnpm test:all` → `41 files / 270 tests passed`; `pnpm typecheck`, `pnpm lint`, `pnpm build` clean,
+  with `/connections` still `ƒ` and `/dashboard` still `○`. The page was read in a browser against
+  the migrated local database signed in as the fixture tenant: `Search console (GSC)` → Not
+  connected, `Analytics (GA4)` → Not connected, `Semrush` → Linked Sep 25, 2026, and no `vault:`
+  string reached the DOM.
+  **Hosted has not been told** — local only, and the hosted apply is its own open line below. Docs
+  corrected in the same pass (`RULES.md` §10): `AGENTS.md`, `09-connections.md` and
+  `context/code-standards.md` no longer describe the column as reachable by a tenant-select on the
+  policy (that limitation is closed; it was acceptable while it stood because the column holds an
+  opaque Vault reference and not key material, and nothing in the app decrypts it),
+  `docs/target-state.md` carries the worker's forward constraint — resolve a reference through a
+  service-role read or a `security definer` function, never a tenant-visible `select` — and
+  `RULES.md` §13's stale "two live-RLS files with 9 tests" is now 3 files / 21 tests.
+  `context/architecture-context.md` was grepped and needed no change: no line there described the
+  grant, only that no code path selects the column.
+  Adjacent risk, spotted and **not** acted on: `pg_default_acl` still grants
+  `authenticated=arwdDxtm` on *future* `public` tables, so this fixes one table only — printed as
+  Open Question material below, since narrowing every future table is a standing-rules decision, not
+  a migration in this unit's scope.
+  **Whole-branch review (2026-10-12, `76d142f..3e7c46f`) and what it changed.** No Critical findings;
+  the privilege set, the untouched `service_role`, the absence of any view or definer path re-exposing
+  the column, and the still-working RLS `using` clause were each confirmed against the live catalog.
+  Two things it caught were worth fixing, and both are now true rather than asserted: the docs quoted
+  SQLSTATE `42501` while the test only proved *some* refusal (so `credentials-visibility.test.ts`
+  carries the code and asserts `42501` — a renamed or dropped column now fails the tier instead of
+  leaving it green), and `docs/target-state.md` stated the narrowed privilege as unqualified fact when
+  hosted still has the wide grant (qualified, with the constraint shown to hold either way). Also
+  settled with evidence instead of inference: `pg_class.relacl` on `api_credentials` holds exactly
+  `postgres=` and `service_role=` aclitems and **no** `authenticated` one (`aclexplode` count 0), and
+  `set role authenticated; select *` returns `42501` rather than silently shrinking to the three
+  granted columns.
 
 - **Guard follow-up: the fixed cache headers win over `extra`** (2026-10-12) — review finding on
   unit 2. `json()` spread `extra` last, so any route could have replaced `Cache-Control` / `Vary`
@@ -864,16 +931,58 @@ page's claims were made to match the build and the first live-RLS integration sl
   exercised against a real local Postgres (Docker + `supabase start`), not a faked PostgREST. The
   anon path throws (grant revoked → fail-closed 503) rather than returning `[]`.
 - **The `integration` tier is live.** `tests/<feature>/integration/` is wired in the Vitest
-  workspace; tenant isolation is now **9 tests across 2 files** — `rls-gate.test.ts` (5, `clients`)
-  and `credentials-visibility.test.ts` (4, `api_credentials`) — green against the local stack.
+  workspace (`tests/*/integration/**/*.test.ts`); it is now **21 tests across 3 files** —
+  `rls-gate.test.ts` (5, `clients`), `credentials-visibility.test.ts` (6, `api_credentials`, the
+  reference-denied pair included) and `provisioning.test.ts` (10, the admin definer RPCs) — green
+  against the local stack.
   Needs `pnpm exec supabase start` and a `.env.test` with `TEST_SUPABASE_URL` /
   `TEST_SUPABASE_PUBLISHABLE_KEY` / `TEST_SUPABASE_SERVICE_ROLE_KEY` /
   `TEST_DEMO_PASSWORD` (see `AGENTS.md` → Verification, `tests/fixtures/README.md`). Measured
-  2026-09-25: `.env.test` as it stands runs `9 passed` bare, no keys supplied inline. Note the skip
+  2026-09-25: `.env.test` ran the then-9 tests bare, no keys supplied inline; re-measured
+  2026-10-12 on the migrated local stack: `21 passed`, 0 skipped. Note the skip
   gate is `TEST_SUPABASE_URL` **alone** (`tests/helpers/db.ts`), so a URL that is live while the
   keys are stale makes the tier *fail* rather than skip — read the counts, not the exit code. With
   no `TEST_*` names at all it skips, so CI stays effectively unit+e2e until a hosted test DB exists.
 - ~~**`20260925000000_connections_read.sql` is applied to the local stack only.**~~ **Applied to hosted 2026-09-30.** `pnpm db:migrate` printed `apply 20260925000000_connections_read.sql` and `Applied 1 migration(s)` (the other three `skip`ped), so hosted `public.schema_migrations` went 3 rows → 4. `pnpm db:seed-connections` then printed `inserted 4 row(s)` — hosted had **zero** `api_credentials` rows before, so the migration alone would have rendered three "Not connected" cards. Verified as `authenticated` inside rolled-back transactions: the admin session sees 3 clients / 4 credentials, the Northstar client-role session sees 1 / 3, and the post-transaction count is still 4. Hosted still has no *real* credential — nothing writes one until the Connect flow exists, which stays gated on the worker-hosting decision (item 2). No spec covers the authenticated render: `tests/identity/e2e/connections-guard.spec.ts` asserts only the anonymous redirect, and `tests/dashboard/e2e/rail.spec.ts` never navigates to the page.
+- ~~**`credential_reference` is column-selectable by any tenant that can see its row** — the
+  row-level policy's accepted limitation, recorded in `AGENTS.md` and
+  `context/feature-specs/09-connections.md`.~~ **Closed 2026-10-12** by
+  `supabase/migrations/20261010000000_credential_reference_unselectable.sql`, **on the local stack
+  only**. The mechanism is what the probe settled, not what the spec predicted: a bare
+  `revoke select (credential_reference) …` is inert under a surviving table-wide grant (privileges
+  are additive — allowed if the table bit *or* the column bit is present, and the column stayed
+  `t`), so the working form revokes `authenticated`'s table-wide `select` and grants it back on
+  `client_id`, `source`, `created_at`. Afterwards `has_column_privilege` prints `f` for the
+  reference with `client_id`/`created_at` still `t`, a live tenant session naming it through
+  PostgREST gets `42501 permission denied for table api_credentials`, and the grants sit in
+  `pg_attribute.attacl` — `pg_class.relacl` keeps **no** `authenticated` entry, which is the
+  narrowing working and not a vanished grant.
+- **`20261010000000_credential_reference_unselectable.sql` is applied to the local stack only —
+  the hosted apply is open and needs King's own yes.** Hosted therefore still grants
+  `authenticated` table-wide `select` on `public.api_credentials`, so the reference column remains
+  nameable there; rows stay RLS-filtered, the column holds an opaque Vault reference and never
+  key material, and nothing has ever carried it into a response, log line or cache entry. When
+  asked, the command is `SUPABASE_DB_URL=<hosted> pnpm db:migrate` followed by a session-scoped
+  read check against hosted — re-running the local tier proves nothing there, because its `TEST_*`
+  names point at `127.0.0.1`.
+- **`pg_default_acl` hands `authenticated` (and `anon`) every table privilege on the *next* `public`
+  table, so the class unit 3 closed recurs by default.** Printed 2026-10-12 on the local stack:
+  `select defaclrole::regrole, defaclobjtype::text, defaclnamespace::regnamespace, defaclacl::text
+  from pg_default_acl;` shows `authenticated=arwdDxtm/…` for kind `r` (table) in schema `public`,
+  from **both** `postgres` and `supabase_admin` — the roles that create application tables here. A
+  future `create table` in `public` therefore arrives already readable *and writable* by `authenticated`
+  with no migration ever granting it. `api_credentials` did **not** get its wide grant that way:
+  `20260917000000_seo_poc.sql:199-207` revoked `all` from `public, anon, authenticated` on each table
+  it created (`api_credentials` at `:201`), and
+  `20260925000000_connections_read.sql:21` then granted `select` back explicitly — the exposure unit 3
+  closed. That is the useful comparison: the default is neutralized only when a migration says so, so a
+  future table whose migration forgets a blanket revoke is born open. `RULES.md` §16 already binds
+  every new table to ship its **policies** in the same migration; this is the grant-shaped half of the
+  same sentence, and the two ways to close it are
+  `ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated` (one
+  migration, after which each table must grant explicitly) or a standing rule that each new table's
+  migration names the columns its reads actually use. **King's call** — unit 3 was one column of one
+  table, and either answer changes what every future migration must do.
 - Profile display name: **decided 2026-09-24 — no `users` column needed.** Name editing already
   persists to `user_metadata.name` via Supabase Auth, which the profile reads; a public-schema
   mirror column would duplicate the auth store for no gain.

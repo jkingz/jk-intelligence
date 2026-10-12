@@ -125,6 +125,16 @@ which is what makes this a refactor rather than a rewrite.
 
 ## Unit 3 — revoke the `credential_reference` column
 
+> **Addendum 2026-10-12 — the probe this section asked for ran, and it changed the command.** The
+> first bullet below is **inert as written**: a bare `revoke select (credential_reference)` leaves
+> the column readable while a table-wide `select` survives, because privileges are additive — access
+> is allowed if *either* the table bit in `pg_class.relacl` or the column bit in
+> `pg_attribute.attacl` is present. What shipped narrows the table-wide grant instead: revoke
+> `authenticated`'s `select` on the table, then grant it back on `client_id, source, created_at`.
+> Read the heading as "narrow the grant to the status columns". The `private`-view fallback below
+> was not needed. Reasoning and evidence:
+> `docs/superpowers/plans/2026-10-12-credential-reference-unselectable.md`.
+
 Files: new `supabase/migrations/20261010000000_credential_reference_unselectable.sql`;
 `tests/tenant-isolation/integration/credentials-visibility.test.ts`;
 `supabase/migrations/20260925000000_connections_read.sql` gains no edit (applied migrations are
