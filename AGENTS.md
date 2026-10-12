@@ -128,8 +128,10 @@ status page; an admin provisioning panel at `/admin` with three `/api/admin/*` w
 
 **Not built** — real sync (`lib/queue/worker.ts` returns `mock_completed`; dashboard rows come from
 `scripts/seed.mjs` and the `api_credentials` rows `/connections` renders from
-`scripts/seed-connections.mjs`), any LLM integration (no `@anthropic-ai/sdk`, no `ANTHROPIC_API_KEY`,
-no Claude call in the repo), and a consumer for the `seo-sync` queue in production.
+`scripts/seed-connections.mjs`), any LLM integration (no `@anthropic-ai/sdk`, no `ANTHROPIC_API_KEY`, no
+Claude call in the repo — and the "AI" surfaces are presentation only: `autonomous-brief.tsx` phrases
+numbers it is handed, and `lib/dashboard/overview.ts` hardcodes `aiCitations: []`, so the citation grid
+always renders its empty state), and a consumer for the `seo-sync` queue in production.
 
 Verified: 2026-10-13, against the repo at the commit this section was ported into.
 
@@ -438,8 +440,9 @@ surface described here, and move newly built modules out of `docs/target-state.m
 
 # TARGET STATE — Not Yet Built
 
-Design intent that is **not** implemented. Treat this section as requirements for future work,
-**never** as a description of current behavior.
+Design intent from the original product spec. Treat this section as requirements for future work,
+**never** as a description of current behavior — where a promise below is already built, § Project
+Overview → Status is the authority on which half exists.
 
 ## Product features the spec promises
 
