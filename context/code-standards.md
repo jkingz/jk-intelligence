@@ -157,9 +157,11 @@ no `Content-Type` (the guard's `json()` adds that itself). `getAuthUser()` takes
   cascades from it, so a delete silently destroys keyword history too.
 - current_metrics is the only mutable cache layer — one row per `(client_id, source)`.
 - `api_credentials` holds a `vault:<uuid>` **reference**, never key material.
-  `api_credentials_select_tenant_or_admin` lets a tenant (or an admin) select its own rows, and no
-  code path selects `credential_reference`. Nothing in `.env`, logs, or responses may carry a
-  provider key.
+  `api_credentials_select_tenant_or_admin` lets a tenant (or an admin) select its own rows, and
+  `20261010000000_credential_reference_unselectable.sql` narrows that role's `select` to the
+  `client_id`, `source`, `created_at` columns (local stack only — hosted has not been told), so no
+  code path can select `credential_reference` even by asking, and none does. Nothing in `.env`,
+  logs, or responses may carry a provider key.
 - Never expose the service-role key to client components or `NEXT_PUBLIC_*` vars. It is read only
   in `lib/db/admin.ts`, which is `server-only`.
 - RLS enabled on every table — policies must match the role model (admin/client/staff), with

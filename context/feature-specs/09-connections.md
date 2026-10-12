@@ -22,21 +22,34 @@ cannot be connected yet and why.
   the static-token case that exists today is Semrush.
 
 ## Data and tenancy
-- One migration: `api_credentials` loses `using (false)`, gains
+- One policy migration: `api_credentials` loses `using (false)`, gains
   `api_credentials_select_tenant_or_admin` — the same `private.current_user_role()` /
   `current_user_client_id()` predicate as `clients_select_authenticated`. No TypeScript
-  helper re-derives ownership (`RULES.md` section 15).
+  helper re-derives ownership (`RULES.md` section 15). The grant that decides which *columns*
+  that row policy can reach is a second migration, the bullet below.
 - `listConnections()` reads `clients` then `api_credentials`, both through the cookie-bound
   client, and selects `client_id, source, created_at`. It is never wrapped in
   `unstable_cache`: a cookie-bound client inside a function keyed on nothing is the
   cross-user leak the tenant-gate change closed (invariant 4-5).
 - `/connections` is dynamic (`ƒ`) by design. It awaits the session cookie.
+- Column privileges narrow that row-level policy. `20261010000000_credential_reference_unselectable.sql`
+  revokes `authenticated`'s table-wide `select` on `api_credentials` and grants it back on
+  `client_id`, `source`, `created_at` only, so a live tenant session that names `credential_reference`
+  through PostgREST gets `42501 permission denied for table api_credentials` — no schema-cache reload
+  needed. `id` is ungranted too (no caller reads it), which is why `authenticated` can no longer
+  `select *` from this table. **Applied to the local stack only**; the hosted apply needs King's own
+  yes, as every hosted migration here does.
 
-## Accepted limitations
-- The select policy is row-level, so `credential_reference` is selectable by a tenant that
-  can see the row. Tolerated because the column holds an opaque Vault *reference* rather than
-  a secret, nothing in the app decrypts it, and no response, log or cache entry carries it.
-  Column-level protection is the follow-up if a real reference is ever written.
+## Closed and accepted
+- Closed 2026-10-12: the row-level policy used to leave `credential_reference` selectable by any
+  tenant that could see the row. Acceptable while it stood because the column holds an opaque Vault
+  *reference* and not key material, nothing in the app decrypts it, and no response, log or cache
+  entry carries it. `20261010000000_credential_reference_unselectable.sql` closes it at the column
+  (local stack only, per the bullet above). Note where the grant lives afterwards:
+  `pg_class.relacl` holds **no** `authenticated` entry at all — the three columns are in
+  `pg_attribute.attacl`, visible through `information_schema.column_privileges` and testable with
+  `has_column_privilege`. An `aclexplode(relacl)` audit returning zero rows for `authenticated` is
+  the narrowing working, not a missing grant.
 - `api_credentials` records that a link exists and when. It carries no health, scope or
   expiry, so "Linked" means linked, not working.
 
@@ -53,4 +66,9 @@ cannot be connected yet and why.
 `tests/tenant-isolation/unit/connections-read.test.ts` (incl. "never the admin client",
 "never selects the reference"), `tests/platform/unit/connections-catalog.test.ts`,
 `tests/tenant-isolation/integration/credentials-visibility.test.ts` (live RLS, `skipIf` — executed
-against the local stack 2026-09-25: 4 tests green alongside `rls-gate.test.ts`'s 5).
+against the local stack 2026-09-25: 4 tests green alongside `rls-gate.test.ts`'s 5; re-executed
+2026-10-12 on the migrated local stack, now **6** tests — the reference-denied pair included — and
+the whole `integration` tier printed `21 passed / 0 skipped`).
+The page itself was read in a browser against the migrated local database as the fixture tenant:
+`Search console (GSC)` → Not connected, `Analytics (GA4)` → Not connected, `Semrush` → Linked
+Sep 25, 2026, and no `vault:` string reached the DOM.

@@ -63,6 +63,17 @@ export async function syncClient(clientId: string) {
 }
 ```
 
+**Credential-resolution constraint (added 2026-10-12; design intent, not current behavior).** The
+worker resolves a credential reference through a **service-role read** or a **`security definer`
+function** — never through a tenant-visible `select`. `20261010000000_credential_reference_unselectable.sql`
+revoked `authenticated`'s table-wide `select` on `public.api_credentials` and granted it back on
+`client_id`, `source`, `created_at` only, so `credential_reference` (and `id`) are unreadable to the
+`authenticated` role, and `getClientCredentials()` above cannot be implemented as a `select` made
+with the caller's session. That is deliberate: a worker reading the reference *as the caller* would
+undo the narrowing and put tenant-facing code on the credential path at the same time. The service-role
+option is the one `getAdminDb()` already exists for; the definer option keeps the read inside a role
+guard, the pattern the admin RPCs use.
+
 ---
 
 ### 2. Data Transform Agent (`lib/agents/transformAgent.ts`)
@@ -318,11 +329,14 @@ Purpose: View sync history and failure reasons.
 
 Kept as the dependency order for the unbuilt parts. Marked against the code as of 2026-09-23, steps 1 and 3 re-marked 2026-09-25 — re-verify before trusting a line.
 
-1. ✅ DB schema + migrations — four files under `supabase/migrations/`.
+1. ✅ DB schema + migrations — six files under `supabase/migrations/` (recounted 2026-10-12).
 2. ✅ Supabase Auth + Google OAuth + email/password + RLS policies.
 3. ⚠️ API credentials model — a tenant can now read its own `api_credentials` status rows
-   (`20260925000000_connections_read.sql`), surfaced at `/connections`. Still unread:
-   `credential_reference`, which nothing resolves because no sync worker is hosted (steps 4-8).
+   (`20260925000000_connections_read.sql`), surfaced at `/connections`. `credential_reference` is no
+   longer merely unread: on the **local** stack Postgres denies it to `authenticated`
+   (`20261010000000_credential_reference_unselectable.sql`, hosted pending its own yes), and nothing
+   resolves it because no sync worker is hosted (steps 4-8). See the credential-resolution
+   constraint under Planned agents §1.
 4. ⬜ GSC sync agent (fetch → transform → store).
 5. ⬜ GA4 sync agent.
 6. ⬜ Semrush/Ahrefs sync agent.
