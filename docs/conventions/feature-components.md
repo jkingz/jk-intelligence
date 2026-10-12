@@ -5,7 +5,7 @@
 - Branch: `feat/<slug>` — e.g. `feat/email-password-auth`
 - Title: `feat(<slug>): <what>` — e.g. `feat(auth): email + password sign-in/sign-up`
 - One feature unit per PR; spec must exist in `specs/` before implementation
-- PR body links spec path + `docs/progress-tracker.md` update note
+- PR body links the spec path and names the verification the unit passed; the `docs/progress-tracker.md` record is written after that, under `## Completed`, so there is no tracker note to link at PR time
 - Checks green before ready: `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`
 
 ## Feature Folders

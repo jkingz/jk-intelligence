@@ -977,24 +977,47 @@ Name files `<sut>.test.ts` (unit/integration) or `<flow>.spec.ts` (e2e).
 
 ## Mocking
 
-Unit tier only, and only at the I/O boundary: `@/lib/agents/...`, `@/lib/db/repository`. Never inside
-business logic, never a real network or DB call. The integration tier exists precisely to put a real
-Postgres behind `canAccessClient` — do not mock there.
+Unit tier only, and only at the I/O boundary: `@/lib/agents/...`, `@/lib/db/repository` —
+`vi.mock("@/lib/db/repository", …)`, never an internal function, never a real network or DB call.
+The integration tier exists precisely to put a real Postgres behind `canAccessClient` — do not mock
+there.
+
+Declare the spies where the factory can close over them:
+`const boundary = vi.hoisted(() => ({ fn: vi.fn() }))`, and `afterEach(() => vi.resetAllMocks())`.
+
+`vitest.config.ts` aliases `server-only` to its empty module and sets `conditions: ["react-server"]`,
+so a test never needs its own `vi.mock("server-only")` — the few that carry one are dead weight; drop
+it when you touch that file.
+
+New behavior gets a test in the same change; a bugfix gets a test that fails without the fix.
 
 ## Coverage every route handler needs
 
 `401` unauthenticated · `403` not this caller's client · `400` malformed id · **no-data-before-auth**
-(the handler checks identity before it reads). Route tests live in `<name>-route.test.ts`.
-Ownership and isolation need a two-tenant fixture proving a foreign id cannot be read.
+(the handler checks identity before it reads) · `503` rather than a throw when the identity read, the
+tenant gate, or the read itself rejects. Route tests live in `<name>-route.test.ts`.
+Ownership and isolation need a two-tenant fixture proving a foreign id cannot be read — tenant
+isolation is the highest-value test in the repo, so assert that B's data never appears in A's response.
+
+Two files carry the boundary and move with it: `@/tests/sync/unit/flow.test.ts` (cron → queue handoff)
+and `tests/tenant-isolation/unit/repository.test.ts` (the RLS gate contract). Change either surface and
+those tests must change with it.
+
+Component-render tests are deliberately absent. Adding a testing-library dependency is a decision to
+raise with the owner, not one to make silently — the rationale is §2 of
+`docs/superpowers/specs/2026-09-23-test-suite-architecture-design.md`.
 
 ## Running
 
 ```bash
-pnpm test                 # unit project
+pnpm test                 # unit project only
 pnpm test:all             # + integration, against the local stack
 pnpm test:e2e             # public browser tier
-pnpm test tests/dashboard # one folder
+pnpm test:e2e:auth        # credential-gated tier, local only
+pnpm test tests/dashboard # one folder — `pnpm test -- tests/dashboard` runs the whole tier instead
 ```
+
+A filter that matches nothing exits 1, so a moved file announces itself instead of passing empty.
 
 ## What the integration tier covers today
 
@@ -1142,9 +1165,29 @@ See `/testing` for tiers, organization, mocking patterns and commands.
 
 - Tests live in `tests/<feature>/<tier>/`, imported through `@/`, never relatively
 - Mock at the boundary, unit tier only
-- Every route test covers `401`/`403`/`400` and no-data-before-auth
+- Every route test covers `401`/`403`/`400`/`503` and no-data-before-auth
 - Opt-in tiers exit 0 — report which tier a run covered
+- Component-render tests are deliberately absent; a testing-library dependency is a decision to raise,
+  not one to make silently (§2 of `docs/superpowers/specs/2026-09-23-test-suite-architecture-design.md`)
 ```
+
+**This block is a correction, not the original instruction.** As first written it deleted seven facts
+that lived **only** in § Testing's prose at `0ffc4e4` — `vi.hoisted` + `afterEach(vi.resetAllMocks)`; the
+`vitest.config.ts` `server-only` alias / `conditions: ["react-server"]` and the "drop the redundant
+`vi.mock(\"server-only\")` when you touch that file" instruction; "a filter that matches nothing exits 1,
+so a moved file announces itself instead of passing empty"; the two named highest-value tests
+(`@/tests/sync/unit/flow.test.ts`, `tests/tenant-isolation/unit/repository.test.ts`) and their coupling
+note; "new behavior gets a test in the same change, a bugfix gets a test that fails without the fix";
+the `503` in the route-coverage list; and the component-render prohibition with its §2 citation. Each was
+re-grepped at `eecb7f7` to confirm it was gone from every live file (`e2e:auth` survives at
+`README.md:46` + `package.json:15`, so it is not a loss). They now live in
+`.claude/skills/testing/SKILL.md` — which is why the pointer line says *tiers, organization, mocking
+patterns and commands* and the skill's own footer defers back here: § Testing is the contract's index,
+`/testing` is where the detail moved to, and no fact was allowed to die in the handover. `Ruling: extend
+the Step 3 skill text rather than restore the § Testing prose` — a 1,700-line file that keeps every
+sub-detail is the thing this plan exists to stop, and the skill is the load-when-needed home. Cost if
+wrong: a reader who never opens `/testing` misses the `503` and the dependency prohibition, so both are
+also in the bullet list above, which is the part that stays in the read order.
 
 Add `# FEATURE SPECS` before `# TARGET STATE`:
 
@@ -1181,6 +1224,13 @@ contributor touches and when, not a new rule. `## Completed` exists at `docs/pro
 finished work. Say in the commit body that the note and these three lines were in conflict and which way
 you resolved it.
 
+**A fourth consequence of the same rewording, found when it landed:** once nothing is written to the log
+*before* implementation, the two PR-body instructions that promise a "tracker note" in the PR body are
+ordering-false — there is no note at PR time. They are `docs/conventions/feature-components.md:8` ("PR
+body links spec path + `docs/progress-tracker.md` update note") and `.claude/skills/feature-component/SKILL.md:33`
+(step 6, "body links spec + tracker note"). Reword both to name the spec path plus the verification the
+unit passed, and state that the log record comes after verification.
+
 - [ ] **Step 7: Verify**
 
 ```bash
@@ -1191,7 +1241,7 @@ git grep -n "project-overview\.md\|architecture-context\.md\|ui-context\.md\|cod
 git log --oneline -1 --follow -- specs/09-connections.md     # expect the move visible in history
 ```
 
-Expected: `context/` gone; the citation grep prints `exit: 1`. **Rule 14's `Transitional` paragraph is already gone** — Task 8 deleted the whole paragraph at `0803c17` because demoting the tracker emptied it — so there is nothing to delete here; verify instead with `grep -c "Transitional" AGENTS.md` → `0`, and check rule 14's read-order line names `specs/` rather than `context/feature-specs/`. The three memory notes and dated plans under `docs/superpowers/` are allowed to name old paths and are excluded from that grep on purpose.
+Expected: `context/` gone. **The citation grep does not print `exit: 1`, and that is correct** — measured at `eecb7f7`, it exits `0` with exactly one hit, `.agents/skills/migrate-radix-to-base/menus.md:171` (`## Data-attribute mapping (dropdown/context/menubar menus)`), a substring false positive inside a **vendored** skill that predates this plan (confirmed at BASE `0ffc4e4` with `git grep … HEAD`) and that Task 9 left untouched. Assert the hit *set*, not the exit code: that one line and nothing else. Do not narrow the pattern and do not exclude `.agents/skills/` — either would blind the gate to a real `context/` reference introduced into a vendored tree later. `Ruling: accept as noise`, recorded here so Task 11 reports it rather than chasing it. **Rule 14's `Transitional` paragraph is already gone** — Task 8 deleted the whole paragraph at `0803c17` because demoting the tracker emptied it — so there is nothing to delete here; verify instead with `grep -c "Transitional" AGENTS.md` → `0`, and check rule 14's read-order line names `specs/` rather than `context/feature-specs/`. The bare-name gate must print `exit: 1`. The three memory notes and dated plans under `docs/superpowers/` are allowed to name old paths and are excluded from that grep on purpose.
 
 - [ ] **Step 8: Commit**
 

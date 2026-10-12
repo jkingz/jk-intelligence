@@ -904,8 +904,10 @@ See `/testing` for tiers, organization, mocking patterns and commands.
 
 - Tests live in `tests/<feature>/<tier>/`, imported through `@/`, never relatively
 - Mock at the boundary, unit tier only
-- Every route test covers `401`/`403`/`400` and no-data-before-auth
+- Every route test covers `401`/`403`/`400`/`503` and no-data-before-auth
 - Opt-in tiers exit 0 — report which tier a run covered
+- Component-render tests are deliberately absent; a testing-library dependency is a decision to raise,
+  not one to make silently (§2 of `docs/superpowers/specs/2026-09-23-test-suite-architecture-design.md`)
 
 ## Development Workflow — Portable core
 

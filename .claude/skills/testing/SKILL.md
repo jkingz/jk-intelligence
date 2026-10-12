@@ -16,24 +16,47 @@ Name files `<sut>.test.ts` (unit/integration) or `<flow>.spec.ts` (e2e).
 
 ## Mocking
 
-Unit tier only, and only at the I/O boundary: `@/lib/agents/...`, `@/lib/db/repository`. Never inside
-business logic, never a real network or DB call. The integration tier exists precisely to put a real
-Postgres behind `canAccessClient` — do not mock there.
+Unit tier only, and only at the I/O boundary: `@/lib/agents/...`, `@/lib/db/repository` —
+`vi.mock("@/lib/db/repository", …)`, never an internal function, never a real network or DB call.
+The integration tier exists precisely to put a real Postgres behind `canAccessClient` — do not mock
+there.
+
+Declare the spies where the factory can close over them:
+`const boundary = vi.hoisted(() => ({ fn: vi.fn() }))`, and `afterEach(() => vi.resetAllMocks())`.
+
+`vitest.config.ts` aliases `server-only` to its empty module and sets `conditions: ["react-server"]`,
+so a test never needs its own `vi.mock("server-only")` — the few that carry one are dead weight; drop
+it when you touch that file.
+
+New behavior gets a test in the same change; a bugfix gets a test that fails without the fix.
 
 ## Coverage every route handler needs
 
 `401` unauthenticated · `403` not this caller's client · `400` malformed id · **no-data-before-auth**
-(the handler checks identity before it reads). Route tests live in `<name>-route.test.ts`.
-Ownership and isolation need a two-tenant fixture proving a foreign id cannot be read.
+(the handler checks identity before it reads) · `503` rather than a throw when the identity read, the
+tenant gate, or the read itself rejects. Route tests live in `<name>-route.test.ts`.
+Ownership and isolation need a two-tenant fixture proving a foreign id cannot be read — tenant
+isolation is the highest-value test in the repo, so assert that B's data never appears in A's response.
+
+Two files carry the boundary and move with it: `@/tests/sync/unit/flow.test.ts` (cron → queue handoff)
+and `tests/tenant-isolation/unit/repository.test.ts` (the RLS gate contract). Change either surface and
+those tests must change with it.
+
+Component-render tests are deliberately absent. Adding a testing-library dependency is a decision to
+raise with the owner, not one to make silently — the rationale is §2 of
+`docs/superpowers/specs/2026-09-23-test-suite-architecture-design.md`.
 
 ## Running
 
 ```bash
-pnpm test                 # unit project
+pnpm test                 # unit project only
 pnpm test:all             # + integration, against the local stack
 pnpm test:e2e             # public browser tier
-pnpm test tests/dashboard # one folder
+pnpm test:e2e:auth        # credential-gated tier, local only
+pnpm test tests/dashboard # one folder — `pnpm test -- tests/dashboard` runs the whole tier instead
 ```
+
+A filter that matches nothing exits 1, so a moved file announces itself instead of passing empty.
 
 ## What the integration tier covers today
 
