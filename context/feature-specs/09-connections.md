@@ -36,9 +36,12 @@ cannot be connected yet and why.
   revokes `authenticated`'s table-wide `select` on `api_credentials` and grants it back on
   `client_id`, `source`, `created_at` only, so a live tenant session that names `credential_reference`
   through PostgREST gets `42501 permission denied for table api_credentials` — no schema-cache reload
-  needed. `id` is ungranted too (no caller reads it), which is why `authenticated` can no longer
-  `select *` from this table. **Applied to the local stack only**; the hosted apply needs King's own
-  yes, as every hosted migration here does.
+  needed. That SQLSTATE is asserted by the negative case in
+  `tests/tenant-isolation/integration/credentials-visibility.test.ts`, so the code the docs quote is
+  the code the database actually returns. `id` is ungranted too (no caller reads it), and `select *`
+  is refused rather than quietly shrunk to the granted columns (verified directly:
+  `set role authenticated; select * from public.api_credentials` → `42501`). **Applied to the local
+  stack only**; the hosted apply needs King's own yes, as every hosted migration here does.
 
 ## Closed and accepted
 - Closed 2026-10-12: the row-level policy used to leave `credential_reference` selectable by any
@@ -69,6 +72,8 @@ cannot be connected yet and why.
 against the local stack 2026-09-25: 4 tests green alongside `rls-gate.test.ts`'s 5; re-executed
 2026-10-12 on the migrated local stack, now **6** tests — the reference-denied pair included — and
 the whole `integration` tier printed `21 passed / 0 skipped`).
-The page itself was read in a browser against the migrated local database as the fixture tenant:
-`Search console (GSC)` → Not connected, `Analytics (GA4)` → Not connected, `Semrush` → Linked
-Sep 25, 2026, and no `vault:` string reached the DOM.
+The tier above is executable and re-runnable. This next line is **a dated manual observation, not a
+check the repo can reproduce**: on 2026-10-12 the page was read in a browser against the migrated
+local database as the fixture tenant `client@a.rls-test.local` — `Search console (GSC)` → Not
+connected, `Analytics (GA4)` → Not connected, `Semrush` → Linked Sep 25, 2026, and no `vault:` string
+reached the DOM. Treat it as evidence of that day's state, and re-run the tier for anything newer.

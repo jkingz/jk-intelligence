@@ -35,6 +35,17 @@ interface CredentialRowShape {
   created_at: string;
 }
 
+// A refused select keeps the SQLSTATE PostgREST reported. "An error happened" is
+// not the claim the docs make — they name `42501`, and only the code tells a
+// denied column apart from one that stopped existing. The app's own wrapper is
+// what the read path throws, and it discards the code, so the code has to be
+// carried here for the docs' wording to be testable at all.
+class RefusedSelect extends Error {
+  constructor(readonly sqlState: string) {
+    super("Database operation failed");
+  }
+}
+
 describe.skipIf(!hasTestDb)("api_credentials visibility against live RLS", () => {
   let clients: TestClients;
 
@@ -56,15 +67,14 @@ describe.skipIf(!hasTestDb)("api_credentials visibility against live RLS", () =>
   }
 
   // Same session path as credentials(), but naming whichever columns the test
-  // asks for. A column Postgres has stopped granting comes back as a
-  // PostgREST error, and databaseOperation()'s message is the one the rest of
-  // this file already asserts.
+  // asks for, and keeping the SQLSTATE instead of flattening it. `data` is
+  // discarded either way, so a red run cannot print a reference value.
   async function selectAs(email: string, columns: string): Promise<void> {
     await withSession(email, async () => {
       const { createServerSupabaseClient } = await import("@/lib/supabase/server");
       const db = await createServerSupabaseClient();
       const { error } = await db.from("api_credentials").select(columns);
-      if (error) throw new Error("Database operation failed");
+      if (error) throw new RefusedSelect(error.code);
     });
   }
 
@@ -113,9 +123,17 @@ describe.skipIf(!hasTestDb)("api_credentials visibility against live RLS", () =>
   it("a tenant cannot select credential_reference at the database", async () => {
     // The point of the unit. Not "the app never asks for it" — that is
     // tests/tenant-isolation/unit/connections-read.test.ts:113 — but "asking
-    // for it is refused by Postgres", which only a live session can show.
-    await expect(
-      selectAs(FIXTURE_USERS.clientA, "credential_reference"),
-    ).rejects.toThrow("Database operation failed");
+    // for it is refused by Postgres", which only a live session can show. The
+    // SQLSTATE is the assertion, not the fact of an error: `AGENTS.md` and
+    // `09-connections.md` quote 42501, and any other code would mean the column
+    // had gone missing rather than being guarded — this tier green, the docs
+    // false. Renaming or dropping the column produces PGRST204, which is exactly
+    // the failure this case would otherwise sleep through.
+    const refusal = await selectAs(FIXTURE_USERS.clientA, "credential_reference").then(
+      () => undefined,
+      (err: unknown) => err as RefusedSelect,
+    );
+    expect(refusal).toBeInstanceOf(RefusedSelect);
+    expect(refusal?.sqlState).toBe("42501");
   });
 });

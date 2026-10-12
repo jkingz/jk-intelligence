@@ -256,7 +256,21 @@ page's claims were made to match the build and the first live-RLS integration sl
   `context/architecture-context.md` was grepped and needed no change: no line there described the
   grant, only that no code path selects the column.
   Adjacent risk, spotted and **not** acted on: `pg_default_acl` still grants
-  `authenticated=arwdDxtm` on *future* `public` tables, so this fixes one table only.
+  `authenticated=arwdDxtm` on *future* `public` tables, so this fixes one table only — printed as
+  Open Question material below, since narrowing every future table is a standing-rules decision, not
+  a migration in this unit's scope.
+  **Whole-branch review (2026-10-12, `76d142f..3e7c46f`) and what it changed.** No Critical findings;
+  the privilege set, the untouched `service_role`, the absence of any view or definer path re-exposing
+  the column, and the still-working RLS `using` clause were each confirmed against the live catalog.
+  Two things it caught were worth fixing, and both are now true rather than asserted: the docs quoted
+  SQLSTATE `42501` while the test only proved *some* refusal (so `credentials-visibility.test.ts`
+  carries the code and asserts `42501` — a renamed or dropped column now fails the tier instead of
+  leaving it green), and `docs/target-state.md` stated the narrowed privilege as unqualified fact when
+  hosted still has the wide grant (qualified, with the constraint shown to hold either way). Also
+  settled with evidence instead of inference: `pg_class.relacl` on `api_credentials` holds exactly
+  `postgres=` and `service_role=` aclitems and **no** `authenticated` one (`aclexplode` count 0), and
+  `set role authenticated; select *` returns `42501` rather than silently shrinking to the three
+  granted columns.
 
 - **Guard follow-up: the fixed cache headers win over `extra`** (2026-10-12) — review finding on
   unit 2. `json()` spread `extra` last, so any route could have replaced `Cache-Control` / `Vary`
@@ -951,6 +965,19 @@ page's claims were made to match the build and the first live-RLS integration sl
   asked, the command is `SUPABASE_DB_URL=<hosted> pnpm db:migrate` followed by a session-scoped
   read check against hosted — re-running the local tier proves nothing there, because its `TEST_*`
   names point at `127.0.0.1`.
+- **`pg_default_acl` hands `authenticated` (and `anon`) every table privilege on the *next* `public`
+  table, so the class unit 3 closed recurs by default.** Printed 2026-10-12 on the local stack:
+  `select defaclrole::regrole, defaclobjtype::text, defaclnamespace::regnamespace, defaclacl::text
+  from pg_default_acl;` shows `authenticated=arwdDxtm/…` for kind `r` (table) in schema `public`,
+  from **both** `postgres` and `supabase_admin` — the roles that create application tables here. A
+  future `create table` in `public` therefore arrives already readable *and writable* by `authenticated`
+  with no migration ever granting it, which is how `api_credentials` got its table-wide `select` in
+  the first place. `RULES.md` §16 already binds every new table to ship its **policies** in the same
+  migration; this is the grant-shaped half of the same sentence, and the two ways to close it are
+  `ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated` (one
+  migration, after which each table must grant explicitly) or a standing rule that each new table's
+  migration names the columns its reads actually use. **King's call** — unit 3 was one column of one
+  table, and either answer changes what every future migration must do.
 - Profile display name: **decided 2026-09-24 — no `users` column needed.** Name editing already
   persists to `user_metadata.name` via Supabase Auth, which the profile reads; a public-schema
   mirror column would duplicate the auth store for no gain.

@@ -95,12 +95,17 @@ Policies: `supabase/migrations/20260917000000_seo_poc.sql`,
 `20260925000000_connections_read.sql`. `api_credentials` is readable through
 `api_credentials_select_tenant_or_admin`, which applies the same two `security definer` helpers as
 `clients`; that policy is **row-level**, so it decides which rows a caller sees and never which
-columns. The column question is answered by grants: `authenticated` holds no table-wide `select`
-on this table — `20261010000000_credential_reference_unselectable.sql` revoked it and granted
-`select` back on `client_id`, `source` and `created_at` only, which is exactly what the app reads
-and what `listConnections()` names. A live tenant session that asks for `credential_reference` by
-name gets `42501 permission denied for table api_credentials`, with no PostgREST schema-cache
-reload; `id` is ungranted too (no caller reads it), so `authenticated` cannot `select *` here.
+columns. The column question is answered by grants, **on the migrated local stack**: `authenticated`
+holds no table-wide `select` on this table —
+`20261010000000_credential_reference_unselectable.sql` revoked it and granted `select` back on
+`client_id`, `source` and `created_at` only, which is exactly what the app reads and what
+`listConnections()` names. A live tenant session that asks for `credential_reference` by name gets
+`42501 permission denied for table api_credentials`, with no PostgREST schema-cache reload — that
+SQLSTATE is asserted by the negative case in
+`tests/tenant-isolation/integration/credentials-visibility.test.ts`, not merely quoted. `id` is
+ungranted too (no caller reads it), and `select *` is refused for the same reason: Postgres does not
+silently shrink `*` to the granted columns here (checked directly with
+`set role authenticated; select * from public.api_credentials` → `42501`).
 After the narrowing there is **no** `authenticated` entry in `pg_class.relacl` — the grants live in
 `pg_attribute.attacl`, so `aclexplode(relacl)` prints zero rows on a correctly migrated database and
 `has_column_privilege` / `information_schema.column_privileges` are the audit tools.
