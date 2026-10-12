@@ -63,6 +63,25 @@ docs/target-state.md          ← deleted by Task 7
 
 **Test cycle for docs work.** There is no unit test for a prose move, so each task's failing test is the citation grep and its passing test is the same grep returning empty, plus `wc -l` against the section budget. `pnpm typecheck && pnpm lint` run only on the tasks that touch code comments — `.ts` in Tasks 1, 3, 8, 9, and one `.mjs` comment in Task 1 (`scripts/seed-connections.mjs`, which `eslint.config.mjs` does lint, since it sets no `files:` restriction) — because a comment change needs no Supabase stack and no Vitest run, and `pnpm test:all` must not be started for one. The full chain runs once, in Task 11.
 
+**Live pointer inventory**, measured tree-wide at `fbb7542` and complete for the six terms. This is the
+work list; the per-task grep is only the check. A pointer whose *host* file is deleted by a later task
+belongs to the task that deletes the *target* — that is what keeps no commit dangling.
+
+| deleted file | live pointers to repair, in the commit that deletes it | host dies at |
+| --- | --- | --- |
+| `context/project-overview.md` | `README.md:5` (its overview half; the tracker half is Task 8's) | — |
+| `context/architecture-context.md` | `README.md:24`, `context/development-workflow.md:102` and `:118`, `docs/target-state.md:278`, `lib/db/repository.ts:325` | Task 6 / Task 7 / stays |
+| `context/ui-context.md` | none outside `AGENTS.md`'s Transitional list and the Task 2 stub | — |
+| `context/code-standards.md` | `context/pm-conventions.md:30` | Task 6 |
+| `context/development-workflow.md` + `context/pm-conventions.md` | none outside `AGENTS.md:98` | — |
+| `docs/target-state.md` | `README.md:6`, `AGENTS.md` inside the ported rules (`:104`) and the sections Tasks 2–6 carried in | — |
+| `context/progress-tracker.md` (moved, not deleted) | `README.md:5`, `.claude/skills/feature-component/SKILL.md:18`, `docs/conventions/feature-components.md:39`, `tests/admin/integration/provisioning.test.ts:9`, `tests/fixtures/README.md:5`, four `AGENTS.md` sites | — |
+| `context/feature-specs/` → `specs/` | `README.md:55`, `docs/conventions/feature-components.md:7`/`:13`/`:43`, `.claude/skills/feature-component/SKILL.md:14`/`:17`, **`.opencode/commands/feature-component.md:9`** (tracked — `git ls-files .opencode` proves it), `AGENTS.md:220`/`:285` | — |
+
+Exempt and never edited: `supabase/migrations/20260925000000_connections_read.sql:11` (names
+`context/feature-specs/09-connections.md`; rule 16 forbids rewriting an applied migration), the seven
+`context/progress-tracker.md` dated lines, and everything under `docs/superpowers/`.
+
 **Anchor copies by heading, not by line number.** Line numbers below orient you; the copy range is the named heading through the next heading of equal or higher level.
 
 **Measured citation baselines**, tree-wide `git grep` with the exclusion set above, taken at `17bba45` (after Task 1). Each task's failing check should start from its own number, and each number includes the hits *inside* the file being folded, which die with that fold:
@@ -246,6 +265,7 @@ whole top; the same claim in the hand-maintained tail is repaired by Task 10."
 **Files:**
 - Modify: `AGENTS.md` (replace the `## Application Building Context` stub, lines 13–28, with `# APPLICATION BUILDING CONTEXT` + `## Project Overview`)
 - Delete: `context/project-overview.md`
+- Modify: `README.md:5` — its `[context/project-overview.md](context/project-overview.md)` link becomes `AGENTS.md` § Project Overview (its partner link, the tracker, is Task 8's and stays)
 
 **Produces:** `## Project Overview` with Status / Overview / Goals / Core user flow / Scope / Success criteria. Creates the `# TARGET STATE — Not Yet Built` heading at the file's end, which Tasks 3, 7 and 8 populate.
 
@@ -346,6 +366,7 @@ because nothing in it is implemented except dashboard widgets and export."
 **Files:**
 - Modify: `AGENTS.md` (new `## Architecture Context` under APPLICATION BUILDING CONTEXT; relocate two paragraphs into `# SERVICE ARCHITECTURE`)
 - Delete: `context/architecture-context.md`
+- Modify: `README.md:24`, `context/development-workflow.md:102` and `:118`, `docs/target-state.md:278` — every live pointer at the file this task deletes (measured; the inventory above says why two of them are not this task's to delete)
 - Modify: `lib/db/repository.ts:325` (comment cites `context/architecture-context.md invariant 4-5`)
 
 **Produces:** `## Architecture Context` = Stack / System boundaries / Storage model / Persistence schema / Auth & tenancy model / Invariants 1–13.
@@ -446,6 +467,7 @@ anti-pattern list says an unverified token name fails silently rather than loudl
 **Files:**
 - Modify: `AGENTS.md` (new `## Code Standards`)
 - Delete: `context/code-standards.md`
+- Modify: `context/pm-conventions.md:30` — it cites `context/code-standards.md` (Testing) and survives until Task 6, so this commit repoints it at `AGENTS.md` § Code Standards
 
 **Produces:** `## Code Standards` = General / TypeScript / Next.js / React 19.3 Rendering / Security Headers / Images / Styling / API Routes / Data & Storage / Standards for new agents / Error Handling / File Organization / Testing. The Testing section is shortened in Task 9, not here, because `/testing` does not exist yet.
 
@@ -684,7 +706,7 @@ finished work. The log's own historical citations are left as written; only live
 - Create: `.claude/skills/testing/SKILL.md`, `.claude/skills/verification-gates/SKILL.md`, `.claude/skills/development-workflow/SKILL.md`, `.claude/skills/git-workflow/SKILL.md`
 - Create: `.agents/skills/{testing,verification-gates,development-workflow,git-workflow}` (symlinks)
 - Modify: `AGENTS.md` (`# FEATURE SPECS`, `## Repo skills`, `## Verification`'s test-folder table, § Code Standards → Testing shortened)
-- Modify: `README.md`, `docs/conventions/feature-components.md`, `.claude/skills/feature-component/SKILL.md` path citations
+- Modify: `README.md:55`, `docs/conventions/feature-components.md:7`/`:13`/`:43`, `.claude/skills/feature-component/SKILL.md:14`/`:17`, `.opencode/commands/feature-component.md:9` path citations (that last file is tracked — verified with `git ls-files .opencode`; the plan's File Structure line about `.opencode/` describes what it carries, not that it is untracked)
 
 **Produces:** the final tree. After this task `context/` is gone.
 
