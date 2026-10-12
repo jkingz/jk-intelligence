@@ -64,7 +64,8 @@ Rules 1–10 are the **portable core** — they hold in every repo this workspac
 
 ### 10. Unknowns are labelled, not invented
 - No fabricated thresholds, policies, precedents, APIs or file paths. If you cannot point at it, say you cannot point at it.
-- State assumptions plus the step that would verify them. Missing requirement → record it as an open question, then continue.
+- State assumptions plus the step that would verify them. Missing requirement → record it as an open
+  question, stop the branch of work that depends on it, and continue with the rest.
 - When implementation and docs disagree, code is truth and the doc is a defect: fix the doc in the same change.
 
 ## Project-specific rules — Rules 11–17
@@ -934,6 +935,9 @@ A unit is done when, in this order:
 
 ## Development Workflow — Project appendix
 
+This appendix and § Development Workflow — Portable core both prescribe; where they disagree, this
+appendix wins for this repo.
+
 ### Read order before implementing
 § STANDING RULES → § APPLICATION BUILDING CONTEXT.
 Unbuilt design lives in `docs/target-state.md`; treat it as requirements, never as description.
@@ -952,7 +956,8 @@ Unbuilt design lives in `docs/target-state.md`; treat it as requirements, never 
 | Demo user | `pnpm db:demo-user` |
 | Queue worker | `pnpm worker` (manual only — no production host yet) |
 
-`pnpm` only (`packageManager` is pinned); Node ≥ 24. npm/yarn produce a lockfile this repo does not use.
+`pnpm` only, Node ≥ 24 — § STANDING RULES 11 is the authority, including why `package-lock.json` was
+deleted. npm/yarn produce a lockfile this repo does not use.
 
 ### Where logic goes
 `lib/agents` identity/role only · `lib/db` persistence + the RLS-backed tenant gate ·
@@ -988,8 +993,9 @@ observe about "sync" is therefore not evidence about sync.
 2. No invariant in § Architecture Context was violated (read the list; #4 tenant
    isolation and #12 the static dashboard shell are the ones that break silently).
 3. `context/progress-tracker.md` reflects what actually happened.
-4. `pnpm test && pnpm typecheck && pnpm lint && pnpm build` are green.
-5. No orphaned dev server, worker, or background process left running.
+4. The four-gate chain in § STANDING RULES 13 is green — that rule is the authority on which gates,
+   and it also names the integration and e2e tiers this checklist used to omit.
+5. Nothing you started is still running — § STANDING RULES 5.
 
 ## PM Conventions
 
@@ -1000,11 +1006,11 @@ real change) may be a single commit; anything larger is a PR.
 
 - Prefix with a conventional type: `feat:` `fix:` `style:` `perf:` `refactor:` `chore:`
   `docs:` `test:` `build:` `ci:`.
-- One logical change per commit. No sweeping mixed commits ("misc cleanup + feature").
+- No sweeping mixed commits ("misc cleanup + feature") — "one logical change per commit" is stated in
+  § Development Workflow — Portable core.
 - No co-authors, no "generated with", no body boilerplate.
 - Never commit secrets / rotated tokens / real env values (gitignored, but check `git status`
   before `git add`).
-- Don't commit or push unless asked.
 
 ### PRs
 
