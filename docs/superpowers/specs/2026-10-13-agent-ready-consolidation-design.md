@@ -77,7 +77,7 @@ tables are verified hex-for-hex against `globals.css` and compression risks losi
 
 ## Forced fixes: claims the merge itself invalidates
 
-Duplicating a contradiction into one file is worse than the current split, so these three are
+Duplicating a contradiction into one file is worse than the current split, so these four are
 corrected in the commit that ports their section. Each is verified against code on 2026-10-13, not
 inferred.
 
