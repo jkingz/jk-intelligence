@@ -16,6 +16,15 @@ Every task's requirements implicitly include this section.
 
 - **Wording is preserved verbatim.** Only headings and cross-references are renamed. The one exception is Task 8 (tracker compression), which is allowed to condense prose and must list every dropped line in its commit message.
 - **A line is dropped only when the destination already carries the same claim**, and each dropped line is named in that commit's message.
+- **Which restatements count as "the same claim" — the register rule.** § SERVICE ARCHITECTURE is
+  *descriptive* (what exists, why a page is dynamic); § UI Context and § Code Standards are *prescriptive*
+  (how to build, what to write). A prescriptive line that leans on a descriptive fact — § Code Standards'
+  "parse `{clientId}` with `z.uuid()` before anything else" beside § HTTP surface's precedence chain, § UI
+  Context's rail composition beside § Pages and caching's shell description — is **not** a second authority
+  for that claim, and is kept. Deduping across registers would gut the instruction layer, which is the whole
+  point of this plan. Only same-register duplication drops: descriptive-vs-descriptive (as `932995b` shipped
+  twice at `AGENTS.md:415` and `:419`, fixed in `3e777df`) or prescriptive-vs-prescriptive. Name the overlap
+  once in the commit body rather than silently keeping it.
 - **A citation names the location that is authoritative at that commit.** So `docs/target-state.md` stays cited until Task 7, and `context/progress-tracker.md` until Task 8 — even though the same sentence's body has already moved. Amend, never leave dangling.
 - **Dated log entries are exempt from that amendment.** `context/progress-tracker.md`'s entries and
   `docs/superpowers/{plans,specs}/` record what was true when they were written; `RULES.md` is
@@ -32,10 +41,13 @@ Every task's requirements implicitly include this section.
   review: a comment that says `see architecture-context.md invariant 4-5` is a live pointer at a file this
   plan deletes, and `git grep "context/architecture-context"` cannot see it — the gate then reports
   `exit: 1` on a tree with four dangling references. So each task's failing check is
-  `git grep -n "<basename>\.md" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md'`
+  `git grep -n "<basename>\.md" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md'`
   as well as the path-prefixed form, and the bare form is the one that must reach zero for the file it
-  deletes. The exception is Task 9: `context/feature-specs/` *moves*, so a bare `08-app-shell.md` still
-  resolves to a real file and is not dangling — there the path-prefixed grep is the gate.
+  deletes. Both exclusions are required: Task 8 `git mv`s the tracker to `docs/progress-tracker.md`, and its
+  dated entries name 12 `architecture-context.md` and 16 `ui-context.md` mentions — a gate missing either
+  path prints hits forever and can never reach zero. The other exception is Task 9: `context/feature-specs/`
+  *moves*, so a bare `08-app-shell.md` still resolves to a real file and is not dangling — there the
+  path-prefixed grep is the gate.
 - **Rule 14 carries a `Transitional` list that every fold task shrinks by exactly one entry** (Tasks 2–9). That is how the read order stays truthful while six files are being emptied one commit at a time. A task that forgets it leaves a pointer at a deleted file, which is the defect this whole plan is built to avoid.
 - **No new facts.** Anything not pointable at existing text or code goes under `# TARGET STATE — Not Yet Built`, labelled as intent.
 - **No application behavior changes.** The only `.ts` edits in this plan are comment citation strings.
@@ -461,7 +473,7 @@ over intact, including the force-dynamic note that is load-bearing for pnpm buil
 
 ```bash
 grep -c "^## UI Context" AGENTS.md    # expect 0
-git grep -n "ui-context\.md" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' | wc -l    # expect 6 at this commit: rule 14's Transitional entry plus the five bare-name sites above
+git grep -n "ui-context\.md" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md' | wc -l    # expect 6 at this commit: rule 14's Transitional entry plus the five bare-name sites above
 ```
 
 - [ ] **Step 2: Port, nothing dropped**
@@ -477,18 +489,18 @@ count their sites by grep, so travelling in is not losing them.
 
 **Ruling on the overlap, so it is not re-litigated by review:** § Layout Patterns restates the rail's
 collapse width, the `Sheet` drawer, `NavUser`, and `/admin` having no active row — all of which § SERVICE
-ARCHITECTURE → Pages and caching already says. Keep both, and say why in the commit body: § Pages and
-caching claims *what exists and why the page is static or dynamic*; § UI Context claims *how the thing is
-composed* — the class names, the `group-data-[collapsible=icon]:hidden` rationale, `NavUser`'s three-line
-deviation. Port rule 2 drops only where the destination carries *the same* claim, and here it does not.
+ARCHITECTURE → Pages and caching already says. Keep both, per the register rule in Global Constraints, and
+say so in the commit body: § Pages and caching is descriptive (what exists, why the page is static), § UI
+Context is prescriptive (how the thing is composed — the class names, the
+`group-data-[collapsible=icon]:hidden` rationale, `NavUser`'s three-line deviation).
 
 - [ ] **Step 3: Verify and delete**
 
 ```bash
 git rm context/ui-context.md
 grep -n "bg-base\|text-copy-primary" AGENTS.md; echo "exit: $?"   # expect exit 1: the bad tokens must not appear
-git grep -n "ui-context" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md'; echo "exit: $?"    # expect exit 1 — this is the bare-name gate
-wc -l AGENTS.md                                                   # expect ≈ 928 (639 at `57e37d5` + 288 source lines + the section heading) — the running measured total governs, not the printed number
+git grep -n "ui-context" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md'; echo "exit: $?"    # expect exit 1 — this is the bare-name gate
+wc -l AGENTS.md                                                   # expect ≈ 929 (640 at `3e777df` + 288 source lines + the section heading) — the running measured total governs, not the printed number
 ```
 
 Delete `context/ui-context.md` from rule 14's Transitional list. Repoint each of the five bare-name sites at
@@ -526,14 +538,29 @@ grep -c "^## Code Standards" AGENTS.md    # expect 0
 
 - [ ] **Step 2: Port verbatim**
 
-Copy `## General` through the end of `## Testing`, demoting headings one level. Line 176's `docs/target-state.md` reference keeps its path until Task 7.
+Copy `## General` (line 3) through end of file (line 274), demoting headings one level. Line 176's
+`docs/target-state.md` reference keeps its path until Task 7. Insert the section after `## UI Context`,
+before `# SERVICE ARCHITECTURE`, so rule 14's read order is the file's order again.
+
+Two things the port must change, because the fold turns them into self-citations:
+- `context/code-standards.md:8` and `:230` were repointed at `AGENTS.md` by name in `3e777df` while the file
+  still sat outside it. Ported *into* `AGENTS.md`, "Respect the system boundaries in `AGENTS.md` §
+  Architecture Context → System boundaries" is the exact defect class Task 3's fix round removed at
+  `AGENTS.md:267`. Drop the filename, keep the `§ …` form.
+- `## API Routes` restates § HTTP surface's precedence chain and guard inventory. **Keep both** under the
+  register rule in Global Constraints — one prescribes how to write a handler, the other describes what is
+  shipped — and name the overlap in the commit body rather than deduping it. Same for
+  `## Standards for new agents` against `# TARGET STATE`'s agent contracts: Task 7 reconciles *contract*
+  descriptions with each other, not standards-with-contracts.
 
 - [ ] **Step 3: Verify and delete**
 
 ```bash
 git rm context/code-standards.md
 grep -n "invented helpers\|readDashboard" AGENTS.md; echo "exit: $?"   # expect exit 1 — no invented helper names
-wc -l AGENTS.md                                                        # expect ≈ 1,155 (Task 4's total + ~240, Testing's 29 lines going to a pointer)
+git grep -n "code-standards\.md" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md'; echo "exit: $?"    # expect exit 1: rule 14's entry gone, pm-conventions:30 repointed in Step 2's Files line
+git grep -c "\`AGENTS.md\` §" AGENTS.md    # expect the count NOT to have grown by this port — the two self-citations above
+wc -l AGENTS.md                                                        # expect ≈ 1,202 (Task 4's ≈929 + 272 source lines + the section heading); Testing stays whole until Task 9
 ```
 
 Delete `context/code-standards.md` from rule 14's Transitional list.
