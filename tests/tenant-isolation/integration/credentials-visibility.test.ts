@@ -3,9 +3,9 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { hasTestDb } from "../../helpers/db";
 
 // Second live-RLS slice, over api_credentials. Nothing is faked at PostgREST,
-// so a green run is evidence about the policy, not about a mock. NEVER EXECUTED
-// in CI — see the deviation note at the top of this plan; quote the skip line in
-// context/progress-tracker.md rather than claiming coverage.
+// so a green run is evidence about the policy, not about a mock. CI runs
+// `pnpm test`, which is the unit project only — this tier needs the local stack
+// plus a filled `.env.test`, and without them skipIf leaves it unexecuted.
 vi.mock("next/headers", () => ({
   cookies: async () => getCurrentCookieStore(),
 }));
@@ -19,11 +19,13 @@ import {
   type TestClients,
 } from "../../fixtures/identity-users";
 
-// The columns the Connections page needs. The prohibition is on the application
-// read path: RULES.md §16 means listConnections names these three and no
-// response, log line or cache entry ever carries `credential_reference`. The one
-// deliberate exception is the negative case below, which names the column only
-// to prove Postgres refuses it, and discards `data` so no value can reach an
+// The columns the Connections page needs, and no more. The prohibition is on the
+// application read path: RULES.md §16 keeps `credential_reference` out of every
+// response and log line, `listConnections` names exactly these three
+// (`lib/db/repository.ts:333-334`), and
+// `tests/tenant-isolation/unit/connections-read.test.ts:102-115` pins that. The
+// one deliberate exception is the negative case below, which names the column
+// only to prove Postgres refuses it, and discards `data` so no value can reach an
 // assertion or a log.
 const COLUMNS = "client_id,source,created_at";
 
