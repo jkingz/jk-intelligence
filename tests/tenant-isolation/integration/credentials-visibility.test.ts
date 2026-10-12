@@ -100,9 +100,9 @@ describe.skipIf(!hasTestDb)("api_credentials visibility against live RLS", () =>
     });
   });
 
-  it("a tenant reads the three status columns and nothing else", async () => {
-    // The positive half of the pair: whatever Task 4 does to the grant, this
-    // page's own read must keep working. /connections selects exactly these.
+  it("a tenant reads the three status columns it is granted", async () => {
+    // The positive half of the pair: the grant may narrow, but it must not cut
+    // these — /connections selects exactly these three.
     await expect(
       selectAs(FIXTURE_USERS.clientA, COLUMNS),
     ).resolves.toBeUndefined();

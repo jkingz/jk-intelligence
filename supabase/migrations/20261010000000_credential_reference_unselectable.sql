@@ -10,8 +10,9 @@
 -- are never rewritten (RULES.md §16). This file supersedes it.
 --
 -- Consequence worth knowing: authenticated can no longer `select *` from this
--- table. Nothing does -- listConnections names the three columns and
--- tests/tenant-isolation/unit/connections-read.test.ts pins that.
+-- table. Nothing does -- `listConnections` names the three columns
+-- (`lib/db/repository.ts:333`) and the unit test that pins it is
+-- `tests/tenant-isolation/unit/connections-read.test.ts:111-113`.
 revoke select on public.api_credentials from authenticated;
 
 grant select (client_id, source, created_at) on public.api_credentials to authenticated;
