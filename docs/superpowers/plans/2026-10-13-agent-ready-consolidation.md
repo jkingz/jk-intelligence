@@ -569,7 +569,16 @@ dropped line in the commit body**, and if a line you meant to drop turns out to 
 
 `## Development Workflow — Project appendix`: the source's 65–123 verbatim (Read order, Commands table, Where logic goes, Next.js 16 fork, Schema changes, Data today, Agent development rules, Before moving to the next unit). In its `### Read order` subsection, list only what is authoritative now — `AGENTS.md` § STANDING RULES → § APPLICATION BUILDING CONTEXT (PROJECT OVERVIEW → ARCHITECTURE CONTEXT → UI CONTEXT → CODE STANDARDS) → `context/development-workflow.md`'s successors inline → `docs/target-state.md` → `context/progress-tracker.md`.
 
-`## PM Conventions`: `context/pm-conventions.md` 6–24 verbatim (Commits, PRs), **excluding** its `## Review gate` (26–31) which restates rule 13, and **keeping** its closing `**Skip when not needed:**` lines (33–34) — that exception is not in rules 1–17.
+`## PM Conventions`: `context/pm-conventions.md` 3–24 verbatim (its lead paragraph, then Commits, PRs), **excluding** its `## Review gate` (26–31) which restates rule 13, and **keeping** its closing `**Skip when not needed:**` lines (33–34) — that exception is not in rules 1–17.
+
+Two things this line was missing, measured at `57e37d5`:
+- **Lines 3–5 carry a number no rule holds** — "small tasks (< 15 lines of real change) may be a single
+  commit; anything larger is a PR". 33–34 only says a doc-only change skips the PR, which is the other
+  direction. Port the lead; dropping it is the silent-content-death this plan keeps hitting.
+- **Line 22 cites `context/development-workflow.md`, which this commit deletes.** Amend it here, in the
+  same commit, to `AGENTS.md § Development Workflow` — the one pointer in this plan whose host and target
+  die together, so no later task can repair it. Lines 30–31 also cite both files but die with the
+  `## Review gate` exclusion.
 
 - [ ] **Step 4: Delete both sources**
 
