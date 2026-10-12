@@ -498,7 +498,7 @@ Context is prescriptive (how the thing is composed — the class names, the
 
 ```bash
 git rm context/ui-context.md
-grep -n "bg-base\|text-copy-primary" AGENTS.md; echo "exit: $?"   # expect exit 1: the bad tokens must not appear
+grep -n "bg-base" AGENTS.md | grep -v -- "--bg-base"; echo "exit: $?"   # expect no output, exit 1: the *utility* form must not appear. The raw term alone cannot be the gate — `--bg-base` is a real `globals.css` property that the mandated tables carry, so `grep "bg-base"` matches correct content. Measured at `9308243`: 4 `bg-base` hits, all `--bg-base`, and `text-copy-primary` 0.
 git grep -n "ui-context" -- ':!docs/superpowers' ':!supabase/migrations' ':!context/progress-tracker.md' ':!docs/progress-tracker.md'; echo "exit: $?"    # expect exit 1 — this is the bare-name gate
 wc -l AGENTS.md                                                   # expect ≈ 929 (640 at `3e777df` + 288 source lines + the section heading) — the running measured total governs, not the printed number
 ```
