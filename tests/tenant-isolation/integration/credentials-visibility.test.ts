@@ -19,11 +19,12 @@ import {
   type TestClients,
 } from "../../fixtures/identity-users";
 
-// The columns the Connections page needs. Deliberately not
-// `credential_reference`: RULES.md §16 keeps a credential out of every response
-// and log line, and a test that selected it would be the first place that
-// invariant got quietly relaxed. Task 5's unit test owns the "we never read the
-// reference" assertion for the application path.
+// The columns the Connections page needs. The prohibition is on the application
+// read path: RULES.md §16 means listConnections names these three and no
+// response, log line or cache entry ever carries `credential_reference`. The one
+// deliberate exception is the negative case below, which names the column only
+// to prove Postgres refuses it, and discards `data` so no value can reach an
+// assertion or a log.
 const COLUMNS = "client_id,source,created_at";
 
 interface CredentialRowShape {
