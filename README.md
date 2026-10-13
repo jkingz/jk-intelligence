@@ -46,7 +46,8 @@ full picture needs `pnpm test:all` (adds the live-RLS integration tier, which ne
 `pnpm test:e2e:auth` for the Playwright tiers — the public tier runs in CI after the build, the
 authed tier is local-only because it needs real credentials.
 
-CI (`.github/workflows/ci.yml`) runs the four above plus the public e2e tier on every push and PR.
+CI (`.github/workflows/ci.yml`) runs the four above plus the public e2e tier on every push to
+`main`/`dev` and on pull requests.
 
 ## Feature workflow
 

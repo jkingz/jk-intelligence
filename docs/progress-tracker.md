@@ -50,10 +50,8 @@ routes were pinned to the dark palette (2026-09-25 — see Recent Work), and bef
 page's claims were made to match the build and the first live-RLS integration slice landed
 (2026-09-24).
 
-> Entries above this line are a log, not a status. `## Current Phase`, `## In Progress`,
-> `## Open Questions` and the *implemented surface* columns in `AGENTS.md` /
-> `context/architecture-context.md` are the state of record. Test counts quoted inside old entries
-> are frozen at that moment — the live number comes from `pnpm test`.
+> Entries above this line are a log, not a status. Test counts quoted inside old entries are frozen
+> at that moment — the live number comes from `pnpm test`.
 
 ## Completed
 - Theme palette (structurewebworks tokens), light/dark mode, dashboard component suite — see prior session notes
