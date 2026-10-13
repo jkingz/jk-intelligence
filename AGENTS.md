@@ -1760,7 +1760,8 @@ waits for a later cleanup commit is describing a state that no longer exists in 
 
 ## When each section changes
 - **STANDING RULES** — when a rule about *how* work gets done changes. Not when a feature ships.
-- **PROJECT OVERVIEW / ARCHITECTURE CONTEXT** — when a decision is made, before the code exists.
+- **APPLICATION BUILDING CONTEXT → PROJECT OVERVIEW / ARCHITECTURE CONTEXT** — when a decision is
+  made, before the code exists.
 - **UI CONTEXT / CODE STANDARDS / DEVELOPMENT WORKFLOW / PM CONVENTIONS** — when the practice they
   prescribe changes, not when a feature ships.
 - **SERVICE ARCHITECTURE** — implemented code only. When something becomes true, move it out of
@@ -1780,6 +1781,7 @@ and trains people to ignore a gate. Instead:
 1. Every § named by rule 14 exists: `grep -n "^# \|^## " AGENTS.md`.
 2. Every file and route cited here exists: `git ls-files <path>`, `find app/api -name route.ts`.
 3. Every command cited here exists: `pnpm run` lists them.
-4. No census is typed in as a state claim — a count of tests, files or lines rots the day the thing it
-   counts changes. Quote the command output in the reply instead. Not censuses: a version copied from
-   the installed package, and a number inside an example of a report line.
+4. No census is typed in as a state claim — a count of tests or lines rots the day the thing it counts
+   changes. Quote the command output in the reply instead. Not censuses: a number inside an example of
+   a report line, a version copied from the installed package, and a measurement labelled with the date
+   it was taken and kept as the evidence for an open question.
