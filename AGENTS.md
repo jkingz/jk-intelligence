@@ -1795,9 +1795,12 @@ defect wearing a different name.
    `insightsAgent.ts`. A sixth line is a dead pointer. Bare basenames (`guard.ts`) and
    `node_modules/…` paths are outside this command's reach; check those by opening the file, because a
    whole-file grep over them produces the noise this section refuses to generate.
-3. Every command cited here is real. `pnpm run` lists the scripts; the `pnpm exec` / `pnpm dlx` /
-   `pnpm patch` / `pnpm add` forms and `playwright test` are not script entries, so confirm those with
-   `command -v <tool>` or the tool's own `--help`.
+3. Every command cited here is real. `pnpm run` lists the scripts, but a `pnpm <verb>` form outside
+   that list is not covered by it. Enumerate those with
+   `grep -oE 'pnpm (exec|dlx|patch|patch-commit|add|install|remove)' AGENTS.md | sort -u` — expected
+   today: `pnpm exec`, `pnpm patch`, `pnpm patch-commit`. A fourth line means a new form was cited and
+   needs confirming with `command -v <tool>` or the tool's own `--help`; so does any bare tool
+   invocation this file cites, such as `supabase start`.
 4. No census is typed in as a state claim — a total count of tests, files, lines or routes rots the
    day the thing it counts changes. Quote the command output in the reply instead. Not censuses: a
    number inside an example of a report line; a version copied from the installed package; a
