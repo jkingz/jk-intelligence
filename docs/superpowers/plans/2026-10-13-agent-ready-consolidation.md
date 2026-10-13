@@ -1416,7 +1416,7 @@ State: the chain's output, the probe's result, `AGENTS.md`'s line count, the cou
 - The size lever (compress token tables to utilities referenced in JSX; cut TARGET STATE to the agent contracts, ≈300 lines) stays available if the 1,430-line load cost shows up in practice.
 - The spec's section budget included `# VERIFICATION STANDARDS` (20 lines) and `# EDITING THIS FILE`, but its nine-commit staging assigned neither — Task 10 exists to close that gap, which is why this plan runs to ten commits.
 
-### Amendment, 2026-10-13 — what shipped, measured at `14a8ef8`
+### Amendment, 2026-10-13 — what shipped, measured at `6152128`
 
 This plan is a record, so nothing above is rewritten to match what happened. Four lines in it would
 otherwise be read as live and are not: the **Architecture** header's "Ten commits … `AGENTS.md` grows
@@ -1424,12 +1424,14 @@ to ≈1,430 lines", Task 11 step 4's "Total ≈1,430 lines", the size-lever bull
 load cost shows up in practice", and the last bullet above this amendment's "this plan runs to ten
 commits".
 
-- **Actual: 49 commits, `AGENTS.md` at 1,811 lines (+27 % against the budget)** — `git rev-list
-  --count 074dec9..HEAD` and `wc -l AGENTS.md`; this amendment is the 50th commit. The overage is
+- **Actual: 51 commits, `AGENTS.md` at 1,814 lines (+27 % against the budget)** — measured with
+  `git rev-list --count 074dec9..6152128` and `wc -l AGENTS.md` at that commit; the heading names a
+  SHA rather than `HEAD` because re-running either command later prints a larger pair. The overage is
   Task 11's, not scope creep: it is the whole-branch review's eight Important findings and seven of
-  its ten Minor ones, fixed as five further commits after the review, each with a drop-and-name body.
+  its ten Minor ones, fixed in the five commits `ceb3f6b`, `73c35fd`, `c34d0ec`, `1328e50` and
+  `14a8ef8`, plus the one the scoped re-review added, `6152128` — each with a drop-and-name body.
   Task 11's own step 4 already compares against the running measured total rather than the printed
-  number, which is why the gate passed on a file 381 lines longer than the budget.
+  number, which is why the gate passed on a file 384 lines longer than the budget.
 - **Three Minor findings were left open on purpose.** The source-line citations inside rule sentences
   (`auth-page-shell.tsx:19,29` and `auth-dark-default.test.ts:33` in § Theme, `dashboard-metrics.tsx:28`
   and `landing-page.tsx:27` in § Icons) are the file's highest-rot tokens — completeness check 2 can
@@ -1442,7 +1444,7 @@ commits".
   `AGENTS.md` promises Rules 1–10 belong in any new project's `AGENTS.md` **verbatim** —
   generalising it to "the trunk branch this repo uses" would make the core portable but break that
   promise, so it is the owner's call, not a fix round's.
-- **The size lever is re-armed against 1,811, not 1,430.** Its trigger was phrased on a budget that
+- **The size lever is re-armed against 1,814, not 1,430.** Its trigger was phrased on a budget that
   never existed, so as written it could never fire. Compressing the two token tables to utilities
   referenced in JSX, and cutting § TARGET STATE to the four agent contracts (the ≈300 lines the
   size-lever bullet budgeted), remains available; spend it when the load cost shows up in practice,
@@ -1493,4 +1495,6 @@ commits".
   Critical, 8 Important, 10 Minor — whose report lived in this plan's git-ignored SDD workspace and
   is deleted with it, so this list is the surviving record of what it found. Read it as the review's
   conclusions, not as a re-derivation: every named correction can be checked against `AGENTS.md`
-  directly.
+  directly. The fixes were then re-reviewed once, scoped to those findings and to the fix diff, and
+  accepted; its single new finding — completeness check 3 listing three command forms the file never
+  cites — is what `6152128` fixes.
