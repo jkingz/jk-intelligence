@@ -27,9 +27,8 @@ Declare the spies where the factory can close over them:
 `const boundary = vi.hoisted(() => ({ fn: vi.fn() }))`, and `afterEach(() => vi.resetAllMocks())`.
 
 `vitest.config.ts` aliases `server-only` to its empty module and sets `conditions: ["react-server"]`,
-so a test never needs its own `vi.mock("server-only")` — 11 of the 41 test files still carry one
-(measured 2026-10-13), which is dead weight rather than a defect; drop it when you touch that file,
-and do not add it to a new one.
+so a test never needs its own `vi.mock("server-only")`. One that still carries it holds dead weight
+rather than a defect: drop it when you touch that file, and do not add it to a new one.
 
 New behavior gets a test in the same change; a bugfix gets a test that fails without the fix.
 
