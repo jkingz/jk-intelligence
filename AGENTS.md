@@ -86,11 +86,11 @@ Rules 1–10 are the **portable core** — they hold in every repo this workspac
 - `pnpm test && pnpm typecheck && pnpm lint && pnpm build` must be green before reporting work complete; CI (`.github/workflows/ci.yml`) runs these four plus `pnpm test:e2e` (public tier only).
 - Tests live in `tests/<feature>/<tier>/` — features `identity`, `tenant-isolation`, `dashboard`, `export`, `sync`, `landing`, `platform`; tiers `unit`, `integration`, `e2e`. `AGENTS.md` lists what each feature owns. Name the file `<sut>.test.ts` (unit/integration) or `<flow>.spec.ts` (e2e); import the **subject under test** through `@/`, never relatively — a `./` specifier can silently resolve to a neighbouring file of the same name. Shared helpers under `tests/helpers/` are the one exception and may be imported relatively.
 - Unit tests mock at the boundary (`@/lib/agents/...`, `@/lib/db/repository`) — never inside business logic, and never make a real network or DB call. That last clause is **unit-tier only**: the integration tier exists precisely to put a real Postgres behind `canAccessClient`.
-- `pnpm test` is the **unit project**, not the whole suite. The `integration` project is `tests/*/integration/**/*.test.ts` — **three files / 21 tests as of 2026-10-12**: the two live-RLS files `tests/tenant-isolation/integration/rls-gate.test.ts` (`clients`, 5) and `credentials-visibility.test.ts` (`api_credentials`, 6), plus `tests/admin/integration/provisioning.test.ts` (admin definer RPCs, 10), run against the local stack. All three `skipIf(!TEST_SUPABASE_URL)`, so a green tier can mean *nothing ran* — read the passed/skipped counts, not the exit code. E2E is a separate runner. Run `pnpm test:all` and `pnpm test:e2e` before pushing. Narrow with `pnpm test dashboard`, never `pnpm test -- dashboard` — the latter silently runs everything.
+- `pnpm test` is the **unit project**, not the whole suite. The `integration` project is `tests/*/integration/**/*.test.ts`, run against the local stack: the two live-RLS files `tests/tenant-isolation/integration/rls-gate.test.ts` (`clients`) and `credentials-visibility.test.ts` (`api_credentials`), plus `tests/admin/integration/provisioning.test.ts` (admin `security definer` RPCs). All three gate on `describe.skipIf(!hasTestDb)`, where `tests/helpers/db.ts` derives `hasTestDb` from `TEST_SUPABASE_URL`, so a green tier can mean *nothing ran* — read the passed/skipped counts from the run, not the exit code, and quote the run's numbers rather than typing a census into this file. E2E is a separate runner. Run `pnpm test:all` and `pnpm test:e2e` before pushing. Narrow with `pnpm test dashboard`, never `pnpm test -- dashboard` — the latter silently runs everything.
 - Route handlers get a `<name>-route.test.ts` covering 401 / 403 / 400 / 503 and the no-data-leaked-before-auth path.
 
 ### 14. Read order
-`AGENTS.md` § STANDING RULES → then, for architectural decisions, § APPLICATION BUILDING CONTEXT in
+§ STANDING RULES → then, for architectural decisions, § APPLICATION BUILDING CONTEXT in
 order: Project Overview → Architecture Context → UI Context → Code Standards → Development Workflow
 → PM Conventions. Then § SERVICE ARCHITECTURE for what exists, § TARGET STATE for what does not.
 Per-unit feature specs live in `specs/`. The rolling log at `docs/progress-tracker.md`
@@ -1181,7 +1181,7 @@ Per-route contracts — the detail behind the table's Notes column:
 - `GET /api/metrics/{clientId}/keywords` — returns the raw rows, not series, as the `{ data, meta }` envelope; the grouping into `KeywordRankSeries` is `buildKeywordSeries`, reached through `getKeywordRankingHistory` on the dashboard read path, not by this route. `?source=` (`gsc` default) + `?from`/`?to` ISO (default: last 30 days). Same `no-store` + `Vary: Cookie`.
 - `GET /api/exports/{clientId}/csv` — `text/csv; charset=utf-8` attachment. Filename is ASCII-slugged (`<client-slug>-metrics-<days>d-<YYYY-MM-DD>.csv`) by `lib/exports/filename.ts`, so non-ASCII client names never reach the header.
 - `GET /api/exports/{clientId}/pdf` — `application/pdf` attachment, same filename scheme with `-report-`. 503 JSON when `renderPdfReport()` throws — never a 200 with an empty body.
-- `POST /api/revalidate/dashboard` — `revalidateTag(DASHBOARD_OVERVIEW_TAG)`, guarded by `Authorization: Bearer <CRON_SECRET>`. `revalidateTag` throws outside a request context, which is why the standalone worker POSTs here (`lib/cache/notify.ts`) instead of calling it.
+- `POST /api/revalidate/dashboard` — `revalidateTag(DASHBOARD_OVERVIEW_TAG, DASHBOARD_REVALIDATE_PROFILE)` (the profile is `{ expire: 0 }`, both constants owned by `lib/cache/invalidate.ts`), guarded by `Authorization: Bearer <CRON_SECRET>`. `revalidateTag` throws outside a request context, which is why the standalone worker POSTs here (`lib/cache/notify.ts`) instead of calling it.
 - `GET /api/cron/sync` — Vercel cron (`vercel.json`, `GET`, bearer `CRON_SECRET`): iterates `listActiveClients()` and queues one BullMQ job per client with `Promise.allSettled`; returns `{ queued, errors }`. Jobs are consumed by `lib/queue/worker.ts`, which currently returns `mock_completed` without touching the sources.
 
 Planned and absent: see § TARGET STATE → Planned API Route Definitions, whose `### Cron Trigger` is the
@@ -1246,9 +1246,11 @@ pnpm test:all                                            # + integration tier �
 pnpm test:e2e                                            # public Playwright specs
 ```
 
-The integration tier — `tests/tenant-isolation/integration/rls-gate.test.ts` (`clients`) and
-`credentials-visibility.test.ts` (`api_credentials`) — is the only evidence that the RLS policies
-actually decide visibility; both `skipIf` on `TEST_SUPABASE_URL`, so the tier skips with a warning
+The two live-RLS files — `tests/tenant-isolation/integration/rls-gate.test.ts` (`clients`) and
+`credentials-visibility.test.ts` (`api_credentials`) — are the only evidence that the RLS policies
+actually decide visibility; the integration tier's third file,
+`tests/admin/integration/provisioning.test.ts`, proves the admin `security definer` RPCs, not
+visibility. All three `skipIf` on `TEST_SUPABASE_URL`, so the tier skips with a warning
 rather than faking a pass when `.env.test` has no `TEST_*` names.
 `supabase/config.toml` keeps `[db.migrations].enabled = false` —
 `pnpm db:migrate` is the sole applier and ledger (`public.schema_migrations`); the CLI's own
@@ -1323,13 +1325,6 @@ the five that go the other way. `.opencode/` carries only
 `commands/feature-component.md` — its own `.gitignore` keeps the tool's `node_modules/` and
 `package.json` untracked, so do not expect skills there.
 
-## Editing this file
-
-`AGENTS.md`'s top block ("This is NOT the Next.js you know" through the context-file list) is
-regenerated by `next dev` — commit it with your work rather than deleting it. Everything below the
-`# SERVICE ARCHITECTURE` heading is hand-maintained: update it in the same change that alters the
-surface described here, and move newly built modules out of § TARGET STATE and into this section.
-
 # FEATURE SPECS
 
 Feature specifications live in `specs/`, one file per deliverable unit, numbered in implementation
@@ -1338,7 +1333,7 @@ instead — a spec states requirements for one unit, a design doc records one de
 
 # TARGET STATE
 
-Design intent for what is **not** built. Nothing here is a description of current behavior: treat it as
+Design intent for what is **not** built. Most of this section is requirements rather than description: treat it as
 requirements, and give each item its own build + test pass before citing it as fact. Where a promise
 below is already built — § Product features the spec promises and § Build sequence (original POC plan)
 both mix shipped and unshipped halves — § Project Overview → Status is the authority. Two further things
@@ -1740,3 +1735,39 @@ and 3 re-marked 2026-09-25, step 3 again on 2026-10-12 — re-verify before trus
 14. ✅ CSV/PDF export behind a sliding-window quota (`lib/exports/quota.ts`).
 
 Sequencing rule that still holds: schema → auth/RLS → sync agent per source → queue/cron → cache → read routes → dashboard → admin → insights. Do not build a read route before the agent that fills it, and do not build UI against a column nothing writes.
+
+# VERIFICATION STANDARDS — Quality guardrails
+
+A sentence earns its place in this file only if its author read the thing this session. These are the
+failure modes no inline correction has closed yet.
+
+| Bad line | Why it is wrong | Good line |
+| --- | --- | --- |
+| "60 tests passing." | A count rots the day someone adds a test — and `RULES`-era docs here carried exactly that kind of stale number. | Run the command, quote its output in the reply, type nothing into the doc. |
+| "Integration tests pass." | All three integration files `skipIf(!TEST_SUPABASE_URL)`. A green tier that collected nothing is indistinguishable from coverage unless the count is read. | "integration tier: N passed, 0 skipped" — or say it skipped for want of `TEST_*` names. |
+| "Build passes locally and in CI." | The build once fetched a font over the network; a warm cache hid it for weeks and the sealed runner had no route to it. | Name the probe: `NODE_USE_ENV_PROXY=1 HTTPS_PROXY=http://127.0.0.1:9 pnpm build`. Here the Noto TTFs are vendored in `lib/exports/fonts/`, so the probe passes. |
+
+# EDITING THIS FILE
+
+`next dev` writes one thing: the text between `<!-- BEGIN:nextjs-agent-rules -->` and
+`<!-- END:nextjs-agent-rules -->`. `upsertAgentRulesBlock()` in
+`node_modules/next/dist/server/lib/generate-agent-files.js` (Next 16.3.5) replaces that span and
+nothing else, so everything below it — including `# SERVICE ARCHITECTURE` — is hand-maintained and
+never arrives by generation. Commit the marker block with your work rather than deleting it.
+
+## When each section changes
+- **STANDING RULES** — when a rule about *how* work gets done changes. Not when a feature ships.
+- **PROJECT OVERVIEW / ARCHITECTURE CONTEXT** — when a decision is made, before the code exists.
+- **SERVICE ARCHITECTURE** — implemented code only. When something becomes true, move it out of
+  `# TARGET STATE` in the same commit that made it true.
+- **TARGET STATE** — whenever intent outpaces implementation. Never cite it as current behavior.
+- **specs/** — one file per deliverable unit. `specs/00-template.md`.
+
+## Completeness — the checks that work
+No slot grep. The template's `grep -n '<[a-zA-Z_/]' AGENTS.md` cannot run against a filled file:
+`<clientId>`, `<CRON_SECRET>` and `<type>(<scope>)` are real text here, so it reports noise forever
+and trains people to ignore a gate. Instead:
+1. Every § named by rule 14 exists: `grep -n "^# \|^## " AGENTS.md`.
+2. Every file and route cited here exists: `git ls-files <path>`, `find app/api -name route.ts`.
+3. Every command cited here exists: `pnpm run` lists them.
+4. No test count, line count or version number is typed into this file. Quote command output.

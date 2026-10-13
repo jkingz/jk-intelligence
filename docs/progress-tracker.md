@@ -8,7 +8,9 @@
 > and are **not** the live record. `AGENTS.md` § Project Overview → Status and § Open product questions
 > decide what is current; do not add to the four sections here.
 
-Update this file after every meaningful implementation change.
+After every meaningful implementation change, append what actually happened under `## Completed`;
+add nothing to `## Current Phase`, `## Current Goal`, `## In Progress` and `## Open Questions` —
+those four are history.
 
 ## Current Phase
 Hardening the built surface: read paths and tenant isolation are done **and proven against a live
