@@ -1415,3 +1415,82 @@ State: the chain's output, the probe's result, `AGENTS.md`'s line count, the cou
 - The template's `README.md`, `START-HERE.md` and `.github/workflows/ci.yml` were not ported: this repo's CI already runs the filled-in chain, and an onboarding guide is for a template, not a product.
 - The size lever (compress token tables to utilities referenced in JSX; cut TARGET STATE to the agent contracts, ≈300 lines) stays available if the 1,430-line load cost shows up in practice.
 - The spec's section budget included `# VERIFICATION STANDARDS` (20 lines) and `# EDITING THIS FILE`, but its nine-commit staging assigned neither — Task 10 exists to close that gap, which is why this plan runs to ten commits.
+
+### Amendment, 2026-10-13 — what shipped, measured at `14a8ef8`
+
+This plan is a record, so nothing above is rewritten to match what happened. Four lines in it would
+otherwise be read as live and are not: the **Architecture** header's "Ten commits … `AGENTS.md` grows
+to ≈1,430 lines", Task 11 step 4's "Total ≈1,430 lines", the size-lever bullet's "if the 1,430-line
+load cost shows up in practice", and the last bullet above this amendment's "this plan runs to ten
+commits".
+
+- **Actual: 49 commits, `AGENTS.md` at 1,811 lines (+27 % against the budget)** — `git rev-list
+  --count 074dec9..HEAD` and `wc -l AGENTS.md`; this amendment is the 50th commit. The overage is
+  Task 11's, not scope creep: it is the whole-branch review's eight Important findings and seven of
+  its ten Minor ones, fixed as five further commits after the review, each with a drop-and-name body.
+  Task 11's own step 4 already compares against the running measured total rather than the printed
+  number, which is why the gate passed on a file 381 lines longer than the budget.
+- **Three Minor findings were left open on purpose.** The source-line citations inside rule sentences
+  (`auth-page-shell.tsx:19,29` and `auth-dark-default.test.ts:33` in § Theme, `dashboard-metrics.tsx:28`
+  and `landing-page.tsx:27` in § Icons) are the file's highest-rot tokens — completeness check 2 can
+  prove a path exists but never that a line number still points at the thing — yet replacing each with
+  a named anchor means rewriting two sentences that are correct today, and the review graded it
+  nice-to-have. The
+  missing blank line between the marker block and `# STANDING RULES` is what `upsertAgentRulesBlock()`
+  leaves behind, so "fixing" it means touching the managed block. And rule 7's `git pull` from
+  `origin main` before pushing to `dev` sits inside the portable core, whose own preamble in
+  `AGENTS.md` promises Rules 1–10 belong in any new project's `AGENTS.md` **verbatim** —
+  generalising it to "the trunk branch this repo uses" would make the core portable but break that
+  promise, so it is the owner's call, not a fix round's.
+- **The size lever is re-armed against 1,811, not 1,430.** Its trigger was phrased on a budget that
+  never existed, so as written it could never fire. Compressing the two token tables to utilities
+  referenced in JSX, and cutting § TARGET STATE to the four agent contracts (the ≈300 lines the
+  size-lever bullet budgeted), remains available; spend it when the load cost shows up in practice,
+  measured from the current number.
+- **The wording this plan told its tasks to copy verbatim was corrected after the review**, so
+  `AGENTS.md` no longer matches the source files it was folded from — and those sources are deleted,
+  which is why the corrections survive only in the file and in the fix commits' bodies. The verbatim
+  constraint in Global Constraints is the reason these travelled in rather than being written here.
+  By kind:
+  - *One authority per rule* — rule 13's test-placement line named seven feature folders and omitted
+    `admin`; it now points at § SERVICE ARCHITECTURE → Verification's table, which is the list that
+    gets maintained. Rule 12's marker-block bullet restated § EDITING THIS FILE's mechanism; it now
+    points at it. § UI Context's stale-banner line, § Layout Patterns' Sidebar bullet and its Admin
+    panel bullet each restated § SERVICE ARCHITECTURE → Pages and caching; all three now point there.
+  - *Identifiers that were wrong* — § UI Context's Metric Cards diagram showed a label-only header
+    and a `↑ 4.2%` delta, against `dashboard-metrics.tsx`, which renders `metric.icon` in the header,
+    `Minus` for a flat change, and a `font-medium` delta; the same section's `@theme inline` sidebar
+    sentence said "all six" classes and listed five (`text-sidebar-accent-foreground` was missing) and
+    named a `rounded` menu-button variant that does not exist — it is `outline`.
+    § SERVICE ARCHITECTURE's `lib/api/guard.ts` bullet said the module holds "the response shape
+    only", while it also exports `readJsonBody` and `firstIssueMessage`.
+  - *Self-checks nobody could run* — § EDITING THIS FILE's Completeness list named two checks with no
+    runnable form: check 2 said "every file and route cited here exists: `git ls-files <path>`"
+    without saying how to enumerate the paths, so running it meant hand-extracting every path-shaped
+    backtick span in a 1,800-line file and eyeballing the misses; check 3 said "`pnpm run` lists
+    them", which is true of the scripts and silent on the `pnpm exec`/`dlx`/`patch`/`add` forms the
+    same file cites. Both were rewritten to a single command with a stated expected result, check 4
+    was narrowed to *total* counts with five named exemptions, and check 5 was added for the
+    `bg-base` anti-pattern — Task 4's gate for it had gone unsatisfiable, because a later task added
+    the sentence that forbids the utility form and so matched its own grep. The "When each section
+    changes" list gained the missing **Repo skills** trigger.
+  - *Counts typed as state* — § File Organization's two directory trees each typed the route total:
+    `app/api`'s "(11 files: 9 session-gated, 2 bearer)" and `lib/api`'s "the 9 session-gated route
+    files (the 2 bearer routes build their own bodies)". Both now point at § HTTP surface, whose
+    table enumerates the files and whose opening sentence prints the `find` that derives the total.
+    Two bare "nine session-gated route files" mentions in § Architecture Context and § Request path
+    lost their number for the same reason.
+- **The same pass corrected five files this plan never pasted**:
+  `.claude/skills/feature-component/SKILL.md` and `docs/conventions/feature-components.md` (both
+  carried a seven-name feature list that omitted `admin`; both now point at the Verification table),
+  `docs/progress-tracker.md`'s footer above `## Completed` (it named the deleted
+  `context/architecture-context.md` and called three history sections "the state of record", which
+  the demotion banner at the top of that file denies), `README.md`'s CI line (the workflow fires on
+  pushes to `main`/`dev` and on pull requests, not on every push), and
+  `.claude/skills/testing/SKILL.md` (a `server-only` census of "11 of the 41 test files" stated as a
+  rule).
+- The findings behind all of the above came from one whole-branch review run at `096aff7` — 0
+  Critical, 8 Important, 10 Minor — whose report lived in this plan's git-ignored SDD workspace and
+  is deleted with it, so this list is the surviving record of what it found. Read it as the review's
+  conclusions, not as a re-derivation: every named correction can be checked against `AGENTS.md`
+  directly.
