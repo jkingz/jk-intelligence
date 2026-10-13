@@ -256,7 +256,7 @@ Overview → Status, not here.
 ### System boundaries
 
 - `app/api` — route handlers: validate → guard → read/delegate.
-- `lib/api` — `guard.ts`: the response shape (`NO_STORE`, `json`, `badRequest`/`unauthorized`/`forbidden`/`databaseFailure`) and the gates (`gateNullable`, `gateSession`, `gateAdmin`, `gateClientAccess`, `resolveAccessibleClient`) shared by the nine session-gated route files. It owns no ownership rule — the tenant gates forward to `canAccessClient` / `listAccessibleClients`.
+- `lib/api` — `guard.ts`: the response shape (`NO_STORE`, `json`, `badRequest`/`unauthorized`/`forbidden`/`databaseFailure`) and the gates (`gateNullable`, `gateSession`, `gateAdmin`, `gateClientAccess`, `resolveAccessibleClient`) shared by the session-gated route files, which § HTTP surface enumerates. It owns no ownership rule — the tenant gates forward to `canAccessClient` / `listAccessibleClients`.
 - `lib/agents` — `authAgent` only (identity + role). sync/transform/cache/insights agents are unbuilt spec.
 - `lib/auth` — `cron.ts` (timing-safe bearer check for cron/revalidate) and `routing.ts` (the `proxy.ts` decision table for `/dashboard` + `/connections` + `/profile` + `/admin`, and open-redirect-safe `next`). Both tested.
 - `lib/navigation` — `destinations.ts`: the rail's `APP_DESTINATIONS` list and `activeDestination()`. Icons are string keys so the module stays importable from a node-tier test; the key → Lucide mapping lives with the rail component. Every href it lists is in `PROTECTED_PREFIXES`, asserted by `tests/platform/unit/destinations.test.ts`.
@@ -878,7 +878,7 @@ components/
   ui/           — shadcn primitives (protected, do not hand-edit)
   features/     — app-shell, admin, connections, dashboard, data-export, email-password-auth, landing, user-profile
 app/
-  api/          — thin route handlers behind `lib/api/guard.ts` (11 files: 9 session-gated, 2 bearer; see § HTTP surface)
+  api/          — thin route handlers behind `lib/api/guard.ts` (see § HTTP surface for the file total and the session-gated/bearer split)
   (app)/        — route group, adds no URL segment: dashboard, connections, profile, admin
     dashboard/  — static shell + client-side boot fetch
 types/          — shared contracts: metrics.ts, dashboard.ts, database.ts (handwritten)
@@ -1049,7 +1049,7 @@ This section describes only code that exists. Design intent for what is **not** 
 ```
 proxy.ts (session refresh via updateSession)
   → app/api route handler
-    → lib/api/guard.ts          — 401/403/503 shape + the gates, shared by the nine session-gated route files
+    → lib/api/guard.ts          — 401/403/503 shape + the gates, shared by the session-gated route files
     → lib/agents/authAgent      — identity + role
     → lib/db/repository         — RLS-backed tenant gate, then metric reads
   → components/features/*       — dashboard reads /api/dashboard/boot client-side
@@ -1763,6 +1763,9 @@ waits for a later cleanup commit is describing a state that no longer exists in 
   prescribe changes, not when a feature ships.
 - **SERVICE ARCHITECTURE** — implemented code only. When something becomes true, move it out of
   `# TARGET STATE` in the same commit that made it true.
+- **SERVICE ARCHITECTURE → Repo skills** — when a skill is added, removed or re-linked. Its counts are
+  a dated filesystem measurement, so re-measure with `readlink` and `git ls-files -s` rather than
+  editing a number.
 - **TARGET STATE** — whenever intent outpaces implementation. Never cite it as current behavior.
 - **FEATURE SPECS** — when `specs/` gains or loses a numbered file, or the split with
   `docs/superpowers/specs/` changes.
@@ -1774,11 +1777,35 @@ waits for a later cleanup commit is describing a state that no longer exists in 
 ## Completeness — the checks that work
 No slot grep. The template's `grep -n '<[a-zA-Z_/]' AGENTS.md` cannot run against a filled file:
 `<clientId>`, `<CRON_SECRET>` and `<type>(<scope>)` are real text here, so it reports noise forever
-and trains people to ignore a gate. Instead:
+and trains people to ignore a gate. Every check below therefore has a stated expected result on the
+file as it stands — a check whose expected output is "some noise you learn to skip" is the same
+defect wearing a different name.
+
 1. Every § named by rule 14 exists: `grep -n "^# \|^## " AGENTS.md`.
-2. Every file and route cited here exists: `git ls-files <path>`, `find app/api -name route.ts`.
-3. Every command cited here exists: `pnpm run` lists them.
-4. No census is typed in as a state claim — a count of tests or lines rots the day the thing it counts
-   changes. Quote the command output in the reply instead. Not censuses: a number inside an example of
-   a report line, a version copied from the installed package, and a measurement labelled with the date
-   it was taken and kept as the evidence for an open question.
+2. Every repo-rooted path cited here resolves. Run:
+
+   ```bash
+   grep -oE '(app|components|lib|tests|types|specs|docs|scripts|supabase|patches|\.github)/[]A-Za-z0-9_./{}()[-]*\.(ts|tsx|css|md|sql|json|mjs|ya?ml)' AGENTS.md \
+     | sort -u \
+     | while read -r p; do git ls-files --error-unmatch "$p" >/dev/null 2>&1 || echo "$p"; done
+   ```
+
+   Expected: exactly the five paths this file cites in order to say they do *not* exist —
+   `lib/admin/http.ts` and `lib/agents/syncAgent.ts` / `transformAgent.ts` / `cacheAgent.ts` /
+   `insightsAgent.ts`. A sixth line is a dead pointer. Bare basenames (`guard.ts`) and
+   `node_modules/…` paths are outside this command's reach; check those by opening the file, because a
+   whole-file grep over them produces the noise this section refuses to generate.
+3. Every command cited here is real. `pnpm run` lists the scripts; the `pnpm exec` / `pnpm dlx` /
+   `pnpm patch` / `pnpm add` forms and `playwright test` are not script entries, so confirm those with
+   `command -v <tool>` or the tool's own `--help`.
+4. No census is typed in as a state claim — a total count of tests, files, lines or routes rots the
+   day the thing it counts changes. Quote the command output in the reply instead. Not censuses: a
+   number inside an example of a report line; a version copied from the installed package; a
+   measurement labelled with the date it was taken, kept as the evidence for a marking or an open
+   question; a count printed beside the command that derives it, as § HTTP surface prints
+   `find app/api -name route.ts` next to its file total; and a count of things the same section
+   enumerates, where the reader can see the members instead of trusting the total.
+5. No raw-token utility outside the sentence that forbids it:
+   `grep -n "\bbg-base\b" AGENTS.md | grep -v -- "--bg-base"` prints only § Styling's "`bg-base`,
+   `text-copy-primary`, `text-brand` generate nothing and fail silently" line. The code side is
+   `grep -rn "bg-base" app components`, whose only hits are `--bg-base` declarations.
