@@ -76,15 +76,12 @@ Rules 1–10 are the **portable core** — they hold in every repo this workspac
 
 ### 12. Next.js 16 is a fork of what you remember
 - Read the matching guide in `node_modules/next/dist/docs/` before touching framework APIs (`proxy.ts` not `middleware.ts`, `RouteContext`, two-arg `revalidateTag`).
-- Only the `<!-- BEGIN:nextjs-agent-rules -->` … `<!-- END:nextjs-agent-rules -->` block is written
-  and re-added by `next dev` — `upsertAgentRulesBlock()` in
-  `node_modules/next/dist/server/lib/generate-agent-files.js` (Next 16.3.5) replaces the text between
-  the markers and nothing else. Everything below it is hand-maintained; commit the block with your
-  work rather than deleting it.
+- `next dev` manages only the marker block at the top of this file. § EDITING THIS FILE owns the
+  mechanism, what it overwrites, and why committing the block with your work keeps the tree clean.
 
 ### 13. Verification gates
 - `pnpm test && pnpm typecheck && pnpm lint && pnpm build` must be green before reporting work complete; CI (`.github/workflows/ci.yml`) runs these four plus `pnpm test:e2e` (public tier only).
-- Tests live in `tests/<feature>/<tier>/` — features `identity`, `tenant-isolation`, `dashboard`, `export`, `sync`, `landing`, `platform`; tiers `unit`, `integration`, `e2e`. `AGENTS.md` lists what each feature owns. Name the file `<sut>.test.ts` (unit/integration) or `<flow>.spec.ts` (e2e); import the **subject under test** through `@/`, never relatively — a `./` specifier can silently resolve to a neighbouring file of the same name. Shared helpers under `tests/helpers/` are the one exception and may be imported relatively.
+- Tests live in `tests/<feature>/<tier>/` — the feature folders and what each one owns are the table in § SERVICE ARCHITECTURE → Verification; tiers `unit`, `integration`, `e2e`. Name the file `<sut>.test.ts` (unit/integration) or `<flow>.spec.ts` (e2e); import the **subject under test** through `@/`, never relatively — a `./` specifier can silently resolve to a neighbouring file of the same name. Shared helpers under `tests/helpers/` are the one exception and may be imported relatively.
 - Unit tests mock at the boundary (`@/lib/agents/...`, `@/lib/db/repository`) — never inside business logic, and never make a real network or DB call. That last clause is **unit-tier only**: the integration tier exists precisely to put a real Postgres behind `canAccessClient`.
 - `pnpm test` is the **unit project**, not the whole suite. The `integration` project is `tests/*/integration/**/*.test.ts`, run against the local stack: the two live-RLS files `tests/tenant-isolation/integration/rls-gate.test.ts` (`clients`) and `credentials-visibility.test.ts` (`api_credentials`), plus `tests/admin/integration/provisioning.test.ts` (admin `security definer` RPCs). All three gate on `describe.skipIf(!hasTestDb)`, where `tests/helpers/db.ts` derives `hasTestDb` from `TEST_SUPABASE_URL`, so a green tier can mean *nothing ran* — read the passed/skipped counts from the run, not the exit code. E2E is a separate runner. Run `pnpm test:all` and `pnpm test:e2e` before pushing. Narrow with `pnpm test dashboard`, never `pnpm test -- dashboard` — the latter silently runs everything.
 - Route handlers get a `<name>-route.test.ts` covering 401 / 403 / 400 / 503 and the no-data-leaked-before-auth path.
@@ -356,7 +353,7 @@ Dark/light mode supported. Default: dark. Toggle via `data-theme` attribute on `
 
 All colors defined as CSS custom properties in `globals.css`, mapped to Tailwind via `@theme inline`. Components use tokens only — no hardcoded hex or raw Tailwind color classes like `zinc-*` or `slate-*`.
 
-`components/ui/sidebar.tsx` ships `bg-sidebar`, `text-sidebar-foreground`, `border-sidebar-border`, `bg-sidebar-accent` and `ring-sidebar-ring` with no values of their own, so `@theme inline` aliases all six onto existing app tokens (`--bg-surface`, `--text-primary`, `--border-default`, `--accent-primary-dim`). Without the mapping these classes compile to no utility at all and the rail renders transparent — check that block before adding another primitive that brings its own token names. One gap is left on purpose: the primitive's unused `rounded` menu-button variant interpolates the *raw* `var(--sidebar-border)` / `var(--sidebar-accent)`, which nothing defines, so if that variant is ever adopted those need their own `:root` values.
+`components/ui/sidebar.tsx` ships `bg-sidebar`, `text-sidebar-foreground`, `border-sidebar-border`, `bg-sidebar-accent`, `text-sidebar-accent-foreground` and `ring-sidebar-ring` with no values of their own, so `@theme inline` aliases all six onto existing app tokens (`--bg-surface`, `--text-primary`, `--border-default`, `--accent-primary-dim`, `--accent-primary`). Without the mapping these classes compile to no utility at all and the rail renders transparent — check that block before adding another primitive that brings its own token names. One gap is left on purpose: the primitive's unused `outline` variant (`sidebarMenuButtonVariants`' `variant.outline`) interpolates the *raw* `var(--sidebar-border)` / `var(--sidebar-accent)`, which nothing defines, so if that variant is ever adopted those need their own `:root` values.
 
 #### Dark Mode Tokens
 
@@ -485,9 +482,9 @@ DropdownMenuContent: w-60 (primitive default p-1)
 
 ```
 Card className="rounded-2xl p-4 sm:p-5 flex flex-col justify-between"   (shadcn Card supplies surface + border)
-├── Label: text-xs text-text-muted        (CardHeader, p-0)
-├── Value: text-2xl font-mono font-medium tracking-tight text-text-primary
-├── Delta: text-xs font-mono + state utility (↑ 4.2% / ↓ 1.8%)
+├── Label + icon: text-xs text-text-muted + metric.icon at size-3.5 text-primary   (CardHeader, p-0 flex-row justify-between)
+├── Value: text-2xl font-mono font-medium tracking-tight text-text-primary   (CardContent, p-0 py-2 flex-wrap items-baseline gap-2)
+├── Delta: ArrowUpRight / ArrowDownRight / Minus at size-3 aria-hidden, then text-xs font-medium + state utility   (e.g. "+4.2%")
 └── Footnote: text-[11px] text-text-muted (CardFooter, p-0 border-none bg-transparent)
 ```
 
@@ -516,7 +513,7 @@ rounded-xl px-4 py-2 text-xs
 ```
 
 `staleSource` mirrors `current_metrics.is_stale`, which nothing writes yet, so this banner is
-reachable in code but not in practice (see `docs/progress-tracker.md`).
+reachable in code but not in practice (see § Pages and caching).
 
 #### Sync Status Pill
 
@@ -551,10 +548,10 @@ colours, and note `--accent-primary-dim` is a red tint — it is the brand accen
 - **Sidebar (`AppNav`):** the shadcn `Sidebar` primitive with `collapsible="icon"` — 15rem
   (`--sidebar-width` is overridden from the primitive's 16rem to keep the documented `w-60`)
   expanded, 3rem icons, `bg-sidebar border-r border-default`. Destinations come from
-  `lib/navigation/destinations.ts`; the shell reads no session so `/dashboard` stays prerendered,
-  and the account block fetches its own identity from `/api/auth/me`. Below 768px the same list
-  renders in a `Sheet` drawer (18rem) opened by the hamburger in `MobileNav`, and every link
-  closes it. The horizontal strip is gone.
+  `lib/navigation/destinations.ts`; the shell's session-free rule and where the account block gets its
+  identity follow § SERVICE ARCHITECTURE → Pages and caching. Below 768px the same list renders in a
+  `Sheet` drawer (18rem) opened by the hamburger in `MobileNav`, and every link closes it. The
+  horizontal strip is gone.
 - **Sidebar header / footer:** header is one row — the 2rem brand tile plus the wordmark on the
   left, `SidebarTrigger` on the right. The label carries `group-data-[collapsible=icon]:hidden`
   (8px padding either side of a 2rem tile is exactly the collapsed width, so the label hides rather
@@ -567,8 +564,8 @@ colours, and note `--accent-primary-dim` is a red tint — it is the brand accen
   `h-auto py-2` to escape the variant's fixed `h-12`; and the trailing affordance is
   `ChevronRight`, not `ChevronDown`, because the menu opens sideways off the rail edge. The
   `tooltip` carries the name so the collapsed rail still says who you are.
-- **Admin panel:** `components/features/admin` inside the same shell; `/admin` is not a destination,
-  so the rail renders beside it with no active row.
+- **Admin panel:** `components/features/admin` inside the same shell; why the rail renders beside it
+  with no active row follows § SERVICE ARCHITECTURE → Pages and caching.
 - **Modals:** centered overlay, `rounded-3xl`, `bg-elevated`, backdrop blur.
 - **Dashboard header:** `bg-surface border-b border-default`, client selector + sync status +
   trigger sync + export menu + theme toggle. It no longer carries the account menu — that moved to
@@ -1077,12 +1074,12 @@ proxy.ts (session refresh via updateSession)
 - `listConnections()` composes those two reads for `/connections` (`clients`, then
   `api_credentials`) and adds no ownership rule of its own.
 - No route or helper may re-implement "is this the caller's client?" in TypeScript.
-- `lib/api/guard.ts` holds the response shape only — `NO_STORE`, `json`/`badRequest`/`unauthorized`/
-  `forbidden`/`databaseFailure`, and the gates `gateNullable`/`gateSession`/`gateAdmin` (typed
-  `Gate<null>`; `requireAdmin()` returns no user)/`gateClientAccess`/`resolveAccessibleClient` — and
-  is a thin caller of the two RLS probes (`gateClientAccess` → `canAccessClient`,
-  `resolveAccessibleClient` → `listAccessibleClients`); it owns no ownership rule. `lib/admin/http.ts`,
-  which used to own the admin trio's shape, is deleted.
+- `lib/api/guard.ts` holds the response shape — `NO_STORE`, `json`/`badRequest`/`unauthorized`/
+  `forbidden`/`databaseFailure` — the gates `gateNullable`/`gateSession`/`gateAdmin` (typed
+  `Gate<null>`; `requireAdmin()` returns no user)/`gateClientAccess`/`resolveAccessibleClient`, and the
+  two body helpers `readJsonBody`/`firstIssueMessage`. It is a thin caller of the two RLS probes
+  (`gateClientAccess` → `canAccessClient`, `resolveAccessibleClient` → `listAccessibleClients`); it owns
+  no ownership rule. `lib/admin/http.ts`, which used to own the admin trio's shape, is deleted.
 - Metric/keyword reads deliberately use the service-role client (`getAdminDb()`, RLS bypassed)
   because they run inside `unstable_cache`; they are reachable only with a `client_id` that already
   cleared the gate.
