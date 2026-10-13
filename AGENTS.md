@@ -863,7 +863,7 @@ const [gsc, ga4, semrush] = await Promise.allSettled([
 lib/
   admin/        — provisioning schemas, Postgres error copy, definer-RPC caller (no React, no `cookies()`)
   agents/       — authAgent (identity + role). Other agents: not built
-  api/          — `guard.ts`: the response shape and the session/admin/tenant gates for the 9 session-gated route files (the 2 bearer routes build their own bodies)
+  api/          — `guard.ts`: the response shape and the session/admin/tenant gates shared by the session-gated route files (the bearer routes build their own bodies; § HTTP surface carries the split)
   auth/         — cron secret check, proxy routing decisions, safe `next`
   cache/        — tag ownership (`invalidate.ts`), worker→app ping (`notify.ts`)
   connections/  — `status.ts`: the pure join that backs `/connections`
