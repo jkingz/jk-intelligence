@@ -12,7 +12,9 @@ subject through `@/`, never relatively — a `./` specifier can resolve to a nei
 same name. `tests/helpers/` is the one exception and may be imported relatively.
 Name files `<sut>.test.ts` (unit/integration) or `<flow>.spec.ts` (e2e).
 
-`AGENTS.md § Verification` owns the table of which feature folder owns which modules.
+`AGENTS.md § SERVICE ARCHITECTURE → Verification` owns the table of which feature folder owns which
+modules. (`§ Development Workflow — Portable core → Verification` shares the heading name but is the
+per-unit completion check, not the ownership census.)
 
 ## Mocking
 
@@ -58,6 +60,8 @@ pnpm test tests/dashboard # one folder — `pnpm test -- tests/dashboard` runs t
 ```
 
 A filter that matches nothing exits 1, so a moved file announces itself instead of passing empty.
+`vitest.config.ts:19` sets `environment: "node"` once, above `projects:`, so both tiers run without a
+DOM.
 
 ## What the integration tier covers today
 

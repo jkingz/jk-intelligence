@@ -44,5 +44,6 @@ green CI is offered as evidence.
 Prove the build is hermetic before trusting a warm cache:
 `NODE_USE_ENV_PROXY=1 HTTPS_PROXY=http://127.0.0.1:9 pnpm build`.
 
-- The rules this skill implements are `AGENTS.md § STANDING RULES 13`. Read that, not this file, for
-  the contract.
+- The chain this skill reports is `AGENTS.md § STANDING RULES 13`; read that, not this file, for the
+  contract. The probe above is this skill's own addition — rule 13 names the four commands, not the
+  egress-blocked rerun.

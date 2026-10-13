@@ -37,8 +37,9 @@ current behavior. No rotting literals — quote command output instead of typing
 ## Before moving to the next unit
 
 The unit works end to end inside the scope stated at step 2; no invariant in
-`§ Architecture Context → Invariants` was violated (4, 12 and 13 are the ones that break silently);
-`§ SERVICE ARCHITECTURE` describes what now exists; the full gate chain is green; no orphaned dev
-server, worker or background process.
+`§ Architecture Context → Invariants` was violated (#4 tenant isolation and #12 the static dashboard
+shell are the ones that break silently); `§ SERVICE ARCHITECTURE` describes what now exists;
+`docs/progress-tracker.md` reflects what actually happened; the full gate chain is green; no orphaned
+dev server, worker or background process.
 
 - `AGENTS.md § STANDING RULES` and `§ Development Workflow — Project appendix` hold the contract.
