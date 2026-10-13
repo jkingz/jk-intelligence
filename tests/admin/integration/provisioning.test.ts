@@ -6,7 +6,7 @@ import type { AdminRpcError } from "@/lib/admin/rpc";
 // The admin RPCs are the enforcement point, so this file is evidence about
 // Postgres: a non-admin must be refused by the function, not by a handler that
 // happens to check first. NEVER EXECUTED in CI — quote the skip line in
-// context/progress-tracker.md rather than claiming coverage.
+// docs/progress-tracker.md rather than claiming coverage.
 vi.mock("next/headers", () => ({
   cookies: async () => getCurrentCookieStore(),
 }));

@@ -4,13 +4,13 @@
 
 - Branch: `feat/<slug>` — e.g. `feat/email-password-auth`
 - Title: `feat(<slug>): <what>` — e.g. `feat(auth): email + password sign-in/sign-up`
-- One feature unit per PR; spec must exist in `context/feature-specs/` before implementation
-- PR body links spec path + progress-tracker update note
+- One feature unit per PR; spec must exist in `specs/` before implementation
+- PR body links the spec path and names the verification the unit passed; the `docs/progress-tracker.md` record is written after that, under `## Completed`, so there is no tracker note to link at PR time
 - Checks green before ready: `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`
 
 ## Feature Folders
 
-Every feature gets its own folder in `components/features/<slug>/`. Number prefixes belong only to `context/feature-specs/<nn>-<slug>.md`; use unnumbered folders, imports, branches, and PR scopes.
+Every feature gets its own folder in `components/features/<slug>/`. Number prefixes belong only to `specs/<nn>-<slug>.md`; use unnumbered folders, imports, branches, and PR scopes.
 
 ```
 components/features/<slug>/
@@ -23,8 +23,9 @@ components/features/<slug>/
 ```
 
 Nothing test-shaped goes in the feature folder. Tests live in `tests/<feature>/<tier>/`
-(`unit` / `integration` / `e2e`), named after the invariant they protect — see `AGENTS.md` for the
-feature list and `RULES.md` §13 for the placement rule. A feature slug used as a test folder name must
+(`unit` / `integration` / `e2e`), named after the invariant they protect — see `AGENTS.md`
+§ SERVICE ARCHITECTURE → Verification for the folder list and what each folder owns, and
+`AGENTS.md` § STANDING RULES 13 for the placement rule. A feature slug used as a test folder name must
 already exist there; if it does not, the feature owns no test folder yet and the test belongs under the
 domain that owns the invariant.
 
@@ -36,13 +37,13 @@ domain that owns the invariant.
 - Cross-feature imports forbidden — shared logic moves down to `lib/` or up to `components/ui`
 - `components/ui/*` stays untouched (protected foundation)
 - Server components by default; `"use client"` only inside feature components that need interactivity
-- Feature owns its context files update (`context/progress-tracker.md` + relevant spec)
+- Feature owns its spec and log update (`docs/progress-tracker.md` + the feature's spec)
 
 ## Checklist (new feature)
 
-1. Spec in `context/feature-specs/<nn>-<slug>.md`
-2. Tracker "In Progress" entry added before implementation
+1. Spec in `specs/<nn>-<slug>.md`
+2. No tracker entry yet — `## In Progress` is history, not a status board; the record lands at step 6
 3. Folder `components/features/<slug>/` with barrel
 4. Implement components/hooks/lib in folder; tests in `tests/<feature>/<tier>/`, not here
 5. Wire via barrel in `app/` pages/routes
-6. Checks green, tracker moved to Completed
+6. Checks green, then record the unit under `docs/progress-tracker.md`'s `## Completed` — never as status in the four history sections

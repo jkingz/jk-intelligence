@@ -2,8 +2,8 @@
 
 Multi-client SEO reporting platform: Next.js 16, React 19, TypeScript, Supabase (Postgres + RLS + auth), shadcn/ui, BullMQ on Upstash.
 
-- Scope and status: [context/project-overview.md](context/project-overview.md), [context/progress-tracker.md](context/progress-tracker.md)
-- Built vs planned: [AGENTS.md](AGENTS.md) describes implemented code only; [docs/target-state.md](docs/target-state.md) holds the rest
+- Scope and status: [AGENTS.md § Project Overview](AGENTS.md#project-overview), [docs/progress-tracker.md](docs/progress-tracker.md)
+- Built vs planned: [AGENTS.md](AGENTS.md) describes implemented code only; [AGENTS.md § TARGET STATE](AGENTS.md) holds the rest
 
 ## Dashboard
 
@@ -21,7 +21,7 @@ Not live yet, do not demo them as working:
 
 ![JK Intelligence architecture](docs/architecture.svg)
 
-Request path, the RLS-backed tenant gate and the HTTP surface: [AGENTS.md](AGENTS.md). Deep boundaries: [context/architecture-context.md](context/architecture-context.md).
+Request path, the RLS-backed tenant gate and the HTTP surface: [AGENTS.md](AGENTS.md). Deep boundaries: [AGENTS.md § Architecture Context](AGENTS.md#architecture-context).
 
 ## Development
 
@@ -46,14 +46,16 @@ full picture needs `pnpm test:all` (adds the live-RLS integration tier, which ne
 `pnpm test:e2e:auth` for the Playwright tiers — the public tier runs in CI after the build, the
 authed tier is local-only because it needs real credentials.
 
-CI (`.github/workflows/ci.yml`) runs the four above plus the public e2e tier on every push and PR.
+CI (`.github/workflows/ci.yml`) runs the four above plus the public e2e tier on every push to
+`main`/`dev` and on pull requests.
 
 ## Feature workflow
 
-Read [AGENTS.md](AGENTS.md) and its ordered `context/` files before implementing.
+Read [AGENTS.md](AGENTS.md) before implementing: § STANDING RULES, then § APPLICATION BUILDING
+CONTEXT in order.
 
-- Specs: `context/feature-specs/<nn>-<slug>.md`. Components: `components/features/<slug>/`, exported through `index.ts`. Numbers belong only to spec filenames.
-- Tracker: mark **In Progress** before implementing, complete after verification.
+- Specs: `specs/<nn>-<slug>.md`. Components: `components/features/<slug>/`, exported through `index.ts`. Numbers belong only to spec filenames.
+- Tracker: record the unit under `docs/progress-tracker.md`'s `## Completed` **after** verification; the four history sections stay as they are. Current status lives in AGENTS.md § Project Overview → Status and § Open product questions.
 - Branches `feat/<slug>`, titles `feat(<slug>): <summary>`. Commit, push and open PRs only when asked.
 - Full rules: [docs/conventions/feature-components.md](docs/conventions/feature-components.md).
 

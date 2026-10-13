@@ -322,7 +322,7 @@ export async function canAccessClient(clientId: string): Promise<boolean> {
  * Deliberately NOT wrapped in `unstable_cache`: the client is cookie-bound, and
  * a cached function keyed on nothing while deriving its rows from the caller is
  * the cross-user leak the tenant-gate change closed
- * (context/architecture-context.md invariant 4-5).
+ * (AGENTS.md § Architecture Context, invariants 4-5).
  */
 export async function listConnections(): Promise<ClientConnections[]> {
   const clients = await listAccessibleClients();

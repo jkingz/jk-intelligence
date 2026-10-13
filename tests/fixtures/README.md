@@ -2,7 +2,7 @@
 
 Data builders for the integration tier. **Empty by design** — this directory currently holds no code
 because the first integration slice has not landed (see the note in
-`context/progress-tracker.md`). This file records what it will need, so the shape is decided before
+`docs/progress-tracker.md`). This file records what it will need, so the shape is decided before
 the first test forces it.
 
 ## Environment

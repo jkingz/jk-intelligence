@@ -119,4 +119,4 @@ the panel reports the refusal rather than pretending the row disappeared.
 request contract (`tests/admin/unit/mutations.test.ts`), the integration tier owns the functions,
 and the round trip — create, rename, pause, move, attach, promote, detach twice, bounce a
 `client` — was driven by hand in Chrome against the local stack and recorded in
-`context/progress-tracker.md`.
+`docs/progress-tracker.md`.

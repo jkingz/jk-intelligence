@@ -1,6 +1,16 @@
 # Progress Tracker
 
-Update this file after every meaningful implementation change.
+> Demoted from `context/` on 2026-10-13 and out of the read order. This is a rolling log: entries
+> below cite the paths that were authoritative when they were written, and those citations are kept
+> as written. Current guidance lives only in `AGENTS.md`.
+>
+> `## Current Phase`, `## Current Goal`, `## In Progress` and `## Open Questions` are kept as history
+> and are **not** the live record. `AGENTS.md` § Project Overview → Status and § Open product questions
+> decide what is current; do not add to the four sections here.
+
+After every meaningful implementation change, append what actually happened under `## Completed`;
+add nothing to `## Current Phase`, `## Current Goal`, `## In Progress` and `## Open Questions` —
+those four are history.
 
 ## Current Phase
 Hardening the built surface: read paths and tenant isolation are done **and proven against a live
@@ -40,10 +50,8 @@ routes were pinned to the dark palette (2026-09-25 — see Recent Work), and bef
 page's claims were made to match the build and the first live-RLS integration slice landed
 (2026-09-24).
 
-> Entries above this line are a log, not a status. `## Current Phase`, `## In Progress`,
-> `## Open Questions` and the *implemented surface* columns in `AGENTS.md` /
-> `context/architecture-context.md` are the state of record. Test counts quoted inside old entries
-> are frozen at that moment — the live number comes from `pnpm test`.
+> Entries above this line are a log, not a status. Test counts quoted inside old entries are frozen
+> at that moment — the live number comes from `pnpm test`.
 
 ## Completed
 - Theme palette (structurewebworks tokens), light/dark mode, dashboard component suite — see prior session notes
