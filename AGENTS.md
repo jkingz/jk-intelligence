@@ -86,7 +86,7 @@ Rules 1–10 are the **portable core** — they hold in every repo this workspac
 - `pnpm test && pnpm typecheck && pnpm lint && pnpm build` must be green before reporting work complete; CI (`.github/workflows/ci.yml`) runs these four plus `pnpm test:e2e` (public tier only).
 - Tests live in `tests/<feature>/<tier>/` — features `identity`, `tenant-isolation`, `dashboard`, `export`, `sync`, `landing`, `platform`; tiers `unit`, `integration`, `e2e`. `AGENTS.md` lists what each feature owns. Name the file `<sut>.test.ts` (unit/integration) or `<flow>.spec.ts` (e2e); import the **subject under test** through `@/`, never relatively — a `./` specifier can silently resolve to a neighbouring file of the same name. Shared helpers under `tests/helpers/` are the one exception and may be imported relatively.
 - Unit tests mock at the boundary (`@/lib/agents/...`, `@/lib/db/repository`) — never inside business logic, and never make a real network or DB call. That last clause is **unit-tier only**: the integration tier exists precisely to put a real Postgres behind `canAccessClient`.
-- `pnpm test` is the **unit project**, not the whole suite. The `integration` project is `tests/*/integration/**/*.test.ts`, run against the local stack: the two live-RLS files `tests/tenant-isolation/integration/rls-gate.test.ts` (`clients`) and `credentials-visibility.test.ts` (`api_credentials`), plus `tests/admin/integration/provisioning.test.ts` (admin `security definer` RPCs). All three gate on `describe.skipIf(!hasTestDb)`, where `tests/helpers/db.ts` derives `hasTestDb` from `TEST_SUPABASE_URL`, so a green tier can mean *nothing ran* — read the passed/skipped counts from the run, not the exit code, and quote the run's numbers rather than typing a census into this file. E2E is a separate runner. Run `pnpm test:all` and `pnpm test:e2e` before pushing. Narrow with `pnpm test dashboard`, never `pnpm test -- dashboard` — the latter silently runs everything.
+- `pnpm test` is the **unit project**, not the whole suite. The `integration` project is `tests/*/integration/**/*.test.ts`, run against the local stack: the two live-RLS files `tests/tenant-isolation/integration/rls-gate.test.ts` (`clients`) and `credentials-visibility.test.ts` (`api_credentials`), plus `tests/admin/integration/provisioning.test.ts` (admin `security definer` RPCs). All three gate on `describe.skipIf(!hasTestDb)`, where `tests/helpers/db.ts` derives `hasTestDb` from `TEST_SUPABASE_URL`, so a green tier can mean *nothing ran* — read the passed/skipped counts from the run, not the exit code. E2E is a separate runner. Run `pnpm test:all` and `pnpm test:e2e` before pushing. Narrow with `pnpm test dashboard`, never `pnpm test -- dashboard` — the latter silently runs everything.
 - Route handlers get a `<name>-route.test.ts` covering 401 / 403 / 400 / 503 and the no-data-leaked-before-auth path.
 
 ### 14. Read order
@@ -1744,8 +1744,8 @@ failure modes no inline correction has closed yet.
 | Bad line | Why it is wrong | Good line |
 | --- | --- | --- |
 | "60 tests passing." | A count rots the day someone adds a test — and `RULES`-era docs here carried exactly that kind of stale number. | Run the command, quote its output in the reply, type nothing into the doc. |
-| "Integration tests pass." | All three integration files `skipIf(!TEST_SUPABASE_URL)`. A green tier that collected nothing is indistinguishable from coverage unless the count is read. | "integration tier: N passed, 0 skipped" — or say it skipped for want of `TEST_*` names. |
-| "Build passes locally and in CI." | The build once fetched a font over the network; a warm cache hid it for weeks and the sealed runner had no route to it. | Name the probe: `NODE_USE_ENV_PROXY=1 HTTPS_PROXY=http://127.0.0.1:9 pnpm build`. Here the Noto TTFs are vendored in `lib/exports/fonts/`, so the probe passes. |
+| "Integration tests pass." | The tier can collect nothing and still exit 0. § STANDING RULES 13 owns the file list and the `skipIf` mechanism — this row adds no rule, only the phrasing. | "integration tier: N passed, 0 skipped" — or say it skipped for want of `TEST_*` names. |
+| "Build passes locally and in CI." | The build once fetched Geist from `fonts.googleapis.com` at build time, which a sealed runner cannot reach; the first CI run was red on it and the fix was to vendor the fonts. | Name the probe: `NODE_USE_ENV_PROXY=1 HTTPS_PROXY=http://127.0.0.1:9 pnpm build`. It passes here because `app/fonts/` and `lib/exports/fonts/` are vendored. |
 
 # EDITING THIS FILE
 
@@ -1755,12 +1755,22 @@ failure modes no inline correction has closed yet.
 nothing else, so everything below it — including `# SERVICE ARCHITECTURE` — is hand-maintained and
 never arrives by generation. Commit the marker block with your work rather than deleting it.
 
+Any section that describes a surface changes in the same commit that alters that surface — a doc that
+waits for a later cleanup commit is describing a state that no longer exists in the meantime.
+
 ## When each section changes
 - **STANDING RULES** — when a rule about *how* work gets done changes. Not when a feature ships.
 - **PROJECT OVERVIEW / ARCHITECTURE CONTEXT** — when a decision is made, before the code exists.
+- **UI CONTEXT / CODE STANDARDS / DEVELOPMENT WORKFLOW / PM CONVENTIONS** — when the practice they
+  prescribe changes, not when a feature ships.
 - **SERVICE ARCHITECTURE** — implemented code only. When something becomes true, move it out of
   `# TARGET STATE` in the same commit that made it true.
 - **TARGET STATE** — whenever intent outpaces implementation. Never cite it as current behavior.
+- **FEATURE SPECS** — when `specs/` gains or loses a numbered file, or the split with
+  `docs/superpowers/specs/` changes.
+- **VERIFICATION STANDARDS** — when an inline correction closes a failure mode: delete its row rather
+  than leaving a second authority.
+- **EDITING THIS FILE** — when a section is added, renamed or moved, this list names it.
 - **specs/** — one file per deliverable unit. `specs/00-template.md`.
 
 ## Completeness — the checks that work
@@ -1770,4 +1780,6 @@ and trains people to ignore a gate. Instead:
 1. Every § named by rule 14 exists: `grep -n "^# \|^## " AGENTS.md`.
 2. Every file and route cited here exists: `git ls-files <path>`, `find app/api -name route.ts`.
 3. Every command cited here exists: `pnpm run` lists them.
-4. No test count, line count or version number is typed into this file. Quote command output.
+4. No census is typed in as a state claim — a count of tests, files or lines rots the day the thing it
+   counts changes. Quote the command output in the reply instead. Not censuses: a version copied from
+   the installed package, and a number inside an example of a report line.
