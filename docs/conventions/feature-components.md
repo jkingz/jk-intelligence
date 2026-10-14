@@ -23,8 +23,8 @@ components/features/<slug>/
 ```
 
 Nothing test-shaped goes in the feature folder. Tests live in `tests/<feature>/<tier>/`
-(`unit` / `integration` / `e2e`), named after the invariant they protect — see `AGENTS.md`
-§ SERVICE ARCHITECTURE → Verification for the folder list and what each folder owns, and
+(`unit` / `integration` / `e2e`), named after the invariant they protect — see
+`docs/architecture/README.md` § Verification for the folder list and what each folder owns, and
 `AGENTS.md` § STANDING RULES 13 for the placement rule. A feature slug used as a test folder name must
 already exist there; if it does not, the feature owns no test folder yet and the test belongs under the
 domain that owns the invariant.

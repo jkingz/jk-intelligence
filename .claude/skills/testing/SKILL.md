@@ -12,8 +12,9 @@ subject through `@/`, never relatively — a `./` specifier can resolve to a nei
 same name. `tests/helpers/` is the one exception and may be imported relatively.
 Name files `<sut>.test.ts` (unit/integration) or `<flow>.spec.ts` (e2e).
 
-`AGENTS.md § SERVICE ARCHITECTURE → Verification` owns the table of which feature folder owns which
-modules. (`§ Development Workflow — Portable core → Verification` shares the heading name but is the
+`docs/architecture/README.md` § SERVICE ARCHITECTURE → Verification owns the table of which feature
+folder owns which modules. (`docs/context/development-workflow.md` § Development Workflow — Portable
+core → Verification shares the heading name but is the
 per-unit completion check, not the ownership census.)
 
 ## Mocking
@@ -70,4 +71,4 @@ grant that denies `credential_reference` with `42501`), plus
 `tests/admin/integration/provisioning.test.ts` (the five admin definer RPCs). Quote the collected
 count rather than the file list if you need a number.
 
-- Contract lives in `AGENTS.md § STANDING RULES 13` and `§ Code Standards → Testing`.
+- Contract lives in `AGENTS.md` § STANDING RULES 13 and `docs/context/code-standards.md` § Code Standards → Testing.

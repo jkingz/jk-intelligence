@@ -8,7 +8,8 @@ const drawer = (page: Page) => page.locator("[data-slot=sidebar][data-mobile=tru
 const toggle = (page: Page) => page.locator("button[data-sidebar=trigger]:visible");
 const sections = (page: Page) => page.getByRole("navigation", { name: "Sections" });
 
-// `w-60` is what AGENTS.md § UI Context documents for the rail, and 3rem is the icon
+// `w-60` is what docs/context/ui-context.md § UI Context documents for the rail;
+// 3rem is the icon
 // width the collapsed rail is designed around.
 const EXPANDED = "240px";
 const ICONS = "48px";

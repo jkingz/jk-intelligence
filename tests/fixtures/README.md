@@ -34,7 +34,7 @@ Three, so cross-tenant denial is an observation rather than an assumption:
 
 Provision with service-role `auth.admin.createUser`, the mechanism `scripts/create-demo-user.mjs:57`
 already uses. Roles are set on the `users` row and read back through the `security definer` helpers —
-never from a JWT claim (`AGENTS.md`, "Tenant isolation").
+never from a JWT claim (`docs/architecture/README.md` § Tenant isolation).
 
 ## Seeding
 

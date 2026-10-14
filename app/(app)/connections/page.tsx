@@ -8,7 +8,8 @@ export const metadata: Metadata = {
 };
 
 /** Dynamic on purpose: it reads the session cookie through the RLS gate. Do not
- *  add `revalidate` or a cache wrapper — see `AGENTS.md` § Architecture Context, invariants 4-5.
+ *  add `revalidate` or a cache wrapper — see
+ *  `docs/context/architecture-context.md` § Architecture Context, invariants 4-5.
  *
  *  `force-dynamic` is load-bearing, not decorative: the cookie read happens
  *  inside `databaseOperation()`, whose catch-all turns Next's prerender bailout

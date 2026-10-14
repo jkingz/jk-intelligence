@@ -29,7 +29,7 @@ sign-out instead of each re-declaring a header.
 
 ## Sizing
 `--sidebar-width` is overridden to 15rem because the primitive defaults to 16rem, which is wider
-than the `w-60` rail `AGENTS.md § UI Context` documents. The icon rail keeps the primitive's
+than the `w-60` rail `docs/context/ui-context.md` § UI Context documents. The icon rail keeps the primitive's
 3rem. The drawer uses the primitive's own 18rem. Breakpoint is the primitive's 768px
 (`useIsMobile`), so `MobileNav` is `md:hidden` and the rail's header trigger is `hidden md:flex`.
 

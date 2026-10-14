@@ -26,13 +26,13 @@ User asks to "add feature X", "scaffold feature <slug>", "wire up a new feature"
    ```
    Tests do **not** go in the feature folder: they live in `tests/<feature>/<tier>/`
    (`unit` / `integration` / `e2e`), where `<feature>` is the domain that owns the invariant — the
-   folder list and each folder's ownership is the table in `AGENTS.md` § SERVICE ARCHITECTURE →
-   Verification. Import the subject through `@/`, never a relative path.
+   folder list and each folder's ownership is the table in
+   `docs/architecture/README.md` § SERVICE ARCHITECTURE → Verification. Import the subject through `@/`, never a relative path.
 4. Implement inside folder. Allowed imports: `components/ui/*`, own folder, `lib/*`, `types/*`. Never `components/ui/*` edits, never cross-feature imports.
 5. Wire pages/routes via barrel only: `import { X } from "@/components/features/<slug>"`.
 6. PR (when requested): branch `feat/<slug>`, title `feat(<slug>): <what>`, body links the spec path and says which verification the unit passed — there is no tracker note to link at this point, because the log record is step 8's.
 7. Verify: `pnpm test && pnpm typecheck && pnpm lint && pnpm build`.
-8. Record the unit under `docs/progress-tracker.md`'s `## Completed`; update the feature's spec in `specs/` and any `AGENTS.md` section the change made untrue.
+8. Record the unit under `docs/progress-tracker.md`'s `## Completed`; update the feature's spec in `specs/` and any `AGENTS.md` or docs-home section the change made untrue.
 
 Full rules: `docs/conventions/feature-components.md`
 
