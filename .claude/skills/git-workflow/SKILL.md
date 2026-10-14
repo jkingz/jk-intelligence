@@ -36,7 +36,9 @@ Skip the PR for tiny doc-only or rename-only changes: commit directly with a con
 
 ## Review gate
 
-`docs/conventions/project-rules.md` § PROJECT RULES 13`, all of it, in that order — CI runs the same commands. Follow
+`docs/conventions/project-rules.md` § PROJECT RULES 13, all of it, in that order. CI runs the four
+plus the public e2e tier and never `pnpm test:all` or `pnpm test:e2e:auth`, so a green CI is not the
+push gate: the gate's integration half has no CI equivalent. Follow
 `/babysitting-a-pr` when watching a thread, and `/leaving-pr-comment` for anything written on the
 owner's behalf, including the mandatory first-line AI-authorship disclaimer. A finding you decline
 gets a written decline, then the thread is resolved.
