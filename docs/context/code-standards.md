@@ -245,7 +245,8 @@ scripts/        — migrations runner, seed, demo user (the only way data lands 
 - No sync logic in route handlers — delegate to `lib/queue`.
 - Tests live in `tests/<feature>/<tier>/`; nothing is colocated beside the module it covers. Import
   the subject under test through `@/` — a relative `./` still resolves after the move, just possibly
-  to a neighbouring file of the same name. `tests/helpers/` is the exception.
+  to a neighbouring file of the same name. `tests/helpers/` and `tests/fixtures/` are support, not
+  subjects, and are imported relatively.
 
 ### Testing
 
