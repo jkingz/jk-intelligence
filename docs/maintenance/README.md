@@ -89,11 +89,12 @@ defect wearing a different name.
    heading over-scans silently the day that heading moves, and one of them has moved. The heading
    names in that table's third column are confirmed by check 1's sibling, the heading census: run
    `grep -n "^# \|^## "` over `AGENTS.md` and each docs home and match the rows by eye.
-2. Every repo-rooted path cited in `AGENTS.md` or the docs homes resolves. Run:
+2. Every repo-rooted path cited in `AGENTS.md`, the docs homes or a skill this repo authors resolves. Run:
 
    ```bash
    grep -ohE '(app|components|lib|tests|types|specs|docs|scripts|supabase|patches|\.github)/[]A-Za-z0-9_./{}()[-]*\.(ts|tsx|css|md|sql|json|mjs|ya?ml)' \
      AGENTS.md docs/context/*.md docs/architecture/README.md docs/target-state/README.md docs/maintenance/README.md \
+     .claude/skills/{babysitting-a-pr,development-workflow,feature-component,git-workflow,leaving-pr-comment,playwright-cli,testing,verification-gates}/SKILL.md \
      | grep -v '\*' \
      | sort -u \
      | while read -r p; do git ls-files --error-unmatch "$p" >/dev/null 2>&1 || echo "$p"; done
@@ -106,10 +107,19 @@ defect wearing a different name.
    this section are full of them, starting with the one above. Bare basenames (`guard.ts`) and
    `node_modules/…` paths are outside this command's reach; check those by opening the file, because a
    whole-file grep over them produces the noise this section refuses to generate.
-3. Every command cited here or in the docs homes is real. `pnpm run` lists the scripts, but a `pnpm <verb>` form outside
-   that list is not covered by it. Enumerate those with `grep -ohE 'pnpm (exec|dlx|patch|patch-commit|add|install|remove)'` run over
-   `AGENTS.md docs/context/*.md docs/architecture/README.md docs/target-state/README.md docs/maintenance/README.md`
-   | sort -u — expected
+
+   The skill list is the eight whose bytes sit in real directories under `.claude/skills/`, not all
+   seventeen; `docs/architecture/README.md` § Repo skills names them and gives the mirror. The other nine
+   are vendored through `skills-lock.json`, which reinstalls over any edit, so their internal pointers are
+   not this repo's to repair: `code-review` cites an issue-tracker doc that its own upstream setup command
+   is meant to create, and the `supabase` skills' guide URLs feed this command's `docs/` alternative as path
+   fragments. Measured 2026-10-15: widening to all seventeen printed five such lines on top of the five
+   above, which is the noise this section refuses to generate. `playwright-cli` is inside the eight because
+   it is committed here, though the installer owns its bytes — see
+   `docs/architecture/README.md` § Repo skills before editing it.
+3. Every command cited here, in the docs homes, or in the eight skills of check 2 is real. `pnpm run` lists the scripts, but a `pnpm <verb>` form outside
+   that list is not covered by it. Enumerate those with `grep -ohE 'pnpm (exec|dlx|patch|patch-commit|add|install|remove)'` run over the same
+   file list as check 2 | sort -u — expected
    today: `pnpm exec`, `pnpm patch`, `pnpm patch-commit`. A fourth line means a new form was cited and
    needs confirming with `command -v <tool>` or the tool's own `--help`; so does any bare tool
    invocation this file cites, such as `supabase start`.
