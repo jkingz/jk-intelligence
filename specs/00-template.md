@@ -33,4 +33,4 @@ test that proves a foreign request is refused>`
 
 `specs/` holds numbered feature specs — one deliverable unit each, named in implementation order.
 `docs/superpowers/specs/` holds dated design docs from brainstorming. File a design doc there and a
-feature spec here; `AGENTS.md § FEATURE SPECS` says so in one line.
+feature spec here; `docs/architecture/README.md` § FEATURE SPECS says so in one line.

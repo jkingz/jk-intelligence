@@ -20,7 +20,7 @@ import {
 } from "../../fixtures/identity-users";
 
 // The columns the Connections page needs, and no more. The prohibition is on the
-// application read path: AGENTS.md § STANDING RULES 16 keeps `credential_reference` out of every
+// application read path: docs/conventions/project-rules.md § PROJECT RULES 16 keeps `credential_reference` out of every
 // response and log line, `listConnections` names exactly these three
 // (`lib/db/repository.ts:333-334`), and
 // `tests/tenant-isolation/unit/connections-read.test.ts:102-115` pins that. The
@@ -124,8 +124,8 @@ describe.skipIf(!hasTestDb)("api_credentials visibility against live RLS", () =>
     // The point of the unit. Not "the app never asks for it" — that is
     // tests/tenant-isolation/unit/connections-read.test.ts:113 — but "asking
     // for it is refused by Postgres", which only a live session can show. The
-    // SQLSTATE is the assertion, not the fact of an error: `AGENTS.md` and
-    // `09-connections.md` quote 42501, and any other code would mean the column
+    // SQLSTATE is the assertion, not the fact of an error: `docs/architecture/README.md`
+    // and `09-connections.md` quote 42501, and any other code would mean the column
     // had gone missing rather than being guarded — this tier green, the docs
     // false. Renaming or dropping the column produces PGRST204, which is exactly
     // the failure this case would otherwise sleep through.

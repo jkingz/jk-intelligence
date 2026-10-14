@@ -93,7 +93,8 @@ function EmptyShell({ message }: { message: string }) {
       </main>
       {/* Brand-only footer: the rail shows the brand at lg+ only, so this is the one
           brand on screen below lg in these states (08-app-shell.md,
-          AGENTS.md § UI Context). The loaded footer's three `overview.*` spans have
+          docs/context/ui-context.md § UI Context). The loaded footer's three
+          `overview.*` spans have
           no data here, so they stay out. */}
       <footer className="border-t border-default bg-surface py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between text-xs text-text-muted gap-4">

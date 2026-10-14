@@ -2,8 +2,8 @@
 
 Multi-client SEO reporting platform: Next.js 16, React 19, TypeScript, Supabase (Postgres + RLS + auth), shadcn/ui, BullMQ on Upstash.
 
-- Scope and status: [AGENTS.md § Project Overview → Status](AGENTS.md#status); [docs/progress-tracker.md](docs/progress-tracker.md) is the dated log behind it, not the live record. `§` names a section — the notation is defined in [AGENTS.md § Notation](AGENTS.md#notation).
-- Built vs planned: [AGENTS.md § SERVICE ARCHITECTURE](AGENTS.md#service-architecture--implemented-surface) describes implemented code only; [§ TARGET STATE](AGENTS.md#target-state) holds unbuilt design intent and is never current behaviour.
+- Scope and status: [docs/context/project-overview.md § Project Overview → Status](docs/context/project-overview.md#status); [docs/progress-tracker.md](docs/progress-tracker.md) is the dated log behind it, not the live record. `§` names a section — the notation is defined in [docs/maintenance/README.md § Notation](docs/maintenance/README.md#notation).
+- Built vs planned: [docs/architecture/README.md § SERVICE ARCHITECTURE](docs/architecture/README.md#service-architecture--implemented-surface) describes implemented code only; [docs/target-state/README.md § TARGET STATE](docs/target-state/README.md#target-state) holds unbuilt design intent and is never current behaviour.
 
 ## Dashboard
 
@@ -21,7 +21,7 @@ Not live yet, do not demo them as working:
 
 ![JK Intelligence architecture](docs/architecture.svg)
 
-Request path, the RLS-backed tenant gate and the HTTP surface: [AGENTS.md](AGENTS.md). Deep boundaries: [AGENTS.md § Architecture Context](AGENTS.md#architecture-context).
+Request path, the RLS-backed tenant gate and the HTTP surface: [docs/architecture/README.md](docs/architecture/README.md). Deep boundaries: [docs/context/architecture-context.md § Architecture Context](docs/context/architecture-context.md#architecture-context).
 
 ## Development
 
@@ -51,11 +51,11 @@ CI (`.github/workflows/ci.yml`) runs the four above plus the public e2e tier on 
 
 ## Feature workflow
 
-Read [AGENTS.md](AGENTS.md) before implementing: § STANDING RULES, then § APPLICATION BUILDING
-CONTEXT in order.
+Read [AGENTS.md](AGENTS.md) before implementing: § STANDING RULES, then the § Reference map and the
+docs files it names, in that table's order.
 
 - Specs: `specs/<nn>-<slug>.md`. Components: `components/features/<slug>/`, exported through `index.ts`. Numbers belong only to spec filenames.
-- Tracker: record the unit under `docs/progress-tracker.md`'s `## Completed` **after** verification; the four history sections stay as they are. Current status lives in AGENTS.md § Project Overview → Status and § Open product questions.
+- Tracker: record the unit under `docs/progress-tracker.md`'s `## Completed` **after** verification; the four history sections stay as they are. Current status lives in `docs/context/project-overview.md` § Project Overview → Status and § Open product questions.
 - Branches `feat/<slug>`, titles `feat(<slug>): <summary>`. Commit, push and open PRs only when asked.
 - Full rules: [docs/conventions/feature-components.md](docs/conventions/feature-components.md).
 

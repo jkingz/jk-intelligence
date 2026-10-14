@@ -16,12 +16,14 @@ real env value must never land in a commit.
 
 ## Push discipline
 
-Commit, push, open or merge a PR **only when asked**. Before pushing to `dev`: `git pull` from
-`origin main`, merge, resolve conflicts, then commit and push — never push to `dev` without that
-pull. No `--no-verify`, no skipped hooks, no bypassed signing; a failing hook is a finding to fix at
-the cause. Never force-push a shared branch, and never `git reset --hard` / `clean -f` /
-`checkout --` over work you did not write. Destructive or externally visible actions need explicit
-authorization every time, not once-and-forever.
+Commit, push, open or merge a PR **only when asked**. Being asked is not clearance to push a red or
+unverified tree: `docs/conventions/project-rules.md` § PROJECT RULES 13's push gate decides, and its three outcomes are
+green, waived (owner's call, per push, named in the reply and the PR body) and red — red stops.
+Before pushing to `dev`: `git pull` from `origin main`, merge, resolve conflicts, then commit and
+push — never push to `dev` without that pull. No `--no-verify`, no skipped hooks, no bypassed
+signing; a failing hook is a finding to fix at the cause. Never force-push a shared branch, and
+never `git reset --hard` / `clean -f` / `checkout --` over work you did not write. Destructive or
+externally visible actions need explicit authorization every time, not once-and-forever.
 
 ## Pull requests
 
@@ -34,7 +36,7 @@ Skip the PR for tiny doc-only or rename-only changes: commit directly with a con
 
 ## Review gate
 
-`AGENTS.md § STANDING RULES 13`, all of it, in that order — CI runs the same commands. Follow
+`docs/conventions/project-rules.md` § PROJECT RULES 13`, all of it, in that order — CI runs the same commands. Follow
 `/babysitting-a-pr` when watching a thread, and `/leaving-pr-comment` for anything written on the
 owner's behalf, including the mandatory first-line AI-authorship disclaimer. A finding you decline
 gets a written decline, then the thread is resolved.

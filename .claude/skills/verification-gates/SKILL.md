@@ -22,7 +22,8 @@ description: The command chain that must be green before work is reported comple
 
 ## Reporting
 
-For each gate: the command, its output or count, pass or fail.
+For each gate: the command, its output or count, and its state — pass, fail, or waived with the
+reason a tier could not run.
 
 ```
 Tests: pnpm test → <count> passed, 0 failed
@@ -44,6 +45,7 @@ green CI is offered as evidence.
 Prove the build is hermetic before trusting a warm cache:
 `NODE_USE_ENV_PROXY=1 HTTPS_PROXY=http://127.0.0.1:9 pnpm build`.
 
-- The chain this skill reports is `AGENTS.md § STANDING RULES 13`; read that, not this file, for the
-  contract. The probe above is this skill's own addition — rule 13 names the four commands, not the
-  egress-blocked rerun.
+- The contract is `docs/conventions/project-rules.md` § PROJECT RULES 13; read that, not this file. Its four-chain gates
+  *reporting work complete*; its push-gate bullet gates *pushing and opening a PR*, with three
+  outcomes — green, waived, red. The probe above is this skill's own addition — PROJECT RULES 13 names the
+  commands, not the egress-blocked rerun.
