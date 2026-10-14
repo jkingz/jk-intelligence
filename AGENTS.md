@@ -94,6 +94,9 @@ Per-unit feature specs live in `specs/`. The rolling log at `docs/progress-track
 is history, not required reading: § Project Overview → Status and § Open product questions decide what
 is current.
 
+The `§` marker these citations are written in — here and in every other file in this repo — is
+defined in § Notation.
+
 ### 15. Tenant isolation is RLS's job
 - Client-ownership is decided only by `canAccessClient` / `listAccessibleClients` in `lib/db/repository.ts`. No route or helper may re-implement that rule in TypeScript.
 - § SERVICE ARCHITECTURE describes implemented code only; anything not built lives in § TARGET STATE.
@@ -1755,6 +1758,34 @@ never arrives by generation. Commit the marker block with your work rather than 
 Any section that describes a surface changes in the same commit that alters that surface — a doc that
 waits for a later cleanup commit is describing a state that no longer exists in the meantime.
 
+## Notation
+
+`§` is this repo's section marker, and it is used well outside this file — in `README.md`, `specs/`,
+`docs/conventions/`, the repo skills, code comments and `.github/workflows/ci.yml`. It is a citation,
+not stray punctuation, so it is never a cleanup target. Five forms:
+
+| Form | Reads as | Live example |
+| --- | --- | --- |
+| `` `FILE.md` § Heading `` | that heading in that named file | `` `docs/progress-tracker.md` § Completed `` |
+| `§ Heading`, no file named | that heading in the file being read | `§ HTTP surface`, above |
+| `§ A → B` | subsection `B` inside section `A` | `§ Project Overview → Status` |
+| `§ A <n>` | numbered item `<n>` of section `A` | `§ STANDING RULES 13` |
+| `<doc> §<n>` | numbered section `<n>` of a named spec or design doc | `Spec §6`, `Planned agents §1` |
+
+Two rules follow from the second row:
+
+- A bare `§` means *the file you are reading*. Inside this file, cite its own sections bare — never
+  prefixed with this file's name. Completeness check 6 counts the prefixed form and expects exactly
+  one hit: the portable-core note at the top of § STANDING RULES, which is talking about *another*
+  project's copy. A citation that crosses files names the file, or it is unreadable from anywhere
+  else.
+- A `§` left pointing at a renamed or deleted heading is a dead pointer, fixed in the commit that
+  moved it — **except inside a dated record.** `docs/progress-tracker.md`'s dated entries, the plans
+  and specs under `docs/superpowers/`, and the applied migrations in `supabase/migrations/` are
+  history: their citations stay exactly as written even when they name a file that no longer exists
+  (`RULES.md`, `context/*`), because repairing a record is falsification. Rule 16 states the
+  migration half of that on its own.
+
 ## When each section changes
 - **STANDING RULES** — when a rule about *how* work gets done changes. Not when a feature ships.
 - **APPLICATION BUILDING CONTEXT → PROJECT OVERVIEW / ARCHITECTURE CONTEXT** — when a decision is
@@ -1812,3 +1843,8 @@ defect wearing a different name.
    `grep -n "\bbg-base\b" AGENTS.md | grep -v -- "--bg-base"` prints only § Styling's "`bg-base`,
    `text-copy-primary`, `text-brand` generate nothing and fail silently" line. The code side is
    `grep -rn "bg-base" app components`, whose only hits are `--bg-base` declarations.
+6. No self-citation by filename — a section of this file is cited bare (`§ HTTP surface`), never
+   prefixed with this file's own name. Run: ``git grep -c 'AGENTS\.md` §' AGENTS.md``. Expected: `1`,
+   the portable-core note at the top of § STANDING RULES, which names *another* project's copy. A
+   second hit is a citation that should have been written bare. The `\.` in the pattern is what keeps
+   this check's own text from matching itself.
