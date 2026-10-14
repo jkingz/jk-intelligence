@@ -9,7 +9,8 @@ description: Test tiers, organization, mocking boundaries, and route coverage re
 
 `tests/<feature>/<tier>/`, tiers `unit`, `integration`, `e2e`. Never beside the module. Import the
 subject through `@/`, never relatively — a `./` specifier can resolve to a neighbouring file of the
-same name. `tests/helpers/` is the one exception and may be imported relatively.
+same name. `tests/helpers/` and `tests/fixtures/` are support, not subjects, and may be imported
+relatively.
 Name files `<sut>.test.ts` (unit/integration) or `<flow>.spec.ts` (e2e).
 
 `docs/architecture/README.md` § SERVICE ARCHITECTURE → Verification owns the table of which feature
