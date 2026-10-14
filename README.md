@@ -2,14 +2,14 @@
 
 Multi-client SEO reporting platform: Next.js 16, React 19, TypeScript, Supabase (Postgres + RLS + auth), shadcn/ui, BullMQ on Upstash.
 
-- Scope and status: [AGENTS.md § Project Overview](AGENTS.md#project-overview), [docs/progress-tracker.md](docs/progress-tracker.md)
-- Built vs planned: [AGENTS.md](AGENTS.md) describes implemented code only; [AGENTS.md § TARGET STATE](AGENTS.md) holds the rest
+- Scope and status: [AGENTS.md § Project Overview → Status](AGENTS.md#status); [docs/progress-tracker.md](docs/progress-tracker.md) is the dated log behind it, not the live record. `§` names a section — the notation is defined in [AGENTS.md § Notation](AGENTS.md#notation).
+- Built vs planned: [AGENTS.md § SERVICE ARCHITECTURE](AGENTS.md#service-architecture--implemented-surface) describes implemented code only; [§ TARGET STATE](AGENTS.md#target-state) holds unbuilt design intent and is never current behaviour.
 
 ## Dashboard
 
 ![JK Intelligence dashboard, seeded demo data](docs/screenshots/dashboard-overview.png)
 
-Deployed at `jk-intelligence.vercel.app`. Screenshot: dark theme, one client ("Atlas Coffee"), Last 7 days. Header carries the client switcher, sync pill, Trigger Sync, CSV/PDF export, theme toggle and account menu; below it the hero headline, `7 | 30 | 90` range select, metric cards, click-trend chart and query table.
+Deployed at `jk-intelligence.vercel.app`. Screenshot: dark theme, one client ("Atlas Coffee"), Last 7 days — taken before the shell gained its left rail, so the account avatar it shows at the header's right edge now lives in the rail's footer (`NavUser`). Current shell: a collapsible destination rail (Dashboard, Connections) on `md+`, a top bar with a drawer trigger below it. The header keeps the client switcher, sync pill, Trigger Sync, CSV/PDF export and theme toggle; under it sit the hero headline, `7 | 30 | 90` range select, metric cards, click-trend chart and query table.
 
 Not live yet, do not demo them as working:
 
