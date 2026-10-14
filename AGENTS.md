@@ -47,6 +47,7 @@ Rules 1–10 are the **portable core** — they hold in every repo this workspac
 
 ### 7. Git discipline
 - Commit, push, open or merge a PR **only when asked**.
+- Being asked is permission to push, not permission to push a red or unverified tree. The project's own rules say which commands are the gate; a tier that could not run is named and waived by the owner, never reported as green.
 - Before pushing to `dev`: `git pull` from `origin main`, merge, resolve conflicts, then commit/push. Never push to `dev` without that pull.
 - No `--no-verify`, no skipped hooks, no bypassed signing. A failing hook is a finding to fix at the cause.
 - Never force-push a shared branch, and never `git reset --hard` / `clean -f` / `checkout --` over work you did not write. Check `git status` first; stash or commit anything unexpected.
@@ -83,7 +84,21 @@ Rules 1–10 are the **portable core** — they hold in every repo this workspac
 - `pnpm test && pnpm typecheck && pnpm lint && pnpm build` must be green before reporting work complete; CI (`.github/workflows/ci.yml`) runs these four plus `pnpm test:e2e` (public tier only).
 - Tests live in `tests/<feature>/<tier>/` — the feature folders and what each one owns are the table in `docs/architecture/README.md` § SERVICE ARCHITECTURE → Verification; tiers `unit`, `integration`, `e2e`. Name the file `<sut>.test.ts` (unit/integration) or `<flow>.spec.ts` (e2e); import the **subject under test** through `@/`, never relatively — a `./` specifier can silently resolve to a neighbouring file of the same name. Shared helpers under `tests/helpers/` are the one exception and may be imported relatively.
 - Unit tests mock at the boundary (`@/lib/agents/...`, `@/lib/db/repository`) — never inside business logic, and never make a real network or DB call. That last clause is **unit-tier only**: the integration tier exists precisely to put a real Postgres behind `canAccessClient`.
-- `pnpm test` is the **unit project**, not the whole suite. The `integration` project is `tests/*/integration/**/*.test.ts`, run against the local stack: the two live-RLS files `tests/tenant-isolation/integration/rls-gate.test.ts` (`clients`) and `credentials-visibility.test.ts` (`api_credentials`), plus `tests/admin/integration/provisioning.test.ts` (admin `security definer` RPCs). All three gate on `describe.skipIf(!hasTestDb)`, where `tests/helpers/db.ts` derives `hasTestDb` from `TEST_SUPABASE_URL`, so a green tier can mean *nothing ran* — read the passed/skipped counts from the run, not the exit code. E2E is a separate runner. Run `pnpm test:all` and `pnpm test:e2e` before pushing. Narrow with `pnpm test dashboard`, never `pnpm test -- dashboard` — the latter silently runs everything.
+- `pnpm test` is the **unit project**, not the whole suite. The `integration` project is `tests/*/integration/**/*.test.ts`, run against the local stack: the two live-RLS files `tests/tenant-isolation/integration/rls-gate.test.ts` (`clients`) and `credentials-visibility.test.ts` (`api_credentials`), plus `tests/admin/integration/provisioning.test.ts` (admin `security definer` RPCs). All three gate on `describe.skipIf(!hasTestDb)`, where `tests/helpers/db.ts` derives `hasTestDb` from `TEST_SUPABASE_URL`, so a green tier can mean *nothing ran* — read the passed/skipped counts from the run, not the exit code. E2E is a separate runner. Narrow with `pnpm test dashboard`, never `pnpm test -- dashboard` — the latter silently runs everything.
+- **The push gate** — `pnpm test:all` and `pnpm test:e2e`, on top of the four-chain above, which only
+  gates *reporting*. It has three outcomes and exactly two are pushable:
+  - **green** — every tier ran and passed, counts quoted from the run.
+  - **waived** — the tier's own dependency is absent, so it cannot run here: no local stack, no
+    `.env.test` names, no browser credentials. Waiving is the owner's decision, per push, never
+    once-and-forever; the reply and the PR body both name the tier and the reason, in the
+    § VERIFICATION STANDARDS phrasing.
+  - **red** — the tier reached its dependency and an assertion failed. Stops: nothing is pushed, no
+    PR is opened, and the cause is fixed before retrying.
+- Telling waived from red is evidence, not mood. `skipIf` keys off `TEST_SUPABASE_URL` being *set*,
+  not reachable, so a stack-less integration run reports **failures**, not skips — every file in the
+  tier dies with the same connection error (`fetch failed`, `ECONNREFUSED`) before any assertion
+  runs. A file that fails on a mismatch while its neighbours pass is red. The exit code cannot tell
+  the three outcomes apart; the output can.
 - Route handlers get a `<name>-route.test.ts` covering 401 / 403 / 400 / 503 and the no-data-leaked-before-auth path.
 
 ### 14. Read order
