@@ -248,29 +248,27 @@ Skills that exist and when to load them:
 - Stack: `code-review`, `feature-component`, `frontend-design`, `shadcn`, `supabase`,
   `supabase-postgres-best-practices`, `tailwind-design-system`, `motion-design`, `playwright-cli`,
   `migrate-radix-to-base`.
-- Visual direction: `gpt-taste` only. The other nine below are listed because `.claude/skills/`
-  names them; none resolves — see the dangling entries immediately after.
+- Visual direction: `gpt-taste` only.
 
-The mirror, measured 2026-10-13 with `readlink` and `-L`. It is **neither one mechanism nor one
+The mirror, measured 2026-10-15 with `readlink` and `-L`. It is **neither one mechanism nor one
 direction**, and there are **no hardlinks** — an inode match in `ls -i` printed above a linked name
 is one file reached twice, not two links to it:
 
 - `.agents/skills/` carries 17 entries and holds the real content for **12**. Five are symlinks
   (`git ls-files -s` mode `120000`) into `.claude/skills/`: `feature-component` and the four process
   skills above.
-- `.claude/skills/` carries 26 entries: **18 symlinks into `.agents/skills/`** and **8** real
-  directories. So for those 18 the source of truth is `.agents/skills/`, and only `feature-component`
-  plus those four are authored in `.claude/skills/` — the opposite of "edit `.claude/`, the mirror
-  follows".
+- `.claude/skills/` carries 17 entries: **9 symlinks into `.agents/skills/`**, all resolving, and
+  **8** real directories. So for those 9 the source of truth is `.agents/skills/`, and only
+  `feature-component` plus those four are authored in `.claude/skills/` — the opposite of "edit
+  `.claude/`, the mirror follows".
 - `babysitting-a-pr`, `leaving-pr-comment` and `playwright-cli` are the exception: each is a real
   directory in **both** trees, byte-identical today (`diff -rq` clean). Nothing propagates between
   the pair, so editing one silently un-pairs them.
-- **9 of the 18 `.claude/` symlinks are dangling** — `brandkit`, `design-taste-frontend`,
-  `high-end-visual-design`, `image-to-code`, `imagegen-frontend-mobile`, `imagegen-frontend-web`,
-  `minimalist-ui`, `redesign-existing-projects`, `stitch-design-taste` all point at `.agents/skills/`
-  entries that do not exist, and are committed as links. `.claude/skills/` therefore advertises nine
-  skills no loader can read. Closing that gap means authoring or vendoring nine skills, not editing
-  this file, so it stays open as the owner's call.
+- Nine `.claude/` symlinks pointed at `.agents/skills/` entries that did not exist (`brandkit`,
+  `design-taste-frontend`, `high-end-visual-design`, `image-to-code`, `imagegen-frontend-mobile`,
+  `imagegen-frontend-web`, `minimalist-ui`, `redesign-existing-projects`, `stitch-design-taste`).
+  Removed 2026-10-15 — nothing resolved through them. `skills-lock.json` still lists them as
+  installed skills from `Leonxlnx/taste-skill`; that manifest is not edited here.
 
 Check the counterpart before editing it — `[ -L path ]` separates a link from a directory, and
 `git ls-files -s path` prints `120000` for a committed link. `git add` refuses a path that resolves

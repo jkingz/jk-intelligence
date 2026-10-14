@@ -71,4 +71,4 @@ grant that denies `credential_reference` with `42501`), plus
 `tests/admin/integration/provisioning.test.ts` (the five admin definer RPCs). Quote the collected
 count rather than the file list if you need a number.
 
-- Contract lives in `AGENTS.md` § STANDING RULES 13 and `docs/context/code-standards.md` § Code Standards → Testing.
+- Contract lives in `docs/conventions/project-rules.md` § PROJECT RULES 13 and `docs/context/code-standards.md` § Code Standards → Testing.

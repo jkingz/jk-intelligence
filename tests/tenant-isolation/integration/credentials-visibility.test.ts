@@ -20,7 +20,7 @@ import {
 } from "../../fixtures/identity-users";
 
 // The columns the Connections page needs, and no more. The prohibition is on the
-// application read path: AGENTS.md § STANDING RULES 16 keeps `credential_reference` out of every
+// application read path: docs/conventions/project-rules.md § PROJECT RULES 16 keeps `credential_reference` out of every
 // response and log line, `listConnections` names exactly these three
 // (`lib/db/repository.ts:333-334`), and
 // `tests/tenant-isolation/unit/connections-read.test.ts:102-115` pins that. The

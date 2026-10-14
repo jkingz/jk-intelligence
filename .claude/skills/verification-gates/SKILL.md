@@ -45,7 +45,7 @@ green CI is offered as evidence.
 Prove the build is hermetic before trusting a warm cache:
 `NODE_USE_ENV_PROXY=1 HTTPS_PROXY=http://127.0.0.1:9 pnpm build`.
 
-- The contract is `AGENTS.md` § STANDING RULES 13; read that, not this file. Its four-chain gates
+- The contract is `docs/conventions/project-rules.md` § PROJECT RULES 13; read that, not this file. Its four-chain gates
   *reporting work complete*; its push-gate bullet gates *pushing and opening a PR*, with three
-  outcomes — green, waived, red. The probe above is this skill's own addition — rule 13 names the
+  outcomes — green, waived, red. The probe above is this skill's own addition — PROJECT RULES 13 names the
   commands, not the egress-blocked rerun.

@@ -36,7 +36,9 @@ A unit is done when, in this order:
 
 ### Git and review
 - One logical change per commit; conventional prefix.
-- Long-lived branch: pull/rebase the trunk before pushing; `--force-with-lease` only.
+- Long-lived branch: pull/rebase the trunk before pushing. A history rewrite is a force-push, which
+  `AGENTS.md` § STANDING RULES 7 forbids on any shared branch; use `--force-with-lease` only on a branch
+  nobody else has pushed to.
 
 ## Development Workflow — Project appendix
 
@@ -61,7 +63,7 @@ Unbuilt design lives in `docs/target-state/README.md` § TARGET STATE; treat it 
 | Demo user | `pnpm db:demo-user` |
 | Queue worker | `pnpm worker` (manual only — no production host yet) |
 
-`pnpm` only, Node ≥ 24 — `AGENTS.md` § STANDING RULES 11 is the authority, including why `package-lock.json` was
+`pnpm` only, Node ≥ 24 — `docs/conventions/project-rules.md` § PROJECT RULES 11 is the authority, including why `package-lock.json` was
 deleted. npm/yarn produce a lockfile this repo does not use.
 
 ### Where logic goes
@@ -98,7 +100,7 @@ observe about "sync" is therefore not evidence about sync.
 2. No invariant in `docs/context/architecture-context.md` § Architecture Context was violated (read the list; #4 tenant
    isolation and #12 the static dashboard shell are the ones that break silently).
 3. `docs/progress-tracker.md` reflects what actually happened.
-4. The four-gate chain in `AGENTS.md` § STANDING RULES 13 is green — that rule is the authority on which gates,
+4. The four-gate chain in `docs/conventions/project-rules.md` § PROJECT RULES 13 is green — that rule is the authority on which gates,
    and it also names the integration and e2e tiers this checklist used to omit.
 5. Nothing you started is still running — `AGENTS.md` § STANDING RULES 5.
 

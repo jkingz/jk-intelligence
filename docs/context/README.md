@@ -1,7 +1,7 @@
 # Application Building Context
 
 The six sections that were one `AGENTS.md` context chapter, split one file per
-former `## ` heading. Read them in this order (it is `AGENTS.md` rule 14's order):
+former `## ` heading. Read them in this order (it is `docs/conventions/project-rules.md` § PROJECT RULES 14's order):
 
 1. [§ Project Overview](project-overview.md)
 2. [§ Architecture Context](architecture-context.md)
@@ -11,4 +11,4 @@ former `## ` heading. Read them in this order (it is `AGENTS.md` rule 14's order
 6. [§ PM Conventions](pm-conventions.md)
 
 Inside these files a bare `§` names a heading in the same file; a pointer to anything else names
-its file — the same notation `AGENTS.md` § Notation defines.
+its file — the same notation `docs/maintenance/README.md` § Notation defines.

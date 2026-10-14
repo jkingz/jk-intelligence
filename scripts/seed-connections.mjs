@@ -3,7 +3,7 @@ import pg from "pg";
 // Seeds demo api_credentials rows so /connections has something to render.
 // Writes a syntactically valid, obviously fake Vault reference: nothing in this
 // app decrypts or uses it, and the credential_reference check constraint is the
-// only thing it must satisfy. Never prints the reference (AGENTS.md § STANDING RULES 16).
+// only thing it must satisfy. Never prints the reference (docs/conventions/project-rules.md § PROJECT RULES 16).
 
 const args = new Set(process.argv.slice(2));
 const reset = args.has("--reset");
