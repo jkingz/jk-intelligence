@@ -11,13 +11,13 @@
 | Database client | `@supabase/supabase-js` | Server-side DB access with JWT tokens |
 | Background tasks | BullMQ + Upstash Redis | **Partly built:** queue + worker process exist; the worker performs no sync (returns `mock_completed`) and has no production host |
 | Cache | Upstash Redis + Next `unstable_cache` | Data-cache tag `dashboard-overview`; the planned stale-flag TTL lives only in the target design |
-| AI Insights | Claude API | **Not built** — see § TARGET STATE |
+| AI Insights | Claude API | **Not built** — see `docs/target-state/README.md` § TARGET STATE |
 | Deployment | Vercel | App hosting, cron trigger, env management. CI: `.github/workflows/ci.yml` |
 
 ### System boundaries
 
 - `app/api` — route handlers: validate → guard → read/delegate.
-- `lib/api` — `guard.ts`: the response shape (`NO_STORE`, `json`, `badRequest`/`unauthorized`/`forbidden`/`databaseFailure`) and the gates (`gateNullable`, `gateSession`, `gateAdmin`, `gateClientAccess`, `resolveAccessibleClient`) shared by the session-gated route files, which § HTTP surface enumerates. It owns no ownership rule — the tenant gates forward to `canAccessClient` / `listAccessibleClients`.
+- `lib/api` — `guard.ts`: the response shape (`NO_STORE`, `json`, `badRequest`/`unauthorized`/`forbidden`/`databaseFailure`) and the gates (`gateNullable`, `gateSession`, `gateAdmin`, `gateClientAccess`, `resolveAccessibleClient`) shared by the session-gated route files, which `docs/architecture/README.md` § HTTP surface enumerates. It owns no ownership rule — the tenant gates forward to `canAccessClient` / `listAccessibleClients`.
 - `lib/agents` — `authAgent` only (identity + role). sync/transform/cache/insights agents are unbuilt spec.
 - `lib/auth` — `cron.ts` (timing-safe bearer check for cron/revalidate) and `routing.ts` (the `proxy.ts` decision table for `/dashboard` + `/connections` + `/profile` + `/admin`, and open-redirect-safe `next`). Both tested.
 - `lib/navigation` — `destinations.ts`: the rail's `APP_DESTINATIONS` list and `activeDestination()`. Icons are string keys so the module stays importable from a node-tier test; the key → Lucide mapping lives with the rail component. Every href it lists is in `PROTECTED_PREFIXES`, asserted by `tests/platform/unit/destinations.test.ts`.
@@ -41,7 +41,7 @@
   rail, dashboard widgets, metric cards, stale banners, auth forms, export menu, connection status
   rows, and `admin/` — the provisioning panel, its two tables and two dialogs).
 - `types` — `database.ts` is handwritten; generated types are an open item.
-- `supabase/migrations` — Policies: see § SERVICE ARCHITECTURE → Tenant isolation.
+- `supabase/migrations` — Policies: see `docs/architecture/README.md` § SERVICE ARCHITECTURE → Tenant isolation.
 
 ### Storage model
 
@@ -58,7 +58,7 @@ Verified against `supabase/migrations/*` — not from the original spec.
 
 - `clients`: id uuid PK, name, **domain** (unique on `lower(domain)`), is_active, created_at.
 - `users`: id uuid PK → `auth.users` on delete cascade, role (`admin`|`client`|`staff`, default `client`), client_id FK (on delete set null), created_at. **No email column** — email lives in `auth.users`. Constraint `users_admin_has_no_tenant`: `admin` must have `client_id is null`.
-- `api_credentials`: client_id FK, source (`gsc`|`ga4`|`semrush`), credential_reference (must match `^vault:<uuid>$`), unique `(client_id, source)`. A pointer only — no key material in Postgres. The app reads `client_id`, `source`, `created_at` (via `listConnections()` for `/connections`); `credential_reference` is selected by no code path, and on the migrated local stack Postgres refuses it to `authenticated` rather than leaving it to convention — see § SERVICE ARCHITECTURE → Tenant isolation.
+- `api_credentials`: client_id FK, source (`gsc`|`ga4`|`semrush`), credential_reference (must match `^vault:<uuid>$`), unique `(client_id, source)`. A pointer only — no key material in Postgres. The app reads `client_id`, `source`, `created_at` (via `listConnections()` for `/connections`); `credential_reference` is selected by no code path, and on the migrated local stack Postgres refuses it to `authenticated` rather than leaving it to convention — see `docs/architecture/README.md` § SERVICE ARCHITECTURE → Tenant isolation.
 - `metrics_snapshots`: id uuid PK, client_id FK, source, run_id (1–512 chars), metrics jsonb (non-empty array), synced_at, created_at, unique `(client_id, source, run_id)` — immutable, append-only.
 - `keyword_rankings`: PK `(snapshot_id, metric_index)`, client_id FK, source, keyword, rank numeric ≥ 0, synced_at. FK to `metrics_snapshots` is `on delete cascade`, so deleting a snapshot deletes its keyword rows — hence invariant 7.
 - `current_metrics`: PK `(client_id, source)`, snapshot_id FK, run_id, metrics jsonb, synced_at, is_stale.

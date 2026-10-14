@@ -1,7 +1,7 @@
 # SERVICE ARCHITECTURE — implemented surface
 
 This section describes only code that exists. Design intent for what is **not** built lives in
-§ TARGET STATE; never cite that section as current behavior.
+`docs/target-state/README.md` § TARGET STATE; never cite that section as current behavior.
 
 ## Request path
 
@@ -21,7 +21,7 @@ proxy.ts (session refresh via updateSession)
 | Module | Status |
 | --- | --- |
 | `authAgent.ts` | implemented: `getAuthSession()`, `getAuthUser()`, `requireAdmin()` |
-| `syncAgent` / `transformAgent` / `cacheAgent` / `insightsAgent` | **do not exist** — spec only, see § TARGET STATE |
+| `syncAgent` / `transformAgent` / `cacheAgent` / `insightsAgent` | **do not exist** — spec only, see `docs/target-state/README.md` § TARGET STATE |
 
 `authAgent` answers identity and role. It must not grow a copy of the client-ownership rule.
 
@@ -140,7 +140,7 @@ Per-route contracts — the detail behind the table's Notes column:
 - `POST /api/revalidate/dashboard` — `revalidateTag(DASHBOARD_OVERVIEW_TAG, DASHBOARD_REVALIDATE_PROFILE)` (the profile is `{ expire: 0 }`, both constants owned by `lib/cache/invalidate.ts`), guarded by `Authorization: Bearer <CRON_SECRET>`. `revalidateTag` throws outside a request context, which is why the standalone worker POSTs here (`lib/cache/notify.ts`) instead of calling it.
 - `GET /api/cron/sync` — Vercel cron (`vercel.json`, `GET`, bearer `CRON_SECRET`): iterates `listActiveClients()` and queues one BullMQ job per client with `Promise.allSettled`; returns `{ queued, errors }`. Jobs are consumed by `lib/queue/worker.ts`, which currently returns `mock_completed` without touching the sources.
 
-Planned and absent: see § TARGET STATE → Planned API Route Definitions, whose `### Cron Trigger` is the
+Planned and absent: see `docs/target-state/README.md` § TARGET STATE → Planned API Route Definitions, whose `### Cron Trigger` is the
 one route there that exists — it ships as `GET /api/cron/sync`, described just above.
 
 ## Queue, worker, cron
@@ -149,7 +149,7 @@ one route there that exists — it ships as `GET /api/cron/sync`, described just
 - `lib/queue/worker.ts` — `pnpm worker` runs it locally. It currently revalidates the dashboard and
   returns `status: "mock_completed"`: no API fetch, no rows written.
 - **Nothing consumes the queue in production.** Vercel hosts only the cron; hosting the worker
-  (always-on process, inline-in-cron, or QStash) is an open decision — see § Open product questions.
+  (always-on process, inline-in-cron, or QStash) is an open decision — see `docs/context/project-overview.md` § Open product questions.
 - `persistMetrics`, `markMetricsStale` and `writeSyncLog` in `lib/db/repository.ts` exist but have
   zero callers. All dashboard rows today come from `scripts/seed.mjs`, and the placeholder
   `api_credentials` rows `/connections` renders come from `scripts/seed-connections.mjs`.

@@ -90,7 +90,7 @@ enqueues; nothing consumes it). Step 3 reads seeded rows.
 ### Open product questions
 
 Compressed 2026-10-13 from the log's four live sections; the dated evidence behind each line stays in
-`docs/progress-tracker.md`. Questions only — a line about what is not built belongs in § Project
+`docs/progress-tracker.md`. Questions only — a line about what is not built belongs in the next section, § Project
 Overview → Status, not here.
 
 - **Who hosts the `seo-sync` worker** — an always-on process (Fly/Render), the cron calling sync

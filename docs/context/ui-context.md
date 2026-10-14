@@ -166,7 +166,7 @@ rounded-xl px-4 py-2 text-xs
 ```
 
 `staleSource` mirrors `current_metrics.is_stale`, which nothing writes yet, so this banner is
-reachable in code but not in practice (see § Pages and caching).
+reachable in code but not in practice (see `docs/architecture/README.md` § Pages and caching).
 
 #### Sync Status Pill
 
@@ -202,7 +202,7 @@ colours, and note `--accent-primary-dim` is a red tint — it is the brand accen
   (`--sidebar-width` is overridden from the primitive's 16rem to keep the documented `w-60`)
   expanded, 3rem icons, `bg-sidebar border-r border-default`. Destinations come from
   `lib/navigation/destinations.ts`; the shell's session-free rule and where the account block gets its
-  identity follow § SERVICE ARCHITECTURE → Pages and caching. Below 768px the same list renders in a
+  identity follow `docs/architecture/README.md` § SERVICE ARCHITECTURE → Pages and caching. Below 768px the same list renders in a
   `Sheet` drawer (18rem) opened by the hamburger in `MobileNav`, and every link closes it. The
   horizontal strip is gone.
 - **Sidebar header / footer:** header is one row — the 2rem brand tile plus the wordmark on the
@@ -218,7 +218,7 @@ colours, and note `--accent-primary-dim` is a red tint — it is the brand accen
   `ChevronRight`, not `ChevronDown`, because the menu opens sideways off the rail edge. The
   `tooltip` carries the name so the collapsed rail still says who you are.
 - **Admin panel:** `components/features/admin` inside the same shell; why the rail renders beside it
-  with no active row follows § SERVICE ARCHITECTURE → Pages and caching.
+  with no active row follows `docs/architecture/README.md` § SERVICE ARCHITECTURE → Pages and caching.
 - **Modals:** centered overlay, `rounded-3xl`, `bg-elevated`, backdrop blur.
 - **Dashboard header:** `bg-surface border-b border-default`, client selector + sync status +
   trigger sync + export menu + theme toggle. It no longer carries the account menu — that moved to

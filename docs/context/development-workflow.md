@@ -1,6 +1,6 @@
 # Development Workflow — Portable core
 
-1. Read what governs the change (§ STANDING RULES, then the context sections)
+1. Read what governs the change (`AGENTS.md` § STANDING RULES, then `AGENTS.md` § Reference map and the `docs/context/` files it names)
 2. State scope in one sentence
 3. Implement the smallest verifiable increment
 4. Verify with commands, not claims
@@ -44,8 +44,8 @@ This appendix and § Development Workflow — Portable core both prescribe; wher
 appendix wins for this repo.
 
 ### Read order before implementing
-§ STANDING RULES → § APPLICATION BUILDING CONTEXT.
-Unbuilt design lives in § TARGET STATE; treat it as requirements, never as description.
+`AGENTS.md` § STANDING RULES → `AGENTS.md` § Reference map → the `docs/context/` files it names.
+Unbuilt design lives in `docs/target-state/README.md` § TARGET STATE; treat it as requirements, never as description.
 
 ### Commands
 | Need | Command |
@@ -61,7 +61,7 @@ Unbuilt design lives in § TARGET STATE; treat it as requirements, never as desc
 | Demo user | `pnpm db:demo-user` |
 | Queue worker | `pnpm worker` (manual only — no production host yet) |
 
-`pnpm` only, Node ≥ 24 — § STANDING RULES 11 is the authority, including why `package-lock.json` was
+`pnpm` only, Node ≥ 24 — `AGENTS.md` § STANDING RULES 11 is the authority, including why `package-lock.json` was
 deleted. npm/yarn produce a lockfile this repo does not use.
 
 ### Where logic goes
@@ -79,7 +79,7 @@ before touching a framework API: `proxy.ts` replaces `middleware.ts`, route hand
 
 ### Schema changes
 Never edit an applied migration — add a timestamped one. Every new table needs RLS enabled with a
-policy matching the role/tenant model in § Architecture Context, in the same change.
+policy matching the role/tenant model in `docs/context/architecture-context.md` § Architecture Context, in the same change.
 
 ### Data today
 The dashboard's rows come from `scripts/seed.mjs`, and the `api_credentials` rows `/connections`
@@ -95,10 +95,10 @@ observe about "sync" is therefore not evidence about sync.
 
 ### Before moving to the next unit
 1. The unit works end to end inside the scope you stated in step 2 of the loop.
-2. No invariant in § Architecture Context was violated (read the list; #4 tenant
+2. No invariant in `docs/context/architecture-context.md` § Architecture Context was violated (read the list; #4 tenant
    isolation and #12 the static dashboard shell are the ones that break silently).
 3. `docs/progress-tracker.md` reflects what actually happened.
-4. The four-gate chain in § STANDING RULES 13 is green — that rule is the authority on which gates,
+4. The four-gate chain in `AGENTS.md` § STANDING RULES 13 is green — that rule is the authority on which gates,
    and it also names the integration and e2e tiers this checklist used to omit.
-5. Nothing you started is still running — § STANDING RULES 5.
+5. Nothing you started is still running — `AGENTS.md` § STANDING RULES 5.
 

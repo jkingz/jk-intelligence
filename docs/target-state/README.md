@@ -3,10 +3,10 @@
 Design intent for what is **not** built. Most of this section is requirements rather than description: treat it as
 requirements, and give each item its own build + test pass before citing it as fact. Where a promise
 below is already built — § Product features the spec promises and § Build sequence (original POC plan)
-both mix shipped and unshipped halves — § Project Overview → Status is the authority. Two further things
+both mix shipped and unshipped halves — `docs/context/project-overview.md` § Project Overview → Status is the authority. Two further things
 in this section look like current state and are not authority either: the verified-status block below,
-which is the older record (2026-09-23, corrected 2026-09-25) and is subordinate to § Status wherever
-they disagree; and the `POST /api/cron/sync` shape, which ships as `GET /api/cron/sync` — § HTTP surface
+which is the older record (2026-09-23, corrected 2026-09-25) and is subordinate to `docs/context/project-overview.md` § Project Overview → Status wherever
+they disagree; and the `POST /api/cron/sync` shape, which ships as `GET /api/cron/sync` — `docs/architecture/README.md` § HTTP surface
 is its authority.
 
 Verified status at 2026-09-23, corrected where a bullet says otherwise:
@@ -24,7 +24,7 @@ Verified status at 2026-09-23, corrected where a bullet says otherwise:
 - No deployment host runs the worker. Vercel provides only the cron (`vercel.json`: `0 2 * * *` →
   `GET /api/cron/sync`), so enqueued jobs have no consumer in production.
 
-Routes below marked "planned" are absent from `app/api/`. Read § SERVICE ARCHITECTURE for what the app
+Routes below marked "planned" are absent from `app/api/`. Read `docs/architecture/README.md` § SERVICE ARCHITECTURE for what the app
 actually serves.
 
 ## Product features the spec promises
@@ -116,7 +116,7 @@ on `public.api_credentials` and granted it back on `client_id`, `source`, `creat
 `credential_reference` (and `id`) are unreadable to the `authenticated` role, and
 `getClientCredentials()` above cannot be implemented as a `select` made with the caller's session.
 Which databases that narrowing has actually been applied to is current state and lives in
-§ Tenant isolation, not here — this section holds design intent only, and one of its own claims is that
+`docs/architecture/README.md` § Tenant isolation, not here — this section holds design intent only, and one of its own claims is that
 `credential_reference` is never resolved through a tenant-visible read. The constraint does not depend
 on which database you are in, and neither reading should be chosen because the column happens to be
 readable today. A worker reading the reference *as the caller* would undo the narrowing and put
@@ -322,7 +322,7 @@ await logSync({
 
 ## Planned API Route Definitions
 
-Only `/api/cron/sync` is implemented, and as `GET` (Vercel cron sends no body) — see § HTTP surface for the real contract. The `POST` shape below is the original spec, kept for reference.
+Only `/api/cron/sync` is implemented, and as `GET` (Vercel cron sends no body) — see `docs/architecture/README.md` § HTTP surface for the real contract. The `POST` shape below is the original spec, kept for reference.
 
 ### Cron Trigger
 ```

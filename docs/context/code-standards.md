@@ -5,8 +5,8 @@
 - Keep modules small and single-purpose.
 - Fix root causes — do not layer workarounds.
 - Do not mix unrelated concerns in one component or route.
-- Respect the system boundaries in § Architecture Context → System boundaries; a helper belongs in the layer that owns the data.
-- One agent per file, and one file per concern — `lib/agents/authAgent.ts` is the template. Agents other than `authAgent` do not exist yet; when added they follow § TARGET STATE.
+- Respect the system boundaries in `docs/context/architecture-context.md` § Architecture Context → System boundaries; a helper belongs in the layer that owns the data.
+- One agent per file, and one file per concern — `lib/agents/authAgent.ts` is the template. Agents other than `authAgent` do not exist yet; when added they follow `docs/target-state/README.md` § TARGET STATE.
 - Import within the app with the `@/` alias (`@/lib/db/repository`), never `../../..` climbing.
 - Any module reading env secrets or the service-role client starts with `import "server-only"`.
 
@@ -84,7 +84,7 @@ const row: any = await fetchGSC()
   When unsure, `grep -- "--color-" app/globals.css`.
 - Opacity modifiers on state tokens are the standard tint pattern: `bg-state-warning/10` +
   `text-state-warning`.
-- Border radius comes from § Border Radius — do not invent a value. Metric cards are always
+- Border radius comes from `docs/context/ui-context.md` § Border Radius — do not invent a value. Metric cards are always
   `rounded-2xl`, and badges/inline stay on `rounded-lg` rather than the button value.
 
 ### API Routes
@@ -173,7 +173,7 @@ no `Content-Type` (the guard's `json()` adds that itself). `getAuthUser()` takes
 ### Standards for new agents
 
 `lib/agents/` currently holds `authAgent` only. These rules apply to the sync/transform/cache/insights
-agents when they are built to the contracts in § TARGET STATE.
+agents when they are built to the contracts in `docs/target-state/README.md` § TARGET STATE.
 
 - Each agent is a pure function where possible: input → output, side effects at the edges.
 - Sync uses `Promise.allSettled` — one source's failure never blocks the others, and a partial
@@ -215,7 +215,7 @@ const [gsc, ga4, semrush] = await Promise.allSettled([
 lib/
   admin/        — provisioning schemas, Postgres error copy, definer-RPC caller (no React, no `cookies()`)
   agents/       — authAgent (identity + role). Other agents: not built
-  api/          — `guard.ts`: the response shape and the session/admin/tenant gates shared by the session-gated route files (the bearer routes build their own bodies; § HTTP surface carries the split)
+  api/          — `guard.ts`: the response shape and the session/admin/tenant gates shared by the session-gated route files (the bearer routes build their own bodies; `docs/architecture/README.md` § HTTP surface carries the split)
   auth/         — cron secret check, proxy routing decisions, safe `next`
   cache/        — tag ownership (`invalidate.ts`), worker→app ping (`notify.ts`)
   connections/  — `status.ts`: the pure join that backs `/connections`
@@ -230,7 +230,7 @@ components/
   ui/           — shadcn primitives (protected, do not hand-edit)
   features/     — app-shell, admin, connections, dashboard, data-export, email-password-auth, landing, user-profile
 app/
-  api/          — thin route handlers behind `lib/api/guard.ts` (see § HTTP surface for the file total and the session-gated/bearer split)
+  api/          — thin route handlers behind `lib/api/guard.ts` (see `docs/architecture/README.md` § HTTP surface for the file total and the session-gated/bearer split)
   (app)/        — route group, adds no URL segment: dashboard, connections, profile, admin
     dashboard/  — static shell + client-side boot fetch
 types/          — shared contracts: metrics.ts, dashboard.ts, database.ts (handwritten)
@@ -257,5 +257,5 @@ See `/testing` for tiers, organization, mocking patterns and commands.
 - Opt-in tiers exit 0 — `pnpm test:integration` carries `--passWithNoTests` (`package.json:12`), so a
   green run can mean nothing matched. Report which tier a run covered
 - Component-render tests are deliberately absent; a testing-library dependency is a decision to raise,
-  not one to make silently (§2 of `docs/superpowers/specs/2026-09-23-test-suite-architecture-design.md`)
+  not one to make silently (`docs/superpowers/specs/2026-09-23-test-suite-architecture-design.md` §2)
 
