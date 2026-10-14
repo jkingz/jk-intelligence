@@ -1,7 +1,7 @@
 # Application Building Context
 
-The six sections that were `AGENTS.md` § APPLICATION BUILDING CONTEXT, split one file per
-`## ` heading. Read them in this order (it is `AGENTS.md` rule 14's order):
+The six sections that were one `AGENTS.md` context chapter, split one file per
+former `## ` heading. Read them in this order (it is `AGENTS.md` rule 14's order):
 
 1. [§ Project Overview](project-overview.md)
 2. [§ Architecture Context](architecture-context.md)

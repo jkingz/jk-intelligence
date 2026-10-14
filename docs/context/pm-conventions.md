@@ -19,7 +19,7 @@ real change) may be a single commit; anything larger is a PR.
 - Body: **what changed** (2-3 bullets), **how it was verified** (tests/typecheck/lint/build,
   plus any live check), and **what wasn't covered** (Vercel mirroring, live OAuth, etc.).
 - One PR per feature/unit — follow the scoping rules in `AGENTS.md` § STANDING RULES (standing constraints)
-  and § Development Workflow. No grab-bag PRs.
+  and `docs/context/development-workflow.md` § Development Workflow. No grab-bag PRs.
 - Draft until green; request review after the suite passes.
 - Rebase-merge onto `main`; history is linear, so rebase before pushing.
 
