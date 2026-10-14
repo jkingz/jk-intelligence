@@ -234,13 +234,16 @@ A test goes in the feature that owns the *invariant the test protects*, not the 
 
 ## Repo skills
 
-Two loader directories. `.claude/skills/` and `.agents/skills/` are reachable from different agents,
-and which one holds a skill's bytes is per entry, not a repo-wide rule.
+Two loader directories. `.claude/skills/` and `.agents/skills/` are reachable from different agents.
+Which one holds a skill's bytes follows one rule now — the skills this repo commits are real in
+`.claude/skills/` and linked from `.agents/skills/`; the nine fetched through `skills-lock.json` are
+real in `.agents/skills/` and linked back — with `playwright-cli` as the exception named below.
 
 Skills that exist and when to load them:
 
 - `babysitting-a-pr` + `leaving-pr-comment` — how PR review bots, comments and checks get handled
-  and worded. Also installed user-level, so they apply to every repo.
+  and worded. Repo-only: neither exists under `~/.claude/skills/`, `~/.agents/skills/` or
+  `~/.qoder/skills/` (checked 2026-10-15), so they apply to this repo, not to every one.
 - Process: `development-workflow` (the per-unit loop), `verification-gates` (the gate chain and how
   to report each run), `testing` (tiers, organization, mocking boundaries, route coverage),
   `git-workflow` (commits, push discipline, PR shape). Each closes by naming the section it
@@ -250,20 +253,25 @@ Skills that exist and when to load them:
   `migrate-radix-to-base`.
 - Visual direction: `gpt-taste` only.
 
-The mirror, measured 2026-10-15 with `readlink` and `-L`. It is **neither one mechanism nor one
-direction**, and there are **no hardlinks** — an inode match in `ls -i` printed above a linked name
-is one file reached twice, not two links to it:
+The mirror, re-measured 2026-10-15 with `find <tree> -maxdepth 1 -type l` and `-type d`, after the
+two PR skills were linked. It is **neither one mechanism nor one direction**, and there are **no
+hardlinks** — an inode match in `ls -i` printed above a linked name is one file reached twice, not
+two links to it:
 
-- `.agents/skills/` carries 17 entries and holds the real content for **12**. Five are symlinks
-  (`git ls-files -s` mode `120000`) into `.claude/skills/`: `feature-component` and the four process
-  skills above.
+- `.agents/skills/` carries 17 entries: **7 symlinks** (`git ls-files -s` mode `120000`) into
+  `.claude/skills/` — `feature-component`, the four process skills, `babysitting-a-pr`,
+  `leaving-pr-comment` — and **10** real directories.
 - `.claude/skills/` carries 17 entries: **9 symlinks into `.agents/skills/`**, all resolving, and
-  **8** real directories. So for those 9 the source of truth is `.agents/skills/`, and only
-  `feature-component` plus those four are authored in `.claude/skills/` — the opposite of "edit
-  `.claude/`, the mirror follows".
-- `babysitting-a-pr`, `leaving-pr-comment` and `playwright-cli` are the exception: each is a real
-  directory in **both** trees, byte-identical today (`diff -rq` clean). Nothing propagates between
-  the pair, so editing one silently un-pairs them.
+  **8** real directories. So for those 9 the source of truth is `.agents/skills/`, and the seven
+  this repo authors plus `playwright-cli` are the ones whose bytes sit in `.claude/skills/` — the
+  opposite of "edit `.claude/`, the mirror follows".
+- `playwright-cli` is the one entry that is a real directory in **both** trees, byte-identical
+  (`diff -rq` clean), and the one also installed user-level (`~/.claude/skills/`,
+  `~/.agents/skills/`, `~/.qoder/skills/`). Its bytes belong to the installer, so neither copy is
+  linked here; re-check the pair with `diff -rq` after touching either. The other two un-paired
+  directories were linked on 2026-10-15 — `babysitting-a-pr/SKILL.md` and
+  `leaving-pr-comment/SKILL.md` shared a blob hash across the trees first, which is what made
+  dropping one safe.
 - Nine `.claude/` symlinks pointed at `.agents/skills/` entries that did not exist (`brandkit`,
   `design-taste-frontend`, `high-end-visual-design`, `image-to-code`, `imagegen-frontend-mobile`,
   `imagegen-frontend-web`, `minimalist-ui`, `redesign-existing-projects`, `stitch-design-taste`).
@@ -273,9 +281,8 @@ is one file reached twice, not two links to it:
 Check the counterpart before editing it — `[ -L path ]` separates a link from a directory, and
 `git ls-files -s path` prints `120000` for a committed link. `git add` refuses a path that resolves
 *through* a link (`fatal: pathspec '…' is beyond a symbolic link`, exit `128`), so stage the real
-directory: `.agents/skills/<name>/` for the **nine** of those 18 that resolve — the other nine are
-links to nothing, so there is no file to stage for them anywhere — and `.claude/skills/<name>/` for
-the five that go the other way. `.opencode/` carries only
+directory: `.claude/skills/<name>/` for the eight listed above, `.agents/skills/<name>/` for the ten
+that go the other way. Sixteen of the 34 entries are links and all sixteen resolve. `.opencode/` carries only
 `commands/feature-component.md` — its own `.gitignore` keeps the tool's `node_modules/` and
 `package.json` untracked, so do not expect skills there.
 
