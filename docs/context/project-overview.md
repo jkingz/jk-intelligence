@@ -24,6 +24,27 @@ State of record for completed work: `docs/progress-tracker.md`.
 
 Multi-client automated SEO reporting platform. Clients and internal staff log in to view marketing and SEO performance data pulled daily from GSC, GA4, and SEO APIs. AI generates plain-English performance summaries. Admins manage clients, credentials, and sync jobs from a central admin panel.
 
+### Product boundary — hold (decided 2026-10-15)
+
+**This platform is the product of record, and no new feature unit starts while there is no client
+asking for one.** The vertical question that was open between it and agency paid-ads monitoring is
+settled by holding, not by choosing a build.
+
+`docs/superpowers/specs/2026-09-24-paid-ads-monitoring-reshape-design.md` (dated record, kept as
+written) is **parked, not adopted**. It needs three things the app does not have: a host for
+`lib/queue/worker.ts`, a Google Ads developer token, and Meta Marketing API app review. Its slices 0-7
+do not enter the build sequence under `docs/target-state/README.md` § Build sequence, and slice 4's
+plan to reverse the Slack exclusion in § Project Overview → Scope is void while the hold is in force.
+
+The hold lifts on a trigger, in calendar-risk order: a paying client's concrete request; then the
+worker host; then the two platform approvals, which are filed by the owner and are not engineering
+work. Building schema ahead of a trigger is what §12's slice-0 warning says has no product value alone.
+
+**Scope of the hold: product features only.** These stay live because they are exposures on the
+running hosted database, not new scope — applying `20261010000000_credential_reference_unselectable.sql`
+hosted, and the `pg_default_acl` decision that lets the next `public` table arrive closed. Both remain
+in § Open product questions.
+
 ### Goals
 
 1. Authenticated multi-client access with strict data isolation.
@@ -75,6 +96,8 @@ enqueues; nothing consumes it). Step 3 reads seeded rows.
 - Versioned spec history
 - Mobile-native app (responsive web only)
 - Slack/Zapier integrations
+- Agency paid-ads monitoring (Google Ads + Meta) — parked behind external gates, not designed away;
+  see § Product boundary — hold
 
 ### Success Criteria
 
@@ -95,7 +118,9 @@ Overview → Status, not here.
 
 - **Who hosts the `seo-sync` worker** — an always-on process (Fly/Render), the cron calling sync
   inline, or QStash. Every real fetch waits on it, and so does the credential write behind the inert
-  Connect button on `/connections`.
+  Connect button on `/connections`. Re-framed by § Product boundary — hold (2026-10-15): this is no
+  longer the next unit's decision to make, it is the second gate the hold names, and nothing is paid
+  for a host until a client request lifts the hold.
 - **Whether to apply `20261010000000_credential_reference_unselectable.sql` to the hosted project.**
   It has run on the local stack only, so hosted `authenticated` still holds table-wide `select` on
   `api_credentials`; a hosted apply needs the owner's explicit yes, as every hosted migration here has.

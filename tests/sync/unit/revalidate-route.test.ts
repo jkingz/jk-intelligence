@@ -38,6 +38,8 @@ describe("POST /api/revalidate/dashboard", () => {
   });
 
   it("reports unavailable without a configured secret", async () => {
+    vi.stubEnv("CRON_SECRET", "");
+
     const response = await post({ authorization: "Bearer whatever" });
     expect(response.status).toBe(503);
     expect(boundary.revalidate).not.toHaveBeenCalled();
