@@ -73,6 +73,16 @@ broken for unrelated reasons.
 - **Not the cause**: `keepMounted` + `<Activity mode="hidden">`. Hidden panels measure `display: none`, width 0, and contribute nothing to scroll width — verified before changing anything.
 - Scope: `components/features/dashboard/components/query-table.tsx`, `components/features/dashboard/components/dashboard-header.tsx`; tests `tests/dashboard/e2e/mobile-layout.spec.ts` (asserts zero page overflow on all three sections and picker-clears-actions at 320 and 390).
 
+## Data-Relative Read Window Increment (2026-11-09)
+A wall-clock read window blanked the dashboard the moment the data aged past `2 × days`, which is
+exactly what a client saw ("no data"). Both dashboard reads now anchor on the newest snapshot.
+
+**Status: implemented** (267 unit tests incl. new `tests/dashboard/unit/overview-window.test.ts`; typecheck, lint, build pass; the `@auth` overview spec passed against the hosted site as the demo user).
+
+- **Window** (`lib/db/repository.ts`): `getDashboardOverview` and `getKeywordRankingHistory` read `getLatestSnapshotTime(client, "gsc")` first and window `[latest − 2 × days, latest]` instead of `[now − 2 × days, now]`. `buildOverview` already anchors its current/previous split on the newest bucket it is handed, so a stale sync now renders the latest data (with the stale banner) rather than returning `null` and painting the empty shell. A client with no snapshot at all still returns `null` / `[]`. `getKeywordRankingHistory` drops its now-unused `now` parameter.
+- **Staleness** (`lib/db/repository.ts`): `stale` is the stored `current_metrics.is_stale` flag **or** an age over 24h, so a data-relative window cannot label weeks-old data "Current snapshot".
+- **Seed** (`scripts/seed.mjs`): unchanged. The hosted project was re-seeded `--reset --days 90` so the window is fresh today; without the re-seed the fix still renders whatever the newest snapshot is.
+
 ## Security
 - Auth, route protection, and RLS unchanged. The dashboard reads through the service-role client but the page scopes clients by the session's role/`client_id` before reading metrics, so a client user can never request another tenant's overview.
 - Protected UI primitives untouched.
