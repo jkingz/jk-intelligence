@@ -348,21 +348,30 @@ export async function getDashboardOverview(
   now: Date = new Date(),
 ): Promise<DashboardOverview | null> {
   const dayMs = 86_400_000;
-  const from = new Date(now.getTime() - days * 2 * dayMs).toISOString();
-  const to = now.toISOString();
+  const latest = await getLatestSnapshotTime(client.id, "gsc");
+  if (latest === null) return null;
+
+  // Anchor the read window on the newest snapshot, not wall-clock `now`. A
+  // now-relative window blanks the dashboard the moment the data ages past
+  // 2×days — a silent outage that reads as "no data". `buildOverview`
+  // re-anchors its current/previous split on the newest bucket it is given, so
+  // it only needs a window wide enough to hold both periods.
+  const anchor = new Date(latest);
+  const from = new Date(anchor.getTime() - days * 2 * dayMs).toISOString();
+  const to = anchor.toISOString();
+
   const [snapshots, current] = await Promise.all([
     listMetricSnapshots(client.id, "gsc", from, to),
     getCurrentMetrics(client.id, "gsc"),
   ]);
   if (snapshots.length === 0) return null;
 
-  return buildOverview({
-    client,
-    days,
-    snapshots,
-    stale: current?.is_stale ?? false,
-    now,
-  });
+  // Believe the stored flag, but never report a snapshot older than a day as
+  // current: on a data-relative window the age is the only honest staleness
+  // signal, and the banner depends on it.
+  const stale = (current?.is_stale ?? false) || now.getTime() - anchor.getTime() > dayMs;
+
+  return buildOverview({ client, days, snapshots, stale, now });
 }
 
 /**
@@ -388,12 +397,16 @@ export function getCachedDashboardOverview(
 export async function getKeywordRankingHistory(
   client: DashboardClient,
   days: DashboardRange,
-  now: Date = new Date(),
 ): Promise<KeywordRankSeries[]> {
   const dayMs = 86_400_000;
-  const from = new Date(now.getTime() - days * 2 * dayMs).toISOString();
-  const to = now.toISOString();
-  const rows = await listKeywordRankings(client.id, "gsc", from, to);
+  const latest = await getLatestSnapshotTime(client.id, "gsc");
+  if (latest === null) return [];
+
+  // Same data-relative anchor as `getDashboardOverview`: keyword history must
+  // survive a stale sync instead of emptying out of a now-relative window.
+  const anchor = new Date(latest);
+  const from = new Date(anchor.getTime() - days * 2 * dayMs).toISOString();
+  const rows = await listKeywordRankings(client.id, "gsc", from, anchor.toISOString());
   return buildKeywordSeries(rows);
 }
 
